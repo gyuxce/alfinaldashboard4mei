@@ -344,9 +344,9 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-bold text-text-primary">CSAT Room (Surveys)</h1>
-          <div className="flex flex-col xl:flex-row gap-2 xl:gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-4 w-full overflow-hidden">
+          <h1 className="text-lg font-bold text-text-primary whitespace-nowrap shrink-0">CSAT Room (Surveys)</h1>
+          <div className="flex flex-col md:flex-row gap-2 xl:gap-4 w-full overflow-hidden">
              <div className="flex overflow-x-auto no-scrollbar bg-surface-muted p-1 rounded-lg w-full md:w-max gap-1">
                <button
                  onClick={() => setViewMode('full')}
@@ -372,7 +372,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </button>
              </div>
              
-             <div className="inline-flex bg-surface-muted p-1 rounded-lg w-max gap-1">
+             <div className="flex overflow-x-auto no-scrollbar bg-surface-muted p-1 rounded-lg w-full md:w-max gap-1">
                <button
                  onClick={() => setAnalysisMode('agent')}
                  className={cn(
