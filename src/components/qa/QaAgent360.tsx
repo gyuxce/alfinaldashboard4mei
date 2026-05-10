@@ -1,0 +1,746 @@
+import React, { useState, useMemo } from 'react';
+import { AgentKPI, QAEntry } from '../../lib/dataProcessor';
+import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
+import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
+import { useStore } from '../../store';
+import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
+
+import { SortableHeader } from '../ui/SortableHeader';
+
+export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
+  const [search, setSearch] = useState('');
+  const [filterTL, setFilterTL] = useState<string | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<{agent: AgentKPI, date?: string, type?: 'all' | 'defects'} | null>(null);
+  const [viewMode, setViewMode] = useState<'performance' | 'defect'>('performance');
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  
+  const [perfSortConfig, setPerfSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [defectSortConfig, setDefectSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const handlePerfSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (perfSortConfig && perfSortConfig.key === key && perfSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setPerfSortConfig({ key, direction });
+  };
+
+  const handleDefectSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (defectSortConfig && defectSortConfig.key === key && defectSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setDefectSortConfig({ key, direction });
+  };
+
+  const dict = useStore(state => state.agentDictionary);
+
+  React.useEffect(() => {
+    if (selectedAgent) {
+      setExpandedDates(new Set());
+    }
+  }, [selectedAgent]);
+
+  const handleCopy = (e: React.MouseEvent, text: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopiedId(text);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const { startDate, endDate, setDateRange } = useStore();
+
+  const tableData = useMemo(() => {
+    return data.filter(a => {
+      const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchTL = filterTL ? a.teamLeader === filterTL : true;
+      return matchSearch && matchTL && a.qaScoreCount > 0;
+    });
+  }, [data, search, filterTL]);
+
+  const uniqueDates = useMemo(() => {
+    const dates = new Set<string>();
+    tableData.forEach(a => {
+      a.qaHistory?.forEach(h => dates.add(h.date));
+    });
+    return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+  }, [tableData]);
+
+  const defectData = useMemo(() => {
+    return tableData.map(agent => {
+      const defects = agent.qaHistory.filter((q) => {
+         const level = (q.mistakeLevel || '').toUpperCase();
+         return level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
+      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      let mediumCount = 0;
+      let highCount = 0;
+      let veryHighCount = 0;
+      
+      const mistakeCounts: Record<string, number> = {};
+
+      defects.forEach(d => {
+        const level = (d.mistakeLevel || '').toUpperCase();
+        if (level.includes('VERY HIGH')) veryHighCount++;
+        else if (level.includes('HIGH')) highCount++;
+        else if (level.includes('MEDIUM')) mediumCount++;
+
+        const category = d.category || '-';
+        mistakeCounts[category] = (mistakeCounts[category] || 0) + 1;
+      });
+
+      const totalDefect = mediumCount + highCount + veryHighCount;
+      
+      let mostFrequentMistake = '-';
+      let maxCount = 0;
+      for (const cat in mistakeCounts) {
+         if (mistakeCounts[cat] > maxCount) {
+             maxCount = mistakeCounts[cat];
+             mostFrequentMistake = cat;
+         }
+      }
+
+      return {
+        ...agent,
+        defects,
+        mediumCount,
+        highCount,
+        veryHighCount,
+        totalDefect,
+        mostFrequentMistake
+      };
+    }).sort((a, b) => b.totalDefect - a.totalDefect);
+  }, [tableData]);
+
+  
+  const tickerItems: TickerItem[] = useMemo(() => {
+    let totalSum = 0;
+    let totalCount = 0;
+    const bpoStats: Record<string, { sum: number; count: number }> = {};
+    const tlStats: Record<string, { sum: number; count: number }> = {};
+
+    tableData.forEach(agent => {
+       if (viewMode === 'performance') {
+          if (agent.qaScoreCount > 0) {
+             const score = agent.qaScoreSum / agent.qaScoreCount;
+             totalSum += score * agent.qaScoreCount;
+             totalCount += agent.qaScoreCount;
+             const bpo = agent.bpo || 'Unknown';
+             if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
+             bpoStats[bpo].sum += score * agent.qaScoreCount;
+             bpoStats[bpo].count += agent.qaScoreCount;
+
+             const tl = agent.teamLeader || 'Unknown';
+             if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
+             tlStats[tl].sum += score * agent.qaScoreCount;
+             tlStats[tl].count += agent.qaScoreCount;
+          }
+       } else {
+          const defectCount = agent.qaHistory.filter(h => h.status !== 'Pass').length;
+          totalSum += defectCount;
+          totalCount += agent.qaHistory.length || 1; 
+          const bpo = agent.bpo || 'Unknown';
+          if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
+          bpoStats[bpo].sum += defectCount;
+          bpoStats[bpo].count += 1;
+
+          const tl = agent.teamLeader || 'Unknown';
+          if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
+          tlStats[tl].sum += defectCount;
+          tlStats[tl].count += 1;
+       }
+    });
+
+    if (viewMode === 'performance') {
+       const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, avg: st.sum / st.count })).sort((a,b) => b.avg - a.avg);
+       const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, avg: st.sum / st.count })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => b.avg - a.avg);
+       const sortedTLs = tlArr.slice(0, 5);
+       const sortedAgents = [...tableData].filter(a => a.qaScoreCount > 0).map(a => ({ ...a, avg: a.qaScoreSum / a.qaScoreCount })).sort((a, b) => b.avg - a.avg).slice(0, 5);
+
+       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 1)}%`).join(' · ');
+       const overallAvg = totalCount > 0 ? formatNum(totalSum / totalCount, 1) + '%' : '-';
+
+       return [
+         
+         { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
+         { isSeparator: true },
+         ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: formatNum(t.avg, 1) + '%' })), 'TL:', 3),
+         { isSeparator: true },
+         ...buildRankingItems(sortedAgents.map(a => {
+              return { name: (a.name || a.csId).split(' ')[0], value: formatNum(a.avg, 1) + '%' };
+         }), 'Agent:', 5), { isSeparator: true } ];
+    } else {
+       const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, count: st.sum })).sort((a,b) => a.count - b.count);
+       const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, count: st.sum })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => a.count - b.count);
+       const sortedTLs = tlArr.slice(0, 5);
+       const sortedAgents = [...tableData].map(a => ({ ...a, defectCount: a.qaHistory.filter(h => h.status !== 'Pass').length })).sort((a, b) => a.defectCount - b.defectCount).slice(0, 5);
+       
+       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${b.count} defect`).join(' · ');
+       const overallAvg = totalSum.toString();
+       
+       return [
+         
+         { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
+         { isSeparator: true },
+         ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: `${t.count} defect` })), 'TL:', 3),
+         { isSeparator: true },
+         ...buildRankingItems(sortedAgents.map(a => {
+              return { name: (a.name || a.csId).split(' ')[0], value: `${a.defectCount} defect` };
+         }), 'Agent:', 5), { isSeparator: true } ];
+    }
+  }, [tableData, viewMode]);
+
+  const sortedPerformanceData = useMemo(() => {
+    let sortable = [...defectData];
+    if (perfSortConfig) {
+      sortable.sort((a, b) => {
+        let aVal: any = 0;
+        let bVal: any = 0;
+
+        switch (perfSortConfig.key) {
+          case 'name':
+            aVal = a.name || a.csId;
+            bVal = b.name || b.csId;
+            break;
+          case 'bpo':
+            aVal = a.bpo || '';
+            bVal = b.bpo || '';
+            break;
+          case 'teamLeader':
+            aVal = a.teamLeader || '';
+            bVal = b.teamLeader || '';
+            break;
+          case 'average':
+          default:
+            aVal = a.qaScoreCount > 0 ? (a.qaScoreSum / a.qaScoreCount) * 100 : -1;
+            bVal = b.qaScoreCount > 0 ? (b.qaScoreSum / b.qaScoreCount) * 100 : -1;
+            break;
+        }
+
+        if (aVal < bVal) return perfSortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return perfSortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortable;
+  }, [defectData, perfSortConfig]);
+
+  const sortedDefectData = useMemo(() => {
+    let sortable = defectData.filter(agent => agent.totalDefect > 0);
+    if (defectSortConfig) {
+      sortable.sort((a, b) => {
+        let aVal: any = 0;
+        let bVal: any = 0;
+
+        switch (defectSortConfig.key) {
+          case 'name':
+            aVal = a.name || a.csId;
+            bVal = b.name || b.csId;
+            break;
+          case 'bpo':
+            aVal = a.bpo || '';
+            bVal = b.bpo || '';
+            break;
+          case 'teamLeader':
+            aVal = a.teamLeader || '';
+            bVal = b.teamLeader || '';
+            break;
+          case 'medium':
+            aVal = a.mediumCount || 0;
+            bVal = b.mediumCount || 0;
+            break;
+          case 'high':
+            aVal = a.highCount || 0;
+            bVal = b.highCount || 0;
+            break;
+          case 'veryHigh':
+            aVal = a.veryHighCount || 0;
+            bVal = b.veryHighCount || 0;
+            break;
+          case 'category':
+            aVal = a.mostFrequentMistake || '';
+            bVal = b.mostFrequentMistake || '';
+            break;
+          default:
+            aVal = a.totalDefect;
+            bVal = b.totalDefect;
+            break;
+        }
+
+        if (aVal < bVal) return defectSortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return defectSortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    } else {
+      sortable.sort((a, b) => b.totalDefect - a.totalDefect);
+    }
+    return sortable;
+  }, [defectData, defectSortConfig]);
+
+  return (
+    <div className="flex flex-col gap-4 relative">
+      <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-lg font-bold text-text-primary">QA Agent 360</h1>
+          
+          <div className="flex overflow-x-auto no-scrollbar bg-surface-muted p-1 rounded-lg w-full md:w-max gap-1">
+             <button 
+               onClick={() => setViewMode('performance')}
+               className={cn(
+                 "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
+                 viewMode === 'performance'
+                   ? "bg-card text-primary font-medium"
+                   : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+               )}
+             >
+                <BarChart2 className="w-3.5 h-3.5" />
+                Performance Overview
+             </button>
+             <button 
+               onClick={() => setViewMode('defect')}
+               className={cn(
+                 "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
+                 viewMode === 'defect'
+                   ? "bg-card text-primary font-medium"
+                   : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+               )}
+             >
+                <AlertCircle className="w-3.5 h-3.5" />
+                Defect Analysis
+             </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input 
+              type="text" 
+              placeholder="Search CS ID or Name..." 
+              className="pl-8 pr-3 py-1.5 border border-border rounded-lg text-xs focus:border-primary focus:outline-none w-full md:w-56"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <KpiTicker items={tickerItems} />
+
+      {viewMode === 'performance' ? (
+        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+            <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">
+              <thead className="bg-surface text-text-secondary sticky top-0 z-30">
+                <tr>
+                  <th className="p-2 font-bold text-center border-b border-border md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
+                  <SortableHeader label="Name / CS ID" sortKey="name" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
+                  <SortableHeader label="BPO" sortKey="bpo" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
+                  <SortableHeader label="Team Leader" sortKey="teamLeader" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                  {uniqueDates.map(date => (
+                    <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border">
+                      {date}
+                    </th>
+                  ))}
+                  <SortableHeader label="Total QA Average" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                  <th className="p-2 font-bold text-center text-text-muted border-b border-border bg-surface w-24">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="">
+                {sortedPerformanceData.map((agent, index) => {
+                  const displayName = agent.name || agent.csId;
+
+                  return (
+                    <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
+                      <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
+                      <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
+                        <button 
+                          onClick={() => useStore.getState().setSelectedAgentFor360(agent.csId)}
+                          className="text-kpi-neutral-text hover:underline font-semibold"
+                        >
+                          {displayName}
+                        </button>
+                        <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
+                      </td>
+                      <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
+                        {agent.bpo || '-'}
+                      </td>
+                      <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
+                      
+                      {uniqueDates.map(date => {
+                        const dailyQA = agent.qaHistory?.filter(h => h.date === date);
+                        const sched = agent.dailyHistory?.schedule?.find(h => h.date === date);
+                        const status = sched?.status?.toUpperCase() || '';
+                        
+                        const isOff = status === 'OFF' || status === 'C';
+                        const isPullout = status === 'PULLOUT';
+                        const bgClass = isOff ? 'text-text-muted' : '';
+                        
+                        const validQA = dailyQA.filter(h => h.hasScore);
+                        if (!dailyQA || dailyQA.length === 0) {
+                          return <td key={date} className={`p-2 text-center text-text-disabled z-10 ${bgClass} `}>-</td>;
+                        }
+                        
+                        let displayValue = '-';
+                        let avg = 0;
+                        if (validQA.length > 0) {
+                          const sum = validQA.reduce((acc, curr) => acc + curr.score, 0);
+                          avg = sum / validQA.length;
+                          displayValue = formatNum(avg, 1);
+                        }
+                        
+                        const baseColor = validQA.length > 0 ? getKpiColor(avg, 'qa') : 'text-text-disabled';
+                        const textColor = isPullout ? 'text-text-muted italic' : baseColor;
+                        return (
+                          <td key={date} className={`p-0 text-center font-semibold z-10   ${bgClass}`}>
+                            <button 
+                              onClick={() => setSelectedAgent({ agent, date, type: 'all' })} 
+                              className={`w-full h-full p-2 font-bold text-[11px] hover:bg-surface-muted transition-colors flex items-center justify-center gap-1 group/btn relative cursor-pointer ${textColor}`}
+                            >
+                              {displayValue}
+                              <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity absolute right-1" />
+                            </button>
+                          </td>
+                        );
+                      })}
+
+                      <td className="p-2 text-center font-bold z-10 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                        <span className={`font-bold text-[11px] ${agent.qaScoreCount > 0 ? getKpiColor(agent.qaScoreSum / agent.qaScoreCount, 'qa') : 'text-text-disabled'}`}>
+                          {agent.qaScoreCount > 0 ? formatNum(agent.qaScoreSum / agent.qaScoreCount, 1) : '-'}
+                        </span>
+                      </td>
+                      <td className="p-2 text-center flex items-center justify-center gap-2 z-10">
+                        <button 
+                          onClick={() => setSelectedAgent({ agent, type: 'defects' })}
+                          className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
+                          title="View All Defect Details"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          {agent.totalDefect > 0 && (
+                            <span className="text-danger text-[9px] font-bold px-1.5 py-0.5 rounded-full absolute -top-1 -right-2 leading-none shadow-[0_1px_3px_rgba(0,0,0,0.04)]">{agent.totalDefect}</span>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {sortedPerformanceData.length === 0 && (
+                  <tr>
+                    <td colSpan={6 + uniqueDates.length} className="p-4 text-center text-text-muted text-sm z-10">
+                      Tidak ada data yang sesuai filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+        </div>
+      ) : (
+        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+            <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">
+              <thead className="bg-surface text-text-secondary sticky top-0 z-30">
+                <tr>
+                  <th className="p-2 font-bold text-center border-b border-border md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
+                  <SortableHeader label="Name / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
+                  <SortableHeader label="BPO" sortKey="bpo" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
+                  <SortableHeader label="Team Leader" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                  <SortableHeader label="Medium" sortKey="medium" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
+                  <SortableHeader label="High" sortKey="high" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
+                  <SortableHeader label="Very High" sortKey="veryHigh" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
+                  <SortableHeader label="Most Frequent Mistake (Indicator)" sortKey="category" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border bg-surface text-text-secondary" />
+                  <th className="p-2 font-bold text-center border-b border-border bg-surface w-24">Action</th>
+                </tr>
+              </thead>
+              <tbody className="">
+                {sortedDefectData.map((agent, index) => {
+                  const displayName = agent.name || agent.csId;
+
+                  return (
+                    <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
+                      <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
+                      <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
+                        <button 
+                          onClick={() => useStore.getState().setSelectedAgentFor360(agent.csId)}
+                          className="text-kpi-neutral-text hover:underline font-semibold"
+                        >
+                          {displayName}
+                        </button>
+                        <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
+                      </td>
+                      <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
+                        {agent.bpo || '-'}
+                      </td>
+                      <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
+                      
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.mediumCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.mediumCount || '-'}</span></td>
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.highCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.highCount || '-'}</span></td>
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.veryHighCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.veryHighCount || '-'}</span></td>
+                      
+                      <td className="p-2 font-medium text-text-primary z-10 truncate max-w-[200px]">
+                        {agent.mostFrequentMistake === '-' ? <span className="text-text-muted ml-4">-</span> : agent.mostFrequentMistake}
+                      </td>
+                      <td className="p-2 text-center flex items-center justify-center z-10">
+                        <button 
+                          onClick={() => setSelectedAgent({ agent, type: 'defects' })}
+                          className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
+                          title="View Defect Details"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="font-bold">Detail</span>
+                          {agent.totalDefect > 0 && (
+                            <span className="text-danger text-[9px] font-bold px-1.5 py-0.5 rounded-full absolute -top-1 -right-2 leading-none shadow-[0_1px_3px_rgba(0,0,0,0.04)]">{agent.totalDefect}</span>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {sortedDefectData.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-text-muted z-10">
+                      Tidak ada data yang sesuai filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+        </div>
+      )}
+
+      {selectedAgent && (() => {
+        const currentAgentData = defectData.find(a => a.csId === selectedAgent.agent.csId);
+        const rawList = selectedAgent.type === 'all' 
+             ? (currentAgentData?.qaHistory || []) 
+             : (currentAgentData?.defects || []);
+        
+        const defectsList = rawList.filter(q => {
+          const level = (q.mistakeLevel || '').toUpperCase();
+          return level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
+        });
+
+        const filteredDefects = selectedAgent.date ? defectsList.filter(q => q.date === selectedAgent.date) : defectsList;
+
+        const categoryCounts: Record<string, number> = {};
+        filteredDefects.forEach(d => {
+           const cat = d.category || '-';
+           categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        });
+        
+        let topCategories = Object.entries(categoryCounts)
+           .filter(([cat]) => cat !== '-')
+           .sort((a, b) => b[1] - a[1])
+           .slice(0, 3)
+           .map(entry => entry[0]);
+           
+        if (topCategories.length === 0) topCategories = ['-'];
+
+        const groupedDefects = filteredDefects.reduce((acc, curr) => {
+           if(!acc[curr.date]) acc[curr.date] = [];
+           acc[curr.date].push(curr);
+           return acc;
+        }, {} as Record<string, typeof filteredDefects>);
+        
+        const sortedDates = Object.keys(groupedDefects).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+        return (
+          <div className="fixed inset-0 bg-text-primary/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
+            <div className="bg-card rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-start justify-between p-4 md:p-5 border-b border-border bg-surface-muted relative gap-3 md:gap-4 pr-10 md:pr-5">
+                <div className="flex flex-col gap-2 md:gap-3">
+                  <div>
+                    <h3 className="font-bold text-base md:text-lg text-text-primary flex flex-wrap items-center gap-1.5 md:gap-2">
+                      <AlertCircle className={`w-4 h-4 md:w-5 md:h-5 ${selectedAgent.type === 'defects' ? 'text-danger' : 'text-primary'}`} />
+                      {selectedAgent.type === 'all' ? 'QA Evaluation History:' : 'Historical Audit Trail:'} {selectedAgent.agent.name || selectedAgent.agent.csId} 
+                      {selectedAgent.date && <span className="text-text-muted font-normal text-xs md:text-sm ml-1 md:ml-2">({selectedAgent.date})</span>}
+                    </h3>
+                    <p className="text-[10px] md:text-xs text-text-muted mt-0.5 md:mt-1 ml-6 md:ml-7 flex flex-wrap items-center gap-1">
+                      <span>CS ID: <span className="font-semibold text-text-primary">{selectedAgent.agent.csId}</span></span>
+                      <span className="text-border">&bull;</span> 
+                      <span>Team Leader: <span className="font-semibold text-text-primary">{selectedAgent.agent.teamLeader || '-'}</span></span>
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-4 md:gap-8 ml-0 md:ml-7 mt-1 md:mt-0 pl-0 md:pl-4">
+                     <div className="flex flex-col bg-card md:bg-transparent border border-border md:border-transparent px-3 py-1.5 md:px-0 md:py-0 rounded-lg shrink-0 shadow-sm md:shadow-none">
+                        <span className="text-[9px] md:text-[10px] font-bold text-text-muted uppercase tracking-wider mb-0.5">{selectedAgent.type === 'defects' ? 'Total Defects' : 'Total Evaluations'}</span>
+                        <span className={`text-base md:text-lg font-black leading-none ${selectedAgent.type === 'defects' ? 'text-danger' : 'text-primary'}`}>{filteredDefects.length}</span>
+                     </div>
+                     
+                     <div className="flex md:hidden flex-col flex-1 min-w-[120px]">
+                        <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider mb-1">Top Categories</span>
+                        <div className="flex flex-wrap gap-1">
+                          {topCategories.map((cat, i) => (
+                             <span key={i} className="text-[9px] font-medium bg-card border border-border px-1.5 py-0.5 rounded text-text-secondary truncate max-w-full" title={cat}>{cat}</span>
+                          ))}
+                        </div>
+                     </div>
+                  </div>
+                </div>
+                
+                <div className="hidden md:flex gap-8 items-start">
+                  <div className="flex flex-col mr-4 mt-0.5">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Top Categories (Max 3)</span>
+                      <ul className="flex flex-col gap-1.5 text-xs">
+                        {topCategories.map((cat, i) => (
+                          <li key={i} className="font-semibold text-text-primary leading-tight max-w-[280px] truncate" title={cat}>
+                            {topCategories.length > 1 && topCategories[0] !== '-' && <span className="text-text-muted mr-1.5">{i + 1}.</span>}
+                            {cat}
+                          </li>
+                        ))}
+                      </ul>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setSelectedAgent(null)}
+                  className="absolute top-2 right-2 md:relative md:top-auto md:right-auto p-2 text-text-muted hover:text-text-primary hover:bg-surface-muted rounded-full transition-colors self-start shrink-0"
+                >
+                  <X className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+              </div>
+              
+              <div className="p-0 overflow-y-auto flex-1 bg-card">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.04)] z-20 border-b border-border">
+                    <tr className="text-text-secondary">
+                      <th className="p-3.5 font-semibold w-24">Date</th>
+                      <th className="p-3.5 font-semibold w-32">Mistake Level</th>
+                      <th className="p-3.5 font-semibold min-w-[200px]">Category (Indicator)</th>
+                      <th className="p-3.5 font-semibold min-w-[250px]">Remarks & Feedback</th>
+                      <th className="p-3.5 font-semibold w-40">Ticket & Chat ID</th>
+                      <th className="p-3.5 font-semibold w-32">UID</th>
+                      <th className="p-3.5 font-semibold w-32">QC Name</th>
+                      <th className="p-3.5 font-semibold text-right w-24 pr-6">Case Date</th>
+                    </tr>
+                  </thead>
+                  
+                  {sortedDates.length > 0 ? (
+                    sortedDates.map(date => {
+                       const defects = groupedDefects[date];
+                       const isExpanded = expandedDates.has(date) || sortedDates.length === 1; // Auto-expand if only 1 date
+                       
+                       return (
+                         <tbody key={date} className="group">
+                            <tr 
+                              onClick={() => {
+                                setExpandedDates(prev => {
+                                   const next = new Set(prev);
+                                   if (next.has(date)) next.delete(date);
+                                   else next.add(date);
+                                   return next;
+                                });
+                              }}
+                              className="cursor-pointer bg-surface-muted hover:bg-surface border-b border-border transition-colors"
+                            >
+                               <td colSpan={8} className="p-3.5">
+                                  <div className="flex items-center gap-2">
+                                     {isExpanded ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
+                                     <span className="font-bold text-text-primary">{date}</span>
+                                     <span className="text-danger text-[10px] font-bold px-2 py-0.5 rounded-full ml-2">
+                                        {defects.length} Defect{defects.length > 1 ? 's' : ''} Found
+                                     </span>
+                                  </div>
+                               </td>
+                            </tr>
+                            
+                            {isExpanded && defects.map((q, i) => {
+                                const levelStr = (q.mistakeLevel || '').toUpperCase();
+                                let badgeClass = 'bg-surface-muted text-text-secondary';
+                                if (levelStr.includes('VERY HIGH')) badgeClass = 'text-danger border border-danger';
+                                else if (levelStr.includes('HIGH') || levelStr.includes('MAJOR')) badgeClass = 'bg-danger-soft text-danger border border-danger';
+                                else if (levelStr.includes('MEDIUM') || levelStr.includes('MINOR')) badgeClass = 'bg-warning-soft text-warning border border-warning';
+                                
+                                return (
+                                  <tr key={`${date}-${i}`} className="border-b border-border hover:bg-surface-muted/50 transition-colors last:border-b-0 text-text-primary group">
+                                    <td className="p-3.5 whitespace-nowrap font-medium pl-8">
+                                       <div className="flex items-center">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-text-disabled mr-3"></div>
+                                          {q.date}
+                                       </div>
+                                    </td>
+                                    <td className="p-3.5">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] uppercase shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${badgeClass}`}>
+                                        {q.mistakeLevel || 'N/A'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3.5 leading-relaxed font-medium">
+                                      {q.category || '-'}
+                                    </td>
+                                    <td className="p-3.5 text-text-secondary leading-relaxed max-w-sm whitespace-pre-wrap">
+                                      <div className="flex flex-col gap-1">
+                                        {q.remarks && <div>{q.remarks}</div>}
+                                        {q.feedback && <div className="italic text-text-muted mt-1">{q.feedback}</div>}
+                                        {(!q.remarks && !q.feedback) && <span>-</span>}
+                                      </div>
+                                    </td>
+                                    <td className="p-3.5 text-text-primary text-xs font-mono">
+                                      <div className="flex flex-col gap-1">
+                                        {q.ticketId && 
+                                          <div className="flex items-center gap-1.5 group/copy">
+                                            <span className="text-text-muted select-none">T:</span>
+                                            <span title="Ticket ID" className="truncate max-w-[120px]">{q.ticketId}</span>
+                                            <button onClick={(e) => handleCopy(e, q.ticketId!)} className="p-1 hover:bg-surface-muted rounded text-text-muted opacity-0 group-hover/copy:opacity-100 transition-opacity focus:opacity-100">
+                                              {copiedId === q.ticketId ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+                                            </button>
+                                          </div>
+                                        }
+                                        {q.chatId && 
+                                          <div className="flex items-center gap-1.5 group/copy">
+                                            <span className="text-text-muted select-none">C:</span>
+                                            <span title="Chat ID" className="truncate max-w-[120px]">{q.chatId}</span>
+                                            <button onClick={(e) => handleCopy(e, q.chatId!)} className="p-1 hover:bg-surface-muted rounded text-text-muted opacity-0 group-hover/copy:opacity-100 transition-opacity focus:opacity-100">
+                                              {copiedId === q.chatId ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+                                            </button>
+                                          </div>
+                                        }
+                                        {(!q.ticketId && !q.chatId) && <span>-</span>}
+                                      </div>
+                                    </td>
+                                    <td className="p-3.5 text-text-primary font-mono text-xs">
+                                      <div className="flex items-center gap-1.5 group/copy w-max">
+                                        <span title="UID" className="truncate">{q.uid || '-'}</span>
+                                        {q.uid && (
+                                          <button onClick={(e) => handleCopy(e, q.uid!)} className="p-1 hover:bg-surface-muted rounded text-text-muted opacity-0 group-hover/copy:opacity-100 transition-opacity focus:opacity-100">
+                                            {copiedId === q.uid ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-3.5 text-text-primary text-xs">
+                                      {q.qcName || '-'}
+                                    </td>
+                                    <td className="p-3.5 text-right text-text-primary text-xs pr-6 whitespace-nowrap">
+                                      {q.caseDate || '-'}
+                                    </td>
+                                  </tr>
+                                );
+                            })}
+                         </tbody>
+                       );
+                    })
+                  ) : (
+                    <tbody>
+                      <tr>
+                        <td colSpan={8} className="p-16 text-center">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="w-16 h-16 bg-surface-muted border border-border rounded-full flex items-center justify-center mb-4">
+                               <BarChart2 className="w-8 h-8 text-text-disabled" />
+                            </div>
+                            <div className="text-text-secondary font-bold text-base">{selectedAgent.type === 'defects' ? 'No defects found for this agent.' : 'No evaluations found.'}</div>
+                            <div className="text-text-muted mt-1 max-w-sm">{selectedAgent.type === 'defects' ? 'Excellent performance with zero recorded defects in the selected period.' : 'No QA evaluation data to display.'}</div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  )}
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+};
+

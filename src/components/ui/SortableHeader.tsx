@@ -1,0 +1,27 @@
+import React from 'react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
+import { cn } from '../../lib/utils';
+
+export const SortableHeader: React.FC<{
+  label: string;
+  sortKey: string;
+  config: { key: string, direction: 'asc' | 'desc' } | null;
+  onSort: (key: string) => void;
+  className?: string;
+}> = ({ label, sortKey, config, onSort, className }) => {
+  const isActive = config?.key === sortKey;
+  return (
+    <th 
+      className={cn("p-2 font-bold cursor-pointer hover:bg-surface-muted transition-colors select-none", className)}
+      onClick={() => onSort(sortKey)}
+    >
+      <div className={cn("flex items-center gap-1", className?.includes('text-center') ? 'justify-center' : '')}>
+        {label}
+        <span className="flex flex-col opacity-50">
+          <ChevronUp className={cn("w-2.5 h-2.5 -mb-1", isActive && config.direction === 'asc' && 'opacity-100 text-primary')} />
+          <ChevronDown className={cn("w-2.5 h-2.5", isActive && config.direction === 'desc' && 'opacity-100 text-primary')} />
+        </span>
+      </div>
+    </th>
+  );
+};

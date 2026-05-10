@@ -1,0 +1,6 @@
+{
+  "name": "Live Chat KPI Dashboard",
+  "description": "Dashboard for tracking CS Productivity, CSAT, SLA, WHU and Schedules via CSV uploads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

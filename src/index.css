@@ -1,0 +1,239 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Base Surfaces */
+  --background: 248 250 252;          /* #F8FAFC */
+  --surface: 255 255 255;             /* #FFFFFF */
+  --surface-muted: 249 250 251;       /* #F9FAFB */
+  --card: 255 255 255;                /* #FFFFFF */
+  --border: 238 242 247;              /* #EEF2F7 */
+  --border-strong: 229 231 235;       /* #E5E7EB */
+  
+  /* Text */
+  --text-primary: 31 41 55;           /* #1F2937 */
+  --text-secondary: 107 114 128;      /* #6B7280 */
+  --text-muted: 156 163 175;          /* #9CA3AF */
+  --text-disabled: 209 213 219;       /* #D1D5DB */
+  
+  /* Brand - Akulaku Red */
+  --primary: 227 30 36;               /* #E31E24 */
+  --primary-hover: 239 68 68;         /* #EF4444 */
+  --primary-soft: 254 226 226;        /* #FEE2E2 */
+  --primary-soft-hover: 252 165 165;  /* #FCA5A5 */
+  --primary-text: 227 30 36;          /* #E31E24 */
+  
+  /* Semantic */
+  --success: 22 163 74;               /* #16A34A */
+  --success-soft: 220 252 231;
+  --success-text: 21 128 61;
+  --danger: 227 30 36;                /* #E31E24 */
+  --danger-soft: 254 226 226;
+  --danger-text: 185 28 28;
+  --warning: 245 158 11;              /* #F59E0B */
+  --warning-soft: 254 243 199;
+  --warning-text: 180 83 9;
+  
+  /* Sidebar */
+  --sidebar-bg: 255 255 255;          /* Light Mode */
+  --sidebar-bg-hover: 243 244 246;    /* #F3F4F6 */
+  --sidebar-bg-active: 254 226 226;   /* #FEE2E2 */
+  --sidebar-text: 71 85 105;          /* #475569 */
+  --sidebar-text-hover: 15 23 42;     /* #0F172A */
+  --sidebar-text-active: 227 30 36;   /* #E31E24 */
+  --sidebar-border: 238 242 247;
+  --sidebar-accent: 227 30 36;        /* #E31E24 */
+
+  /* KPI Color Identity */
+  --kpi-productivity: 227 30 36;       /* #E31E24 */
+  --kpi-productivity-soft: 254 226 226; /* #FEE2E2 */
+  --kpi-productivity-text: 227 30 36;   /* #E31E24 */
+
+  --kpi-productivity-avg: 227 30 36;    /* #E31E24 */
+  --kpi-productivity-avg-soft: 254 226 226; /* #FEE2E2 */
+  --kpi-productivity-avg-text: 227 30 36;   /* #E31E24 */
+
+  --kpi-csat: 245 158 11;              /* #F59E0B */
+  --kpi-csat-soft: 254 243 199;        /* #FEF3C7 */
+  --kpi-csat-text: 245 158 11;         /* #F59E0B */
+  
+  --kpi-qa: 245 158 11;                /* #F59E0B */
+  --kpi-qa-soft: 254 243 199;          /* #FEF3C7 */
+  --kpi-qa-text: 245 158 11;           /* #F59E0B */
+
+  --kpi-sla: 22 163 74;                /* #16A34A */
+  --kpi-sla-soft: 220 252 231;         /* #DCFCE7 */
+  --kpi-sla-text: 22 163 74;           /* #16A34A */
+
+  --kpi-whu: 22 163 74;                /* #16A34A */
+  --kpi-whu-soft: 220 252 231;         /* #DCFCE7 */
+  --kpi-whu-text: 22 163 74;           /* #16A34A */
+
+  --kpi-neutral: 37 99 235;            /* #2563EB */
+  --kpi-neutral-soft: 219 234 254;     /* #DBEAFE */
+  --kpi-neutral-text: 37 99 235;       /* #2563EB */
+  --chart-primary: 37 99 235;          /* Blue in Light Mode */
+}
+
+.dark {
+  /* Base Surfaces */
+  --background: 15 23 42;             /* #0F172A */
+  --surface: 30 41 59;                /* #1E293B */
+  --surface-muted: 39 53 73;          /* #273549 */
+  --card: 30 41 59;                   /* #1E293B */
+  --border: 51 65 85;                 /* #334155 */
+  --border-strong: 71 85 105;         /* #475569 */
+  
+  /* Text */
+  --text-primary: 241 245 249;        /* #F1F5F9 */
+  --text-secondary: 203 213 245;      /* #CBD5F5 */
+  --text-muted: 148 163 184;          /* #94A3B8 */
+  --text-disabled: 71 85 105;         /* #475569 */
+  
+  /* Brand - Akulaku Red Dark */
+  --primary: 239 68 68;               /* #EF4444 */
+  --primary-hover: 220 38 38;         /* #DC2626 */
+  --primary-soft: 127 29 29;          /* #7F1D1D */
+  --primary-soft-hover: 153 27 27;    /* #991B1B */
+  --primary-text: 241 245 249;        /* #F1F5F9 */
+  
+  /* Semantic */
+  --success: 34 197 94;               /* #22C55E */
+  --success-soft: 20 83 45;           /* #14532D */
+  --success-text: 34 197 94;          /* #22C55E */
+  --danger: 239 68 68;                /* #EF4444 */
+  --danger-soft: 127 29 29;           /* #7F1D1D */
+  --danger-text: 239 68 68;           /* #EF4444 */
+  --warning: 251 191 36;              /* #FBBF24 */
+  --warning-soft: 120 53 15;          /* #78350F */
+  --warning-text: 251 191 36;         /* #FBBF24 */
+  
+  /* Sidebar */
+  --sidebar-bg: 2 6 23;               /* #020617 */
+  --sidebar-bg-hover: 30 41 59;       /* #1E293B */
+  --sidebar-bg-active: transparent;
+  --sidebar-text: 148 163 184;        /* #94A3B8 */
+  --sidebar-text-hover: 241 245 249;  /* #F1F5F9 */
+  --sidebar-text-active: 239 68 68;   /* #EF4444 */
+  --sidebar-border: 51 65 85;         /* #334155 */
+  --sidebar-accent: 239 68 68;        /* #EF4444 */
+
+  /* KPI Color Identity */
+  --kpi-productivity: 239 68 68;        /* #EF4444 */
+  --kpi-productivity-soft: 127 29 29;   /* #7F1D1D */
+  --kpi-productivity-text: 239 68 68;   /* #EF4444 */
+
+  --kpi-productivity-avg: 239 68 68;        /* #EF4444 */
+  --kpi-productivity-avg-soft: 127 29 29; /* #7F1D1D */
+  --kpi-productivity-avg-text: 239 68 68; /* #EF4444 */
+
+  --kpi-csat: 251 191 36;               /* #FBBF24 */
+  --kpi-csat-soft: 120 53 15;           /* #78350F */
+  --kpi-csat-text: 251 191 36;          /* #FBBF24 */
+  
+  --kpi-qa: 251 191 36;                 /* #FBBF24 */
+  --kpi-qa-soft: 120 53 15;             /* #78350F */
+  --kpi-qa-text: 251 191 36;            /* #FBBF24 */
+
+  --kpi-sla: 34 197 94;                 /* #22C55E */
+  --kpi-sla-soft: 20 83 45;             /* #14532D */
+  --kpi-sla-text: 34 197 94;            /* #22C55E */
+
+  --kpi-whu: 34 197 94;                 /* #22C55E */
+  --kpi-whu-soft: 20 83 45;             /* #14532D */
+  --kpi-whu-text: 34 197 94;            /* #22C55E */
+
+  --kpi-neutral: 96 165 250;            /* #60A5FA */
+  --kpi-neutral-soft: 30 58 138;        /* #1E3A8A */
+  --kpi-neutral-text: 96 165 250;       /* #60A5FA */
+  --chart-primary: 239 68 68;           /* Red in Dark Mode */
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-background: rgb(var(--background));
+  --color-surface: rgb(var(--surface));
+  --color-surface-muted: rgb(var(--surface-muted));
+  --color-card: rgb(var(--card));
+  --color-border: rgb(var(--border));
+  --color-border-strong: rgb(var(--border-strong));
+  
+  --color-text-primary: rgb(var(--text-primary));
+  --color-text-secondary: rgb(var(--text-secondary));
+  --color-text-muted: rgb(var(--text-muted));
+  --color-text-disabled: rgb(var(--text-disabled));
+  
+  --color-primary: rgb(var(--primary));
+  --color-primary-hover: rgb(var(--primary-hover));
+  --color-primary-soft: rgb(var(--primary-soft));
+  --color-primary-soft-hover: rgb(var(--primary-soft-hover));
+  --color-primary-text: rgb(var(--primary-text));
+  
+  --color-success: rgb(var(--success));
+  --color-success-soft: rgb(var(--success-soft));
+  --color-success-text: rgb(var(--success-text));
+  --color-danger: rgb(var(--danger));
+  --color-danger-soft: rgb(var(--danger-soft));
+  --color-danger-text: rgb(var(--danger-text));
+  --color-warning: rgb(var(--warning));
+  --color-warning-soft: rgb(var(--warning-soft));
+  --color-warning-text: rgb(var(--warning-text));
+  
+  --color-sidebar-bg: rgb(var(--sidebar-bg));
+  --color-sidebar-bg-hover: rgb(var(--sidebar-bg-hover));
+  --color-sidebar-bg-active: rgb(var(--sidebar-bg-active));
+  --color-sidebar-text: rgb(var(--sidebar-text));
+  --color-sidebar-text-hover: rgb(var(--sidebar-text-hover));
+  --color-sidebar-text-active: rgb(var(--sidebar-text-active));
+  --color-sidebar-border: rgb(var(--sidebar-border));
+  --color-sidebar-accent: rgb(var(--sidebar-accent));
+
+  --color-kpi-productivity: rgb(var(--kpi-productivity));
+  --color-kpi-productivity-soft: rgb(var(--kpi-productivity-soft));
+  --color-kpi-productivity-text: rgb(var(--kpi-productivity-text));
+
+  --color-kpi-productivity-avg: rgb(var(--kpi-productivity-avg));
+  --color-kpi-productivity-avg-soft: rgb(var(--kpi-productivity-avg-soft));
+  --color-kpi-productivity-avg-text: rgb(var(--kpi-productivity-avg-text));
+
+  --color-kpi-csat: rgb(var(--kpi-csat));
+  --color-kpi-csat-soft: rgb(var(--kpi-csat-soft));
+  --color-kpi-csat-text: rgb(var(--kpi-csat-text));
+
+  --color-kpi-sla: rgb(var(--kpi-sla));
+  --color-kpi-sla-soft: rgb(var(--kpi-sla-soft));
+  --color-kpi-sla-text: rgb(var(--kpi-sla-text));
+
+  --color-kpi-whu: rgb(var(--kpi-whu));
+  --color-kpi-whu-soft: rgb(var(--kpi-whu-soft));
+  --color-kpi-whu-text: rgb(var(--kpi-whu-text));
+
+  --color-kpi-qa: rgb(var(--kpi-qa));
+  --color-kpi-qa-soft: rgb(var(--kpi-qa-soft));
+  --color-kpi-qa-text: rgb(var(--kpi-qa-text));
+
+  --color-kpi-neutral: rgb(var(--kpi-neutral));
+  --color-kpi-neutral-soft: rgb(var(--kpi-neutral-soft));
+  --color-kpi-neutral-text: rgb(var(--kpi-neutral-text));
+
+  --color-chart-primary: rgb(var(--chart-primary));
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-ticker {
+  animation: ticker 30s linear infinite;
+}
