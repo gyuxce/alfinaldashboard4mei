@@ -31,8 +31,8 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
     
     // Use Official CSAT if available, else CSAT SC
     const origCsat = csatOfficial > 0 ? csatOfficial : csatSc;
-    // Scale CSAT score (0-5) to (0-100) for the radar chart
-    const csatRadar = origCsat > 0 ? (origCsat / 5) * 100 : 0;
+    // CSAT is already on a 0-100 scale
+    const csatRadar = origCsat;
 
     // SLA
     const sla1m = agent.sla1m || 0;

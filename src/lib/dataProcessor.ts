@@ -64,9 +64,17 @@ export interface AgentKPI {
 
   csatScFullScore: number;
   csatScFullCount: number;
+  csatScGoodCount: number;
+  csatScBadCount: number;
+  csatScTotalValid: number;
+  csatScFull: number | null;
 
   csatScFairScore: number;
   csatScFairCount: number;
+  csatScFairGoodCount: number;
+  csatScFairBadCount: number;
+  csatScFairTotalValid: number;
+  csatScFair: number | null;
 
   csatScCategoriesFull: Record<string, number>;
   csatScCategoriesFair: Record<string, number>;
@@ -102,6 +110,28 @@ export interface AgentKPI {
 }
 
 // Helpers
+export function getPreviousPeriod(startDate: string, endDate: string) {
+  if (!startDate || !endDate) return { start: '', end: '' };
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Calculate duration in days
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - diffDays + 1);
+  
+  return {
+    start: prevStart.toISOString().split('T')[0],
+    end: prevEnd.toISOString().split('T')[0]
+  };
+}
+
 const dateStrCache = new Map<string, string | null>();
 
 function normalizeDateStr(raw: string): string | null {
@@ -311,8 +341,16 @@ export const processKPIs = (
         whu: null,
         csatScFullScore: 0,
         csatScFullCount: 0,
+        csatScGoodCount: 0,
+        csatScBadCount: 0,
+        csatScTotalValid: 0,
+        csatScFull: null,
         csatScFairScore: 0,
         csatScFairCount: 0,
+        csatScFairGoodCount: 0,
+        csatScFairBadCount: 0,
+        csatScFairTotalValid: 0,
+        csatScFair: null,
         csatScCategoriesFull: {},
         csatScCategoriesFair: {},
         csatScScoreDistribution: {
@@ -542,25 +580,31 @@ export const processKPIs = (
         });
       }
 
-      if (!isNaN(csatAsliNum)) {
+      const goodRatingAsli = dVal + eVal; // 5 + 4
+      const badRatingAsli = gVal + hVal;  // 2 + 1
+      const totalValidAsli = goodRatingAsli + badRatingAsli;
+      
+      const csatDaily = totalValidAsli > 0 
+        ? (goodRatingAsli / totalValidAsli) * 100 
+        : null;
+
+      if (csatDaily !== null) {
         if (!totalProdCsatAsliSum[agent.csId])
           totalProdCsatAsliSum[agent.csId] = { sum: 0, count: 0 };
-        totalProdCsatAsliSum[agent.csId].sum += csatAsliNum;
-        totalProdCsatAsliSum[agent.csId].count += 1;
+        
+        // Store sums of good and total for overall agent average
+        totalProdCsatAsliSum[agent.csId].sum += goodRatingAsli;
+        totalProdCsatAsliSum[agent.csId].count += totalValidAsli;
 
-        // Using rolling average for CSAT and WHU since they are percentages/ratios
-        // However dailyHistory items track 'value'. For simplicity, if multiple exist, maybe we override or average?
-        // Since user said "jumlahkan", but CSAT is a percentage, they probably mean just Productivity is summed.
-        // Let's just average CSAT Asli if there are multiple.
         let existingCsat = agent.dailyHistory.csat.find(
           (h) => h.date === targetDateLabel,
         );
         if (existingCsat) {
-          existingCsat.value = (existingCsat.value + csatAsliNum) / 2;
+          existingCsat.value = csatDaily;
         } else {
           agent.dailyHistory.csat.push({
             date: targetDateLabel,
-            value: csatAsliNum,
+            value: csatDaily,
           });
         }
       }
@@ -628,8 +672,6 @@ export const processKPIs = (
       
       const isTakeoutRecord = [
         "tidak bisa transaksi namun memiliki limit",
-        "chat/call terputus",
-        "permintaan kode pembayaran",
         "pengajuan limit kredit ditolak",
         "pertanyaan belum bisa diidentifikasi",
       ].includes(category);
@@ -671,8 +713,18 @@ export const processKPIs = (
         // Only include if score != 3 for SC calculations as per previous rules (though user says "Tetap gunakan aturan EXCLUDE SCORE 3")
         // Wait, if I exclude 3, I should skip adding it to these sums
         if (score !== 3) {
+          // Keep old vars for CsatRoom
           agent.csatScFullScore += score;
           agent.csatScFullCount += 1;
+
+          // New Official Formula
+          if (score >= 4) {
+            agent.csatScGoodCount += 1;
+          } else {
+            agent.csatScBadCount += 1;
+          }
+          agent.csatScTotalValid += 1;
+
 
           let fullDay = agent.dailyHistory.csatScFull.find(
             (h) => h.date === dateStr,
@@ -681,7 +733,7 @@ export const processKPIs = (
             fullDay = { date: dateStr, score: 0, count: 0 };
             agent.dailyHistory.csatScFull.push(fullDay);
           }
-          fullDay.score += score;
+          if (score >= 4) fullDay.score += 1;
           fullDay.count += 1;
 
           const isTakeout = [
@@ -691,8 +743,17 @@ export const processKPIs = (
           ].includes(category);
 
           if (!isTakeout) {
+            // Keep old vars for CsatRoom
             agent.csatScFairScore += score;
             agent.csatScFairCount += 1;
+
+            // New Official Formula for Fair
+            if (score >= 4) {
+              agent.csatScFairGoodCount += 1;
+            } else {
+              agent.csatScFairBadCount += 1;
+            }
+            agent.csatScFairTotalValid += 1;
 
             let fairDay = agent.dailyHistory.csatScFair.find(
               (h) => h.date === dateStr,
@@ -701,8 +762,8 @@ export const processKPIs = (
               fairDay = { date: dateStr, score: 0, count: 0 };
               agent.dailyHistory.csatScFair.push(fairDay);
             }
-            fairDay.score += score;
-            fairDay.count += 1;
+            if (score >= 4) fairDay.score += 1; // good count
+            fairDay.count += 1; // valid count
           }
 
           if (score === 1 || score === 2) {
@@ -864,13 +925,21 @@ export const processKPIs = (
       agent.attendanceScore = 0;
     }
 
+    agent.csatScFull = agent.csatScTotalValid > 0
+      ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100
+      : null;
+
+    agent.csatScFair = agent.csatScFairTotalValid > 0
+      ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100
+      : null;
+
     if (
       totalProdCsatAsliSum[agent.csId] &&
       totalProdCsatAsliSum[agent.csId].count > 0
     ) {
       agent.csatAsli =
-        totalProdCsatAsliSum[agent.csId].sum /
-        totalProdCsatAsliSum[agent.csId].count;
+        (totalProdCsatAsliSum[agent.csId].sum /
+        totalProdCsatAsliSum[agent.csId].count) * 100;
     }
     if (totalWhuSum[agent.csId] && totalWhuSum[agent.csId].count > 0) {
       agent.whu = totalWhuSum[agent.csId].sum / totalWhuSum[agent.csId].count;

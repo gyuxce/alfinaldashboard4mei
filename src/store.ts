@@ -47,6 +47,7 @@ export interface AppState {
   selectedGlobalAgent: string;
   selectedAgentFor360: string | null;
   agentDictionary: Record<string, { name: string; bpo: string; teamLeader: string }>;
+  isComparisonEnabled: boolean;
 
   isHydrating: boolean;
   isPersisting: boolean;
@@ -66,6 +67,7 @@ export interface AppState {
   // Sheet actions
   fetchFromSheets: () => Promise<void>;
   setDataSource: (mode: 'sheets' | 'csv') => void;
+  setIsComparisonEnabled: (enabled: boolean) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -96,6 +98,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedGlobalAgent: 'All Agents',
   selectedAgentFor360: null,
   agentDictionary: {},
+  isComparisonEnabled: false,
   fileValidations: {},
   fileNames: {},
 
@@ -178,6 +181,7 @@ export const useStore = create<AppState>((set, get) => ({
   setSelectedTL: (tl) => set(() => ({ selectedTL: tl })),
   setSelectedGlobalAgent: (agent) => set(() => ({ selectedGlobalAgent: agent })),
   setSelectedAgentFor360: (agentId) => set(() => ({ selectedAgentFor360: agentId })),
+  setIsComparisonEnabled: (enabled) => set(() => ({ isComparisonEnabled: enabled })),
 
   clearFiles: async () => {
     // Clear Zustand

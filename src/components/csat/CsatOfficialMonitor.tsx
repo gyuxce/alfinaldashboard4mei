@@ -5,8 +5,10 @@ import { Search, Star } from 'lucide-react';
 import { useStore } from '../../store';
 import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 import { SortableHeader } from '../ui/SortableHeader';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 
-export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
+export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
+  const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -139,6 +141,15 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) =>
         </div>
       </div>
 
+      {isComparisonEnabled && (
+        <WoWChartPanel 
+          data={data} 
+          previousData={previousData} 
+          previousData2={previousData2} 
+          previousData3={previousData3} 
+        />
+      )}
+
       <KpiTicker items={tickerItems} />
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
@@ -211,6 +222,125 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) =>
               )}
             </tbody>
           </table>
+      </div>
+    </div>
+  );
+};
+
+const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
+  const { startDate, endDate } = useStore();
+
+  const getWeekLabel = (offset: number) => {
+    if (!startDate || !endDate) return `Week -${offset}`;
+    const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
+    const end = new Date(endDate);
+    end.setDate(end.getDate() - (offset * diff));
+    const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+    const weekNum = Math.ceil(end.getDate() / 7);
+    return `W${weekNum} ${month}`;
+  };
+
+  const calcStats = (dataset: AgentKPI[]) => {
+    let sumCsat = 0, csatCount = 0;
+    let sumFull = 0, countFull = 0;
+    let sumTakeout = 0, countTakeout = 0;
+    
+    (dataset || []).forEach(d => {
+      if (d.csatAsli !== null) { sumCsat += d.csatAsli; csatCount++; }
+      sumFull += d.csatScGoodCount || 0;
+      countFull += d.csatScTotalValid || 0;
+      sumTakeout += d.csatScFairGoodCount || 0;
+      countTakeout += d.csatScFairTotalValid || 0;
+    });
+
+    return {
+      asli: csatCount > 0 ? Number((sumCsat / csatCount).toFixed(2)) : 0,
+      full: countFull > 0 ? Number(((sumFull / countFull) * 100).toFixed(2)) : 0,
+      takeout: countTakeout > 0 ? Number(((sumTakeout / countTakeout) * 100).toFixed(2)) : 0,
+    };
+  };
+
+  const w0 = calcStats(data);
+  const w1 = calcStats(previousData);
+  const w2 = calcStats(previousData2);
+  const w3 = calcStats(previousData3);
+
+  const chartData = [
+    { name: getWeekLabel(3), 'CSAT Official': w3.asli, 'SC Full': w3.full, 'SC Takeout': w3.takeout },
+    { name: getWeekLabel(2), 'CSAT Official': w2.asli, 'SC Full': w2.full, 'SC Takeout': w2.takeout },
+    { name: getWeekLabel(1), 'CSAT Official': w1.asli, 'SC Full': w1.full, 'SC Takeout': w1.takeout },
+    { name: getWeekLabel(0), 'CSAT Official': w0.asli, 'SC Full': w0.full, 'SC Takeout': w0.takeout },
+  ].filter(d => d.name !== 'WNaN Invalid Date');
+
+  const dailyData = React.useMemo(() => {
+    const dates = new Map<string, { sum: number, count: number }>();
+    (data || []).forEach(a => {
+      a.dailyHistory?.csat?.forEach(h => {
+        if (!dates.has(h.date)) dates.set(h.date, { sum: 0, count: 0 });
+        if (h.value !== null) {
+           dates.get(h.date)!.sum += h.value;
+           dates.get(h.date)!.count += 1;
+        }
+      });
+    });
+    
+    return Array.from(dates.entries())
+      .map(([date, stats]) => {
+        const d = new Date(date);
+        const validDate = isNaN(d.getTime()) ? date : new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(d);
+        return {
+          date: validDate,
+          CSAT: stats.count > 0 ? Number((stats.sum / stats.count).toFixed(2)) : 0,
+          rawDate: date
+        };
+      })
+      .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
+  }, [data]);
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        {/* Weekly Trend Panel */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-center mb-4">
+            <h3 className="text-sm font-bold text-text-primary text-center">4-Week Comparison Trend</h3>
+          </div>
+          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
+                <Bar dataKey="CSAT Official" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                  <LabelList dataKey="CSAT Official" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: '#3b82f6'}} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Daily Trend Panel */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-center mb-4">
+            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend (Current Week)</h3>
+          </div>
+          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
+                <Bar dataKey="CSAT" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                  <LabelList dataKey="CSAT" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: '#f59e0b'}} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
       </div>
     </div>
   );

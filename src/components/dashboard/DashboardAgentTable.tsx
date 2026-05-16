@@ -73,23 +73,20 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                   {agent.csatAsli !== null ? "" : "-"}
                 </td>
                 <td className="p-2">
-                  {agent.csatScFullCount > 0 ? (
+                  {agent.csatScTotalValid > 0 ? (
                     <div className="flex flex-col">
                       <span
-                        className={`text-[11px] font-bold ${getKpiColor(((agent.csatScFullScore / agent.csatScFullCount) * 100) / 5, "csatFull")}`}
+                        className={`text-[11px] font-bold ${getKpiColor(agent.csatScFull || 0, "csatFull")}`}
                       >
                         {formatNum(
-                          ((agent.csatScFullScore /
-                            agent.csatScFullCount) *
-                            100) /
-                            5,
+                          agent.csatScFull,
                         )}
                         %
                       </span>
                       <span className="text-[9px] text-text-muted font-medium">
                         (
                         {formatNum(
-                          agent.csatScFullScore / agent.csatScFullCount,
+                          agent.csatScTotalValid,
                         )}
                         )
                       </span>
@@ -99,23 +96,20 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                   )}
                 </td>
                 <td className="p-2">
-                  {agent.csatScFairCount > 0 ? (
+                  {agent.csatScFairTotalValid > 0 ? (
                     <div className="flex flex-col">
                       <span
-                        className={`text-[11px] font-bold ${getKpiColor(((agent.csatScFairScore / agent.csatScFairCount) * 100) / 5, "csatFair")}`}
+                        className={`text-[11px] font-bold ${getKpiColor(agent.csatScFair || 0, "csatFair")}`}
                       >
                         {formatNum(
-                          ((agent.csatScFairScore /
-                            agent.csatScFairCount) *
-                            100) /
-                            5,
+                          agent.csatScFair,
                         )}
                         %
                       </span>
                       <span className="text-[9px] text-text-muted font-medium">
                         (
                         {formatNum(
-                          agent.csatScFairScore / agent.csatScFairCount,
+                          agent.csatScFairTotalValid,
                         )}
                         )
                       </span>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from './store';
-import { processKPIs } from './lib/dataProcessor';
+import { processKPIs, getPreviousPeriod } from './lib/dataProcessor';
 
 import { 
   LayoutDashboard, 
@@ -21,8 +21,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileText
 } from 'lucide-react';
+
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 import { FileCenter } from './components/dashboard/FileCenter';
 import { DashboardSummary } from './components/dashboard/DashboardSummary';
@@ -74,7 +77,8 @@ export default function App() {
     startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, selectedAgentFor360, agentDictionary, 
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedAgentFor360,
     isHydrating, hydrateFromStorage,
-    isFetchingSheets, fetchFromSheets, lastSyncTime
+    isFetchingSheets, fetchFromSheets, lastSyncTime,
+    isComparisonEnabled, setIsComparisonEnabled
   } = useStore();
 
   useEffect(() => {
@@ -88,40 +92,72 @@ export default function App() {
     }
   }, []);
 
-  const { rawData, tlList: baseTlList } = useMemo(() => {
+  const { rawData, previousRawData, previousRawData2, previousRawData3, tlList: baseTlList } = useMemo(() => {
     let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary);
     
+    let prevRaw: any[] = [];
+    let prevRaw2: any[] = [];
+    let prevRaw3: any[] = [];
+    if (isComparisonEnabled && startDate && endDate) {
+      const prevRange = getPreviousPeriod(startDate, endDate);
+      prevRaw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange.start, prevRange.end, agentDictionary);
+      
+      const prevRange2 = getPreviousPeriod(prevRange.start, prevRange.end);
+      prevRaw2 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange2.start, prevRange2.end, agentDictionary);
+      
+      const prevRange3 = getPreviousPeriod(prevRange2.start, prevRange2.end);
+      prevRaw3 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange3.start, prevRange3.end, agentDictionary);
+    }
+
     const tls = new Set<string>();
     raw.forEach(a => {
       if (a.teamLeader && a.teamLeader.trim() !== '') tls.add(a.teamLeader.trim());
     });
     const tlsArr = Array.from(tls).sort((a,b) => a.localeCompare(b));
     
-    return { rawData: raw, tlList: tlsArr };
-  }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary]);
+    return { rawData: raw, previousRawData: prevRaw, previousRawData2: prevRaw2, previousRawData3: prevRaw3, tlList: tlsArr };
+  }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, isComparisonEnabled]);
 
-  const { kpiData, tlList, agentList } = useMemo(() => {
+  const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, tlList, agentList } = useMemo(() => {
     let data = rawData;
-    if (selectedBpo && selectedBpo !== 'All BPO') {
-      data = data.filter(a => (a.bpo || '').toUpperCase() === selectedBpo.toUpperCase());
-    }
-    if (selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders') {
-      data = data.filter(a => (a.teamLeader || '').toUpperCase() === selectedTL.toUpperCase());
-    }
+    let prevData = previousRawData;
+    let prevData2 = previousRawData2;
+    let prevData3 = previousRawData3;
+
+    const applyFilters = (d: any[]) => {
+      let filtered = d;
+      if (selectedBpo && selectedBpo !== 'All BPO') {
+        filtered = filtered.filter(a => (a.bpo || '').toUpperCase() === selectedBpo.toUpperCase());
+      }
+      if (selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders') {
+        filtered = filtered.filter(a => (a.teamLeader || '').toUpperCase() === selectedTL.toUpperCase());
+      }
+      if (selectedGlobalAgent && selectedGlobalAgent !== 'All Agents') {
+        filtered = filtered.filter(a => a.name === selectedGlobalAgent || a.csId === selectedGlobalAgent);
+      }
+      return filtered;
+    };
+
+    const filteredData = applyFilters(data);
+    const filteredPrevData = applyFilters(prevData);
+    const filteredPrevData2 = applyFilters(prevData2);
+    const filteredPrevData3 = applyFilters(prevData3);
 
     const agents = new Set<string>();
-    data.forEach(a => {
+    filteredData.forEach(a => {
       if (a.name && a.name !== '-') agents.add(a.name);
       else agents.add(a.csId);
     });
 
-    let filteredData = data;
-    if (selectedGlobalAgent && selectedGlobalAgent !== 'All Agents') {
-      filteredData = data.filter(a => a.name === selectedGlobalAgent || a.csId === selectedGlobalAgent);
-    }
-
-    return { kpiData: filteredData, tlList: baseTlList, agentList: Array.from(agents).sort((a,b) => a.localeCompare(b)) };
-  }, [rawData, baseTlList, selectedBpo, selectedTL, selectedGlobalAgent]);
+    return { 
+      kpiData: filteredData, 
+      previousKpiData: filteredPrevData,
+      previousKpiData2: filteredPrevData2,
+      previousKpiData3: filteredPrevData3,
+      tlList: baseTlList, 
+      agentList: Array.from(agents).sort((a,b) => a.localeCompare(b)) 
+    };
+  }, [rawData, previousRawData, previousRawData2, previousRawData3, baseTlList, selectedBpo, selectedTL, selectedGlobalAgent]);
 
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },
@@ -379,6 +415,17 @@ export default function App() {
                   Next &raquo;
                 </button>
               </div>
+
+              <div 
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card/40 hover:bg-card transition-all group cursor-pointer" 
+                onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
+              >
+                <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
+                  <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
+                </div>
+                <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare WoW</span>
+              </div>
+
             </div>
 
             {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
@@ -418,11 +465,11 @@ export default function App() {
         </div>
 
         <div className="w-full pb-8">
-          {activeTab === 'summary' && <DashboardSummary data={kpiData} />}
+          {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
           {activeTab === 'leaderboard' && <Leaderboard />}
           {activeTab === 'productivity' && <ProductivityDetail data={kpiData} />}
-          {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} />}
-          {activeTab === 'csat' && <CsatRoom data={kpiData} />}
+          {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+          {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
           {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
           {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
           {activeTab === 'qa' && <QaAgent360 data={kpiData} />}

@@ -7,9 +7,10 @@ import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 
 import { SortableHeader } from '../ui/SortableHeader';
 import { CsatDetailModal } from "./CsatDetailModal";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, AreaChart, Area } from 'recharts';
 
-
-export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
+export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
+  const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'full' | 'fair'>('full');
@@ -70,9 +71,28 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     });
     return Object.entries(agg)
       .sort((a,b) => b[1] - a[1])
-      .slice(0, 20)
+      .slice(0, 10)
       .map((entry, idx) => ({ rank: idx+1, name: entry[0], count: entry[1] }));
   }, [tableData, viewMode]);
+
+  const prevTopCategories = useMemo(() => {
+    const prevTableData = previousData.filter(a => {
+      const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchTL = filterTL ? a.teamLeader === filterTL : true;
+      const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
+      return matchSearch && matchTL && count > 0;
+    });
+
+    const agg: Record<string, number> = {};
+    prevTableData.forEach(a => {
+       const cats = viewMode === 'full' ? (a.csatScCategoriesFull || {}) : (a.csatScCategoriesFair || {});
+       for (const cat in cats) {
+          if (!agg[cat]) agg[cat] = 0;
+          agg[cat] += cats[cat];
+       }
+    });
+    return agg;
+  }, [previousData, search, filterTL, viewMode]);
 
   const agentRankings = useMemo(() => {
     const agents = tableData.map(a => {
@@ -294,41 +314,45 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
   
   const tickerItems: TickerItem[] = useMemo(() => {
-    let totalSum = 0;
-    let totalCount = 0;
-    const bpoStats: Record<string, { sum: number; count: number }> = {};
-    const tlStats: Record<string, { sum: number; count: number }> = {};
+    const bpoStats: Record<string, { good: number; total: number }> = {};
+    const tlStats: Record<string, { good: number; total: number }> = {};
 
     tableData.forEach(agent => {
-       const score = viewMode === 'full' ? agent.csatScFullScore : agent.csatScFairScore;
-       const count = viewMode === 'full' ? agent.csatScFullCount : agent.csatScFairCount;
-       if (count > 0) {
-          totalSum += score;
-          totalCount += count;
+       const goodCount = viewMode === 'full' ? agent.csatScGoodCount : agent.csatScFairGoodCount;
+       const totalValid = viewMode === 'full' ? agent.csatScTotalValid : agent.csatScFairTotalValid;
+       if (totalValid > 0) {
           const bpo = agent.bpo || 'Unknown';
-          if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
-          bpoStats[bpo].sum += score;
-          bpoStats[bpo].count += count;
+          if (!bpoStats[bpo]) bpoStats[bpo] = { good: 0, total: 0 };
+          bpoStats[bpo].good += goodCount;
+          bpoStats[bpo].total += totalValid;
 
           const tl = agent.teamLeader || 'Unknown';
-          if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
-          tlStats[tl].sum += score;
-          tlStats[tl].count += count;
+          if (!tlStats[tl]) tlStats[tl] = { good: 0, total: 0 };
+          tlStats[tl].good += goodCount;
+          tlStats[tl].total += totalValid;
        }
     });
 
-    const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, avg: (st.sum / st.count) * 100 / 5 })).sort((a,b) => b.avg - a.avg);
-    const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, avg: (st.sum / st.count) * 100 / 5 })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => b.avg - a.avg);
+    const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({
+      bpo,
+      avg: st.total > 0 ? (st.good / st.total) * 100 : 0
+    })).sort((a,b) => b.avg - a.avg);
+    const tlArr = Object.entries(tlStats).map(([tl, st]) => ({
+      tl,
+      avg: st.total > 0 ? (st.good / st.total) * 100 : 0
+    })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => b.avg - a.avg);
 
     const sortedTLs = tlArr.slice(0, 5);
-    const sortedAgents = [...tableData].filter(a => (viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount) > 0).map(a => {
-       const score = viewMode === 'full' ? a.csatScFullScore : a.csatScFairScore;
-       const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
-       return { ...a, avg: (score / count) * 100 / 5 };
+    const sortedAgents = [...tableData].filter(a => (viewMode === 'full' ? a.csatScTotalValid : a.csatScFairTotalValid) > 0).map(a => {
+       const goodCount = viewMode === 'full' ? a.csatScGoodCount : a.csatScFairGoodCount;
+       const totalValid = viewMode === 'full' ? a.csatScTotalValid : a.csatScFairTotalValid;
+       return { ...a, avg: totalValid > 0 ? (goodCount / totalValid) * 100 : 0 };
     }).sort((a, b) => b.avg - a.avg).slice(0, 5);
 
     const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 1)}%`).join(' · ');
-    const overallAvg = totalCount > 0 ? formatNum((totalSum / totalCount) * 100 / 5, 1) + '%' : '-';
+    const overallGood = tableData.reduce((s, a) => s + (viewMode === 'full' ? a.csatScGoodCount : a.csatScFairGoodCount), 0);
+    const overallValid = tableData.reduce((s, a) => s + (viewMode === 'full' ? a.csatScTotalValid : a.csatScFairTotalValid), 0);
+    const overallAvg = overallValid > 0 ? formatNum((overallGood / overallValid) * 100, 1) + '%' : '-';
 
     return [
       
@@ -436,6 +460,24 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           </div>
         </div>
       </div>
+
+      {isComparisonEnabled && (
+        <>
+          <WoWChartPanel 
+            data={data} 
+            previousData={previousData} 
+            previousData2={previousData2} 
+            previousData3={previousData3} 
+            viewMode={viewMode}
+          />
+          <RespondentChartPanel
+            data={data} 
+            previousData={previousData} 
+            previousData2={previousData2} 
+            previousData3={previousData3} 
+          />
+        </>
+      )}
 
       <KpiTicker items={tickerItems} />
 
@@ -545,7 +587,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                        {scoreAnalysisTopAgents.slice((scoreCasePage - 1) * 20, scoreCasePage * 20).map((agt) => (
                          <tr key={agt.name} className="border-b border-border hover:bg-surface-muted transition-colors group">
                            <td className="p-2 text-center text-text-muted font-medium">{agt.rank}</td>
-                           <td className="p-2 font-medium text-primary max-w-[200px] truncate" title={agt.name}>{agt.name}</td>
+                           <td className="p-2 font-medium text-text-primary max-w-[200px] truncate" title={agt.name}>{agt.name}</td>
                            <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{formatNum(agt.count, 0)}</td>
                          </tr>
                        ))}
@@ -588,26 +630,41 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           </div>
         </div>
       ) : analysisMode === 'category' ? (
-        <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-4">
-             <div>
-               <h2 className="text-sm font-bold text-text-primary">Top Categories (Score 1 & 2)</h2>
-               <p className="text-xs text-text-muted mt-1 ">Identifies categories and top contributors for bad scores</p>
-             </div>
-             <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
-               {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
-             </span>
-          </div>
+        <div className="flex flex-col gap-6">
+          {/* Categories Panel */}
+          <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-4">
+               <div>
+                 <h2 className="text-sm font-bold text-text-primary">Top Categories (Score 1 & 2)</h2>
+                 <p className="text-xs text-text-muted mt-1 ">Identifies categories and top contributors for bad scores</p>
+               </div>
+               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
+                 {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
+               </span>
+            </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
-             <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-               <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top 20 Categories</div>
+            <div className="p-4">
+              {isComparisonEnabled ? (
+                <WoWAnalysisPanel 
+                  type="category"
+                  data={data} 
+                  previousData={previousData} 
+                  previousData2={previousData2} 
+                  previousData3={previousData3} 
+                  viewMode={viewMode}
+                  search={search}
+                  filterTL={filterTL}
+                />
+              ) : (
+                <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                 <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top 10 Categories</div>
                 <table className="w-full text-left text-[10px]">
                  <thead className="bg-surface text-text-secondary border-b border-border">
                    <tr>
                      <th className="p-2 font-bold w-12 text-center min-w-[60px] max-w-[60px]">Rank</th>
                      <th className="p-2 font-bold ">Category Name</th>
-                     <th className="p-2 font-bold w-24 text-center">Freq</th>
+                     <th className="p-2 font-bold w-16 text-center">Freq</th>
+                     {isComparisonEnabled && <th className="p-2 font-bold w-16 text-center">WoW</th>}
                    </tr>
                  </thead>
                  <tbody className="">
@@ -618,11 +675,27 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                           "pertanyaan belum bisa diidentifikasi"
                       ].includes(cat.name.toLowerCase());
                       
+                      const prevCount = prevTopCategories[cat.name] || 0;
+                      const diff = cat.count - prevCount;
+                      const isUp = diff > 0;
+                      const isDown = diff < 0;
+                      
                       return (
                         <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group">
                           <td className="p-2 text-center text-text-muted font-medium">{cat.rank}</td>
                           <td className={`p-2 font-medium max-w-[200px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
                           <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{formatNum(cat.count, 0)}</td>
+                          {isComparisonEnabled && (
+                            <td className="p-2 text-center font-bold text-[10px]">
+                              {diff !== 0 ? (
+                                <span className={isUp ? 'text-red-500' : 'text-green-500'}>
+                                  {isUp ? '▲' : '▼'} {Math.abs(diff)}
+                                </span>
+                              ) : (
+                                <span className="text-text-tertiary">▬ 0</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       );
                    })}
@@ -635,9 +708,37 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                    )}
                  </tbody>
                </table>
-             </div>
+              </div>
+              )}
+            </div>
+          </div>
 
-             <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          {/* Agents Panel */}
+          <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-4">
+               <div>
+                 <h2 className="text-sm font-bold text-text-primary">Agent Bottom Score 1-2</h2>
+                 <p className="text-xs text-text-muted mt-1 ">Identifies agents with the highest bad scores</p>
+               </div>
+               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
+                 {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
+               </span>
+            </div>
+
+            <div className="p-4">
+              {isComparisonEnabled ? (
+                <WoWAnalysisPanel 
+                  type="agent"
+                  data={data} 
+                  previousData={previousData} 
+                  previousData2={previousData2} 
+                  previousData3={previousData3} 
+                  viewMode={viewMode}
+                  search={search}
+                  filterTL={filterTL}
+                />
+              ) : (
+                <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Critical Agents</div>
                <table className="w-full text-left text-[10px]">
                  <thead className="bg-surface text-text-secondary border-b border-border">
@@ -663,8 +764,10 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                      </tr>
                    )}
                  </tbody>
-               </table>
-             </div>
+                </table>
+              </div>
+              )}
+            </div>
           </div>
         </div>
       ) : analysisMode === 'agent' ? (
@@ -721,20 +824,24 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     const isPullout = status === 'PULLOUT';
                     const bgClass = isOff ? 'text-text-muted' : '';
                     
-                    if (!daily || daily.count === 0) {
+                    if (!daily || daily.count === 0 || isOff) {
                       return (
-                        <td key={date} className={`p-0 text-center text-text-disabled z-10 ${bgClass}  `}>
+                        <td key={date} className={`p-0 text-center text-text-disabled z-10 ${bgClass}`}>
                            <button 
-                             onClick={() => setSelectedAgent({ agent, date, type: 'csat' })} 
-                             className="w-full h-full min-h-[36px] flex items-center justify-center hover:bg-surface-muted transition-colors group/btn relative cursor-pointer"
+                             onClick={() => isOff ? null : setSelectedAgent({ agent, date, type: 'csat' })} 
+                             className={`w-full h-full min-h-[36px] flex flex-col items-center justify-center transition-colors group/btn relative ${isOff ? 'cursor-default' : 'hover:bg-surface-muted cursor-pointer'}`}
+                             title={isOff && daily && daily.count > 0 ? `Agent OFF — ${daily.count} survey(s) tetap dihitung di total` : ''}
                            >
-                             -
-                             <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity absolute right-1 text-text-muted" />
+                             <span className="text-[11px]">
+                               {isOff ? <span className="text-text-muted/40 italic text-[9px]">off</span> : '-'}
+                             </span>
+                             {!isOff && <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity absolute right-1 text-text-muted" />}
                            </button>
                         </td>
                       );
                     }
-                    const avg = (daily.score / daily.count) * 100 / 5;
+                    // Official formula: good_count / total_valid × 100 (score 3 excluded, stored in daily.score=good, daily.count=total_valid)
+                    const avg = daily.count > 0 ? (daily.score / daily.count) * 100 : 0;
                     const baseColor = getKpiColor(avg, viewMode === 'full' ? 'csatFull' : 'csatFair');
                     const textColor = isPullout ? `text-text-muted italic` : baseColor;
 
@@ -757,8 +864,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td className={`p-2 text-center font-bold  z-10  relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]`}>
                     {totalCount > 0 ? (
                       <div className="flex flex-col">
-                        <span className={`text-[11px] font-bold ${getKpiColor((totalScore / totalCount) * 100 / 5, viewMode === 'full' ? 'csatFull' : 'csatFair')}`}>
-                          {formatNum((totalScore / totalCount) * 100 / 5)}%
+                        <span className={`text-[11px] font-bold ${getKpiColor(
+                          viewMode === 'full'
+                            ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
+                            : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0),
+                          viewMode === 'full' ? 'csatFull' : 'csatFair'
+                        )}`}>
+                          {formatNum(
+                            viewMode === 'full'
+                              ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
+                              : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0)
+                          )}%
                         </span>
                         <span className="text-[9px] text-text-muted font-medium">({totalCount} surveys)</span>
                       </div>
@@ -909,3 +1025,476 @@ export const CsatRoom: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     </div>
   );
 };
+
+const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
+  const { startDate, endDate } = useStore();
+
+  const getWeekLabel = (offset: number) => {
+    if (!startDate || !endDate) return `Week -${offset}`;
+    const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
+    const end = new Date(endDate);
+    end.setDate(end.getDate() - (offset * diff));
+    const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+    const weekNum = Math.ceil(end.getDate() / 7);
+    return `W${weekNum} ${month}`;
+  };
+
+  const calcStats = (dataset: AgentKPI[]) => {
+    let sumFull = 0, countFull = 0;
+    let sumTakeout = 0, countTakeout = 0;
+    
+    (dataset || []).forEach(d => {
+      sumFull += d.csatScGoodCount || 0;
+      countFull += d.csatScTotalValid || 0;
+      sumTakeout += d.csatScFairGoodCount || 0;
+      countTakeout += d.csatScFairTotalValid || 0;
+    });
+
+    return {
+      full: countFull > 0 ? Number(((sumFull / countFull) * 100).toFixed(2)) : 0,
+      takeout: countTakeout > 0 ? Number(((sumTakeout / countTakeout) * 100).toFixed(2)) : 0,
+    };
+  };
+
+  const w0 = calcStats(data);
+  const w1 = calcStats(previousData);
+  const w2 = calcStats(previousData2);
+  const w3 = calcStats(previousData3);
+
+  const chartData = [
+    { name: getWeekLabel(3), 'SC Full': w3.full, 'SC Takeout': w3.takeout },
+    { name: getWeekLabel(2), 'SC Full': w2.full, 'SC Takeout': w2.takeout },
+    { name: getWeekLabel(1), 'SC Full': w1.full, 'SC Takeout': w1.takeout },
+    { name: getWeekLabel(0), 'SC Full': w0.full, 'SC Takeout': w0.takeout },
+  ].filter(d => d.name !== 'WNaN Invalid Date');
+
+  const dailyData = React.useMemo(() => {
+    const dates = new Map<string, { goodFull: number, totalFull: number, goodTakeout: number, totalTakeout: number }>();
+    (data || []).forEach(a => {
+      a.dailyHistory?.csatScFull?.forEach(h => {
+        if (!dates.has(h.date)) dates.set(h.date, { goodFull: 0, totalFull: 0, goodTakeout: 0, totalTakeout: 0 });
+        if (h.count > 0) {
+           dates.get(h.date)!.goodFull += h.score;
+           dates.get(h.date)!.totalFull += h.count;
+        }
+      });
+      a.dailyHistory?.csatScFair?.forEach(h => {
+        if (!dates.has(h.date)) dates.set(h.date, { goodFull: 0, totalFull: 0, goodTakeout: 0, totalTakeout: 0 });
+        if (h.count > 0) {
+           dates.get(h.date)!.goodTakeout += h.score;
+           dates.get(h.date)!.totalTakeout += h.count;
+        }
+      });
+    });
+    
+    return Array.from(dates.entries())
+      .map(([date, stats]) => {
+        const d = new Date(date);
+        const validDate = isNaN(d.getTime()) ? date : new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(d);
+        return {
+          date: validDate,
+          'SC Full': stats.totalFull > 0 ? Number(((stats.goodFull / stats.totalFull) * 100).toFixed(2)) : 0,
+          'SC Takeout': stats.totalTakeout > 0 ? Number(((stats.goodTakeout / stats.totalTakeout) * 100).toFixed(2)) : 0,
+          rawDate: date
+        };
+      })
+      .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
+  }, [data]);
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        {/* Weekly Trend Panel */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-center mb-4">
+            <h3 className="text-sm font-bold text-text-primary text-center">4-Week Comparison Trend</h3>
+          </div>
+          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
+                <Bar dataKey="SC Full" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#8b5cf6'}} />
+                </Bar>
+                <Bar dataKey="SC Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Daily Trend Panel */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-center mb-4">
+            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend (Current Week)</h3>
+          </div>
+          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
+                <Bar dataKey="SC Full" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#8b5cf6'}} />
+                </Bar>
+                <Bar dataKey="SC Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, viewMode, search, filterTL, type = 'all' }: any) => {
+  const { startDate, endDate } = useStore();
+
+  const getWeekLabel = (offset: number) => {
+    if (!startDate || !endDate) return `Week -${offset}`;
+    const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
+    const end = new Date(endDate);
+    end.setDate(end.getDate() - (offset * diff));
+    const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+    const weekNum = Math.ceil(end.getDate() / 7);
+    return `W${weekNum} ${month}`;
+  };
+
+  const TAKEOUT_CATEGORIES = [
+    "tidak bisa transaksi namun memiliki limit",
+    "pengajuan limit kredit ditolak",
+    "pertanyaan belum bisa diidentifikasi"
+  ];
+
+  const calcTopCats = (dataset: AgentKPI[]) => {
+    const agg: Record<string, number> = {};
+    dataset.filter(a => {
+      const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchTL = filterTL ? a.teamLeader === filterTL : true;
+      const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
+      return matchSearch && matchTL && count > 0;
+    }).forEach(a => {
+       const cats = viewMode === 'full' ? (a.csatScCategoriesFull || {}) : (a.csatScCategoriesFair || {});
+       for (const cat in cats) {
+          if (!agg[cat]) agg[cat] = 0;
+          agg[cat] += cats[cat];
+       }
+    });
+    return Object.entries(agg)
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, 10)
+      .map((entry, idx) => ({ rank: idx+1, name: entry[0], count: entry[1] }));
+  };
+
+  const calcTopAgents = (dataset: AgentKPI[]) => {
+    return dataset.filter(a => {
+      const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchTL = filterTL ? a.teamLeader === filterTL : true;
+      const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
+      return matchSearch && matchTL && count > 0;
+    }).map(a => {
+       const count = viewMode === 'full' ? (a.csatScBadScoreFullCount || 0) : (a.csatScBadScoreFairCount || 0);
+       return { name: a.name || a.csId, csId: a.csId, badScoreCount: count };
+    }).sort((a, b) => b.badScoreCount - a.badScoreCount).filter(a => a.badScoreCount > 0).slice(0, 5);
+  };
+
+  const weeks = [
+    { 
+      name: getWeekLabel(3), 
+      cats: type === 'all' || type === 'category' ? calcTopCats(previousData3) : [], 
+      agents: type === 'all' || type === 'agent' ? calcTopAgents(previousData3) : [] 
+    },
+    { 
+      name: getWeekLabel(2), 
+      cats: type === 'all' || type === 'category' ? calcTopCats(previousData2) : [], 
+      agents: type === 'all' || type === 'agent' ? calcTopAgents(previousData2) : [] 
+    },
+    { 
+      name: getWeekLabel(1), 
+      cats: type === 'all' || type === 'category' ? calcTopCats(previousData) : [], 
+      agents: type === 'all' || type === 'agent' ? calcTopAgents(previousData) : [] 
+    },
+    { 
+      name: getWeekLabel(0), 
+      cats: type === 'all' || type === 'category' ? calcTopCats(data) : [], 
+      agents: type === 'all' || type === 'agent' ? calcTopAgents(data) : [] 
+    },
+  ].filter(d => d.name !== 'WNaN Invalid Date');
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {weeks.map((week, wIdx) => (
+        <div key={wIdx} className="flex flex-col gap-4">
+          <div className="p-2 bg-primary/10 text-primary font-bold text-center rounded-xl border border-primary/20 text-[11px] uppercase tracking-wider">
+            {week.name}
+          </div>
+          
+          {(type === 'all' || type === 'category') && (
+            <div className="overflow-hidden border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
+              <div className="p-2 bg-surface-muted border-b border-border font-bold text-[10px] text-text-secondary text-center uppercase">
+                Top 10 Categories
+              </div>
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-surface text-text-secondary border-b border-border">
+                <tr>
+                  <th className="p-1.5 font-bold w-6 text-center">#</th>
+                  <th className="p-1.5 font-bold">Category</th>
+                  <th className="p-1.5 font-bold w-8 text-center">Freq</th>
+                </tr>
+              </thead>
+              <tbody>
+                {week.cats.map((cat, i) => {
+                  const isTakeoutCategory = TAKEOUT_CATEGORIES.includes(cat.name.toLowerCase());
+                  return (
+                    <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors">
+                      <td className="p-1.5 text-center text-text-muted font-medium">{i+1}</td>
+                      <td className={`p-1.5 font-medium max-w-[120px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
+                      <td className="p-1.5 text-center font-bold text-[10px] text-text-secondary">{formatNum(cat.count, 0)}</td>
+                    </tr>
+                  );
+                })}
+                {week.cats.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="p-3 text-center text-text-muted text-[10px] border-b border-border">
+                      No categories
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          )}
+
+          {(type === 'all' || type === 'agent') && (
+            <div className="overflow-hidden border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
+              <div className="p-2 bg-surface-muted border-b border-border font-bold text-[10px] text-text-secondary text-center uppercase">
+                Top 5 Agents
+              </div>
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-surface text-text-secondary border-b border-border">
+                <tr>
+                  <th className="p-1.5 font-bold w-6 text-center">#</th>
+                  <th className="p-1.5 font-bold">Agent Name</th>
+                  <th className="p-1.5 font-bold w-8 text-center">Freq</th>
+                </tr>
+              </thead>
+              <tbody>
+                {week.agents.map((agent, i) => {
+                  const isRepeat = wIdx > 0 && weeks[wIdx - 1].agents.some(prevAgent => prevAgent.csId === agent.csId);
+                  return (
+                    <tr key={agent.csId} className="border-b border-border hover:bg-surface-muted transition-colors">
+                      <td className="p-1.5 text-center text-text-muted font-medium">{i+1}</td>
+                      <td className={`p-1.5 font-medium max-w-[120px] truncate ${isRepeat ? 'text-danger font-bold' : 'text-text-primary'}`} title={agent.name}>{agent.name}</td>
+                      <td className="p-1.5 text-center font-bold text-[10px] text-text-secondary">{agent.badScoreCount}</td>
+                    </tr>
+                  );
+                })}
+                {week.agents.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="p-3 text-center text-text-muted text-[10px] border-b border-border">
+                      No critical agents
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          )}
+
+        </div>
+      ))}
+    </div>
+  );
+};
+const RespondentChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
+  const { startDate, endDate } = useStore();
+
+  const getWeekLabel = (offset: number) => {
+    if (!startDate || !endDate) return `Week -${offset}`;
+    const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
+    const end = new Date(endDate);
+    end.setDate(end.getDate() - (offset * diff));
+    const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+    const weekNum = Math.ceil(end.getDate() / 7);
+    return `W${weekNum} ${month}`;
+  };
+
+  const calcRespStats = (dataset: AgentKPI[]) => {
+    let totalProcessed = 0;
+    let totalRespondents = 0;
+    let s5 = 0, s4 = 0, s3 = 0, s2 = 0, s1 = 0;
+    (dataset || []).forEach(a => {
+      totalProcessed += a.csatHistory.length;
+      a.csatHistory.forEach(h => {
+        if (h.score >= 1 && h.score <= 5) {
+          totalRespondents += 1;
+          if (h.score === 5) s5++;
+          if (h.score === 4) s4++;
+          if (h.score === 3) s3++;
+          if (h.score === 2) s2++;
+          if (h.score === 1) s1++;
+        }
+      });
+    });
+    let rate = totalProcessed > 0 ? Number(((totalRespondents / totalProcessed) * 100).toFixed(1)) : 0;
+    return { processed: totalProcessed, respondents: totalRespondents, rate, s5, s4, s3, s2, s1 };
+  };
+
+  const weeksData = React.useMemo(() => {
+    const w0 = calcRespStats(data);
+    const w1 = calcRespStats(previousData);
+    const w2 = calcRespStats(previousData2);
+    const w3 = calcRespStats(previousData3);
+
+    return [
+      { name: getWeekLabel(3), ...w3 },
+      { name: getWeekLabel(2), ...w2 },
+      { name: getWeekLabel(1), ...w1 },
+      { name: getWeekLabel(0), ...w0 },
+    ].filter(d => d.name !== 'WNaN Invalid Date');
+  }, [data, previousData, previousData2, previousData3, startDate, endDate]);
+
+  const dailyRespData = React.useMemo(() => {
+    const dates = new Map<string, { processed: number, respondents: number, s5: number, s4: number, s3: number, s2: number, s1: number }>();
+    (data || []).forEach(a => {
+      a.csatHistory.forEach(h => {
+        if (!dates.has(h.date)) dates.set(h.date, { processed: 0, respondents: 0, s5:0, s4:0, s3:0, s2:0, s1:0 });
+        const dInfo = dates.get(h.date)!;
+        dInfo.processed += 1;
+        if (h.score >= 1 && h.score <= 5) {
+          dInfo.respondents += 1;
+          if (h.score === 5) dInfo.s5++;
+          if (h.score === 4) dInfo.s4++;
+          if (h.score === 3) dInfo.s3++;
+          if (h.score === 2) dInfo.s2++;
+          if (h.score === 1) dInfo.s1++;
+        }
+      });
+    });
+    
+    return Array.from(dates.entries())
+      .map(([date, stats]) => {
+        const d = new Date(date);
+        const validDate = isNaN(d.getTime()) ? date : new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(d);
+        return {
+          date: validDate,
+          Respondents: stats.respondents,
+          s5: stats.s5, s4: stats.s4, s3: stats.s3, s2: stats.s2, s1: stats.s1,
+          rawDate: date
+        };
+      })
+      .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
+  }, [data]);
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const d = payload[0].payload;
+      return (
+        <div className="bg-card border border-border rounded-xl shadow-lg p-3 text-xs">
+          <p className="font-bold text-text-primary mb-2 border-b border-border pb-1">{label}</p>
+          <p className="text-text-secondary font-semibold mb-2">Total Respondents: <span className="text-text-primary">{d.Respondents}</span></p>
+          <div className="flex gap-3 font-medium">
+            <span className="text-green-500">5★ {d.s5}</span>
+            <span className="text-green-400">4★ {d.s4}</span>
+            <span className="text-yellow-500">3★ {d.s3}</span>
+            <span className="text-orange-500">2★ {d.s2}</span>
+            <span className="text-red-500">1★ {d.s1}</span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
+      <div className="flex items-center justify-center mb-4">
+        <h3 className="text-sm font-bold text-text-primary text-center">Respondent Volume Trend</h3>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        {/* Left: Weekly Cards */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-center mb-4">
+            <h4 className="text-xs font-bold text-text-secondary text-center">4-Week Respondents</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-4 h-80">
+            {weeksData.map((w, idx) => {
+              const prevW = idx > 0 ? weeksData[idx - 1] : null;
+              let diff = 0;
+              if (prevW && prevW.respondents > 0) {
+                diff = Number((((w.respondents - prevW.respondents) / prevW.respondents) * 100).toFixed(1));
+              }
+              const isUp = diff > 0;
+              const isDown = diff < 0;
+
+              return (
+                <div key={idx} className="bg-surface/30 rounded-xl p-4 border border-border/50 flex flex-col justify-center items-center relative overflow-hidden group hover:border-primary/30 transition-colors">
+                  <div className="absolute top-0 w-full h-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
+                  <span className="text-sm text-text-secondary font-semibold mb-2">{w.name}</span>
+                  <span className="text-4xl font-bold text-text-primary mb-2">{formatNum(w.respondents, 0)}</span>
+                  
+                  {idx > 0 ? (
+                    <div className={`flex items-center gap-1 text-[11px] font-bold ${isUp ? 'text-green-500' : isDown ? 'text-red-500' : 'text-text-tertiary'}`}>
+                      {isUp ? '▲' : isDown ? '▼' : '▬'} {Math.abs(diff)}%
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-text-tertiary font-bold">&nbsp;</div>
+                  )}
+                  
+                  <div className="mt-auto pt-2 border-t border-border/50 w-full text-center flex flex-col gap-1">
+                    <span className="text-[11px] text-text-secondary">Rate: <strong className="text-text-primary">{w.rate}%</strong></span>
+                    <div className="flex items-center justify-center gap-2 text-[10px] font-medium bg-surface/50 py-1 px-2 rounded-md">
+                      <span className="text-green-500">5★ {w.s5}</span>
+                      <span className="text-green-400">4★ {w.s4}</span>
+                      <span className="text-yellow-500">3★ {w.s3}</span>
+                      <span className="text-orange-500">2★ {w.s2}</span>
+                      <span className="text-red-500">1★ {w.s1}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: Daily Area Chart */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-center mb-4">
+            <h4 className="text-xs font-bold text-text-secondary text-center">Daily Respondents (Current Week)</h4>
+          </div>
+          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailyRespData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorResp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <YAxis tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{stroke: 'rgba(0,0,0,0.1)', strokeWidth: 2}} />
+                <Area type="monotone" dataKey="Respondents" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorResp)">
+                  <LabelList dataKey="Respondents" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: '#f59e0b'}} />
+                </Area>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+export default CsatRoom;

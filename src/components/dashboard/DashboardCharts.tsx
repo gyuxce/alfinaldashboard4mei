@@ -45,8 +45,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={[
-                  { name: 'CSAT SC Full', actual: parseFloat(((stats.csatScFull * 100) / 5).toFixed(2)), target: 75, color: '#F59E0B' },
-                  { name: 'CSAT SC Fair', actual: parseFloat(((stats.csatScFair * 100) / 5).toFixed(2)), target: 92, color: '#F59E0B' },
+                  { name: 'CSAT SC Full', actual: parseFloat((stats.csatScFull || 0).toFixed(2)), target: 75, color: '#F59E0B' },
+                  { name: 'CSAT SC Fair', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: '#F59E0B' },
                   { name: 'QA Score', actual: parseFloat(stats.qa.toFixed(2)), target: 92, color: '#F59E0B' },
                   { name: 'Avg Attendance', actual: parseFloat(stats.attendance.toFixed(2)), target: 95, color: '#3B82F6' },
                   { name: 'WHU (%)', actual: parseFloat(stats.whu.toFixed(2)), target: 96, color: '#22C55E' },
@@ -225,9 +225,22 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                   padding: "8px 12px"
                 }}
                 labelStyle={{ fontSize: "10px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px" }}
-                itemStyle={{ color: "#EF4444", fontWeight: "700", fontSize: "11px", padding: 0 }}
-                formatter={(value: any) => [formatNum(value, 0), "Total Productivity"]}
+                itemStyle={{ fontWeight: "700", fontSize: "11px", padding: 0 }}
+                formatter={(value: any, name: string) => [formatNum(value, 0), name === 'productivity' ? 'Current Period' : 'Previous Period']}
               />
+              
+              <Area
+                type="monotone"
+                dataKey="prevProductivity"
+                stroke="#94A3B8"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                fill="transparent"
+                animationDuration={500}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0, fill: "#94A3B8" }}
+              />
+
               <Area
                 type="monotone"
                 dataKey="productivity"
@@ -263,6 +276,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                   formatter={(val: number) => formatNum(val, 0)} 
                 />
               </Area>
+
             </AreaChart>
           </ResponsiveContainer>
         </div>
