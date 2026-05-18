@@ -83,6 +83,12 @@ export interface AgentKPI {
   csatScBadScoreFullCount: number;
   csatScBadScoreFairCount: number;
 
+  // RCA (Root Cause Analysis)
+  rcaAgentAreaCounts: Record<string, number>;
+  rcaCustomerAreaCounts: Record<string, number>;
+  rcaAkulakuProcessCounts: Record<string, number>;
+  rcaTotalCases: number;
+
   sla1m: number | null;
   sla3m: number | null;
   sla1mCount: number;
@@ -363,6 +369,10 @@ export const processKPIs = (
         },
         csatScBadScoreFullCount: 0,
         csatScBadScoreFairCount: 0,
+        rcaAgentAreaCounts: {},
+        rcaCustomerAreaCounts: {},
+        rcaAkulakuProcessCounts: {},
+        rcaTotalCases: 0,
         sla1m: null,
         sla3m: null,
         sla1mCount: 0,
@@ -669,6 +679,16 @@ export const processKPIs = (
       const ticketId = String(row[idIdx + 1] || "").trim();
       const chatId = String(row[idIdx - 1] || "").trim();
       const uid = String(row[idIdx + 5] || "").trim();
+
+      // Find RCA columns from header row dynamically, or use fixed offsets
+      // RCA columns are appended at end - find by scanning headers
+      const headerRow = csatData[0] || [];
+      const rcaAgentIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca agent area');
+      const rcaCustomerIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca customer area');
+      const rcaAkulakuIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca akulaku process');
+      const rcaAgent = rcaAgentIdx !== -1 ? String(row[rcaAgentIdx] || '').trim() : '';
+      const rcaCustomer = rcaCustomerIdx !== -1 ? String(row[rcaCustomerIdx] || '').trim() : '';
+      const rcaAkulaku = rcaAkulakuIdx !== -1 ? String(row[rcaAkulakuIdx] || '').trim() : '';
       
       const isTakeoutRecord = [
         "tidak bisa transaksi namun memiliki limit",
@@ -686,7 +706,28 @@ export const processKPIs = (
             score: isNaN(score) ? 0 : score,
             category: category.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
             response,
-            isTakeout: isTakeoutRecord         });
+            isTakeout: isTakeoutRecord,
+            rcaAgent,
+            rcaCustomer,
+            rcaAkulaku,
+         });
+      }
+
+      // Aggregate RCA into agent-level counts
+      if (rcaAgent) {
+        if (!agent.rcaAgentAreaCounts[rcaAgent]) agent.rcaAgentAreaCounts[rcaAgent] = 0;
+        agent.rcaAgentAreaCounts[rcaAgent] += 1;
+        agent.rcaTotalCases += 1;
+      }
+      if (rcaCustomer) {
+        if (!agent.rcaCustomerAreaCounts[rcaCustomer]) agent.rcaCustomerAreaCounts[rcaCustomer] = 0;
+        agent.rcaCustomerAreaCounts[rcaCustomer] += 1;
+        if (!rcaAgent) agent.rcaTotalCases += 1;
+      }
+      if (rcaAkulaku) {
+        if (!agent.rcaAkulakuProcessCounts[rcaAkulaku]) agent.rcaAkulakuProcessCounts[rcaAkulaku] = 0;
+        agent.rcaAkulakuProcessCounts[rcaAkulaku] += 1;
+        if (!rcaAgent && !rcaCustomer) agent.rcaTotalCases += 1;
       }
 
       // -- Score Distribution Logic --

@@ -32,6 +32,7 @@ import { DashboardSummary } from './components/dashboard/DashboardSummary';
 import { ProductivityDetail } from './components/dashboard/ProductivityDetail';
 import { CsatOfficialMonitor } from './components/csat/CsatOfficialMonitor';
 import { CsatRoom } from './components/csat/CsatRoom';
+import { CsatRcaMonitor } from './components/csat/CsatRcaMonitor';
 import { SlaWhuMonitor } from './components/sla/SlaWhuMonitor';
 import { WhuMonitor } from './components/sla/WhuMonitor';
 import { QaAgent360 } from './components/qa/QaAgent360';
@@ -165,6 +166,7 @@ export default function App() {
     { id: 'productivity', label: 'Productivity Detail', icon: Activity },
     { id: 'csat_official', label: 'CSAT Official', icon: Star },
     { id: 'csat', label: 'CSAT Room (Surveys)', icon: Star },
+    { id: 'csat_rca', label: 'CSAT Root Cause', icon: FileText },
     { id: 'sla', label: 'SLA Monitor', icon: CheckCircle },
     { id: 'whu', label: 'WHU Monitor', icon: Clock },
     { id: 'qa', label: 'QA Agent 360', icon: UserCircle },
@@ -470,6 +472,7 @@ export default function App() {
           {activeTab === 'productivity' && <ProductivityDetail data={kpiData} />}
           {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
           {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+          {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
           {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
           {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
           {activeTab === 'qa' && <QaAgent360 data={kpiData} />}

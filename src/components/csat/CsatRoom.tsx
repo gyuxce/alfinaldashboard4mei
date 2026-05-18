@@ -11,6 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
+  const selectedBpo = useStore(state => state.selectedBpo);
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'full' | 'fair'>('full');
@@ -1175,6 +1176,12 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     "pertanyaan belum bisa diidentifikasi"
   ];
 
+  const selectedBpo = useStore(state => state.selectedBpo);
+  const upperBpo = (selectedBpo || '').toUpperCase();
+  const isSmallBpo = upperBpo === 'TCID' || upperBpo === 'TCID X TIN' || upperBpo === 'TIN X TCID';
+  const topCatsLimit = isSmallBpo ? 5 : 10;
+  const topAgentsLimit = isSmallBpo ? 2 : 5;
+
   const calcTopCats = (dataset: AgentKPI[]) => {
     const agg: Record<string, number> = {};
     dataset.filter(a => {
@@ -1191,7 +1198,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     });
     return Object.entries(agg)
       .sort((a,b) => b[1] - a[1])
-      .slice(0, 10)
+      .slice(0, topCatsLimit)
       .map((entry, idx) => ({ rank: idx+1, name: entry[0], count: entry[1] }));
   };
 
@@ -1204,7 +1211,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     }).map(a => {
        const count = viewMode === 'full' ? (a.csatScBadScoreFullCount || 0) : (a.csatScBadScoreFairCount || 0);
        return { name: a.name || a.csId, csId: a.csId, badScoreCount: count };
-    }).sort((a, b) => b.badScoreCount - a.badScoreCount).filter(a => a.badScoreCount > 0).slice(0, 5);
+    }).sort((a, b) => b.badScoreCount - a.badScoreCount).filter(a => a.badScoreCount > 0).slice(0, topAgentsLimit);
   };
 
   const weeks = [
@@ -1241,7 +1248,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
           {(type === 'all' || type === 'category') && (
             <div className="overflow-hidden border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
               <div className="p-2 bg-surface-muted border-b border-border font-bold text-[10px] text-text-secondary text-center uppercase">
-                Top 10 Categories
+                Top {topCatsLimit} Categories
               </div>
             <table className="w-full text-left text-[10px]">
               <thead className="bg-surface text-text-secondary border-b border-border">
@@ -1277,7 +1284,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
           {(type === 'all' || type === 'agent') && (
             <div className="overflow-hidden border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
               <div className="p-2 bg-surface-muted border-b border-border font-bold text-[10px] text-text-secondary text-center uppercase">
-                Top 5 Agents
+                Top {topAgentsLimit} Agents
               </div>
             <table className="w-full text-left text-[10px]">
               <thead className="bg-surface text-text-secondary border-b border-border">
@@ -1289,7 +1296,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
               </thead>
               <tbody>
                 {week.agents.map((agent, i) => {
-                  const isRepeat = wIdx > 0 && weeks[wIdx - 1].agents.some(prevAgent => prevAgent.csId === agent.csId);
+                  const isRepeat = wIdx === weeks.length - 1 && weeks[wIdx - 1].agents.some(prevAgent => prevAgent.csId === agent.csId);
                   return (
                     <tr key={agent.csId} className="border-b border-border hover:bg-surface-muted transition-colors">
                       <td className="p-1.5 text-center text-text-muted font-medium">{i+1}</td>
@@ -1440,7 +1447,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
               return (
                 <div key={idx} className="bg-surface/30 rounded-xl p-4 border border-border/50 flex flex-col justify-center items-center relative overflow-hidden group hover:border-primary/30 transition-colors">
                   <div className="absolute top-0 w-full h-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
-                  <span className="text-sm text-text-secondary font-semibold mb-2">{w.name}</span>
+                  <span className="text-sm text-text-secondary font-bold mb-2 mt-2">{w.name}</span>
                   <span className="text-4xl font-bold text-text-primary mb-2">{formatNum(w.respondents, 0)}</span>
                   
                   {idx > 0 ? (
@@ -1453,12 +1460,12 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                   
                   <div className="mt-auto pt-2 border-t border-border/50 w-full text-center flex flex-col gap-1">
                     <span className="text-[11px] text-text-secondary">Rate: <strong className="text-text-primary">{w.rate}%</strong></span>
-                    <div className="flex items-center justify-center gap-2 text-[10px] font-medium bg-surface/50 py-1 px-2 rounded-md">
-                      <span className="text-green-500">5★ {w.s5}</span>
-                      <span className="text-green-400">4★ {w.s4}</span>
-                      <span className="text-yellow-500">3★ {w.s3}</span>
-                      <span className="text-orange-500">2★ {w.s2}</span>
-                      <span className="text-red-500">1★ {w.s1}</span>
+                    <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-text-secondary bg-surface/50 py-1.5 px-2 rounded-md mt-1">
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-success shadow-sm"></span>5★ {w.s5}</span>
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#84cc16] shadow-sm"></span>4★ {w.s4}</span>
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-warning shadow-sm"></span>3★ {w.s3}</span>
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-sm"></span>2★ {w.s2}</span>
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-danger shadow-sm"></span>1★ {w.s1}</span>
                     </div>
                   </div>
                 </div>
@@ -1474,7 +1481,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dailyRespData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+              <AreaChart data={dailyRespData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorResp" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
