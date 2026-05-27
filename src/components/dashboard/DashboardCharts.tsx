@@ -207,6 +207,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 tickLine={false}
                 tick={{ fontSize: 10, fill: "var(--color-text-muted)", fontWeight: 500 }}
                 dy={10}
+                minTickGap={30}
               />
               <YAxis
                 axisLine={false}
@@ -266,15 +267,17 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 }}
                 activeDot={{ r: 6, strokeWidth: 0, fill: "#EF4444" }}
               >
-                <LabelList 
-                  dataKey="productivity" 
-                  position="top" 
-                  offset={10}
-                  fill="var(--color-text-primary)" 
-                  fontSize={11} 
-                  fontWeight={700} 
-                  formatter={(val: number) => formatNum(val, 0)} 
-                />
+                {dailyTrend.length <= 14 && (
+                  <LabelList 
+                    dataKey="productivity" 
+                    position="top" 
+                    offset={10}
+                    fill="var(--color-text-primary)" 
+                    fontSize={11} 
+                    fontWeight={700} 
+                    formatter={(val: number) => formatNum(val, 0)} 
+                  />
+                )}
               </Area>
 
             </AreaChart>
