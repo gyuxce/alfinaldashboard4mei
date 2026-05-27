@@ -36,6 +36,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
               <th className="p-2 font-bold">CSAT SC Fair</th>
               <th className="p-2 font-bold">SLA 1m</th>
               <th className="p-2 font-bold">SLA 3m</th>
+              <th className="p-2 font-bold">Avg Attendance</th>
               <th className="p-2 font-bold">WHU</th>
               <th className="p-2 font-bold">QA Score</th>
             </tr>
@@ -131,6 +132,11 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                   {agent.sla3m !== null ? "%" : "-"}
                 </td>
                 <td
+                  className={`p-2 font-bold text-[11px] ${getKpiColor(agent.attendanceScore, "attendance")}`}
+                >
+                  {agent.attendanceScore > 0 ? formatNum(agent.attendanceScore) + "%" : "-"}
+                </td>
+                <td
                   className={`p-2 font-bold text-[11px] ${getKpiColor(agent.whu, "whu")}`}
                 >
                   {formatNum(agent.whu)}
@@ -149,7 +155,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
             {tableData.length === 0 && (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={13}
                   className="p-6 text-center text-text-muted font-medium text-sm"
                 >
                   Tidak ada data agent untuk ditampilkan.

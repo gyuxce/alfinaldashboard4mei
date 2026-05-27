@@ -11,7 +11,7 @@ export function formatNum(num: number | null | undefined, decimals = 2, suffix =
   return Number(num).toFixed(decimals) + suffix;
 }
 
-export type KpiType = 'productivity' | 'qa' | 'sla1m' | 'sla3m' | 'whu' | 'csatFull' | 'csatFair' | 'csatOfficial';
+export type KpiType = 'productivity' | 'qa' | 'sla1m' | 'sla3m' | 'whu' | 'csatFull' | 'csatFair' | 'csatOfficial' | 'attendance';
 
 export function parseDateForSort(dateStr: string): number {
   if (!dateStr) return 0;
@@ -74,6 +74,7 @@ export function getKpiColor(val: number | null | undefined, type: KpiType): stri
     case 'csatFull': target = 75.00; break;
     case 'csatFair': target = 92.00; break;
     case 'csatOfficial': target = 75.00; break;
+    case 'attendance': target = 95.00; break;
   }
 
   const reached = val >= target;
