@@ -105,13 +105,13 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                   />
                   {
                     [
-                      { color: '#111827' },
-                      { color: '#111827' },
-                      { color: '#111827' },
-                      { color: '#111827' },
-                      { color: '#111827' },
-                      { color: '#111827' },
-                      { color: '#111827' }
+                      { color: '#F59E0B' },
+                      { color: '#F59E0B' },
+                      { color: '#F59E0B' },
+                      { color: '#3B82F6' },
+                      { color: '#22C55E' },
+                      { color: '#22C55E' },
+                      { color: '#22C55E' }
                     ].map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))
