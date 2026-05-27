@@ -15,7 +15,7 @@ import {
   Target,
   TrendingDown,
 } from "lucide-react";
-import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { SortableHeader } from '../ui/SortableHeader';
 
 export const ProductivityDetail: React.FC<{ data: AgentKPI[] }> = ({
@@ -204,58 +204,19 @@ export const ProductivityDetail: React.FC<{ data: AgentKPI[] }> = ({
     };
   }, [data, uniqueDates]);
 
-  const tickerItems: TickerItem[] = useMemo(() => {
-    const sortedTLs = [...tlList].sort((a, b) => b.avg - a.avg).slice(0, 5);
-    // Sort agent by localAvg (because it uses local target)
-    const sortedAgents = [...tableData]
-      .sort((a, b) => {
-        const localManDaysA =
-          a.dailyHistory?.schedule?.filter(
-            (sch) => uniqueDates.includes(sch.date) && sch.isManDay,
-          ).length || 0;
-        const localManDaysB =
-          b.dailyHistory?.schedule?.filter(
-            (sch) => uniqueDates.includes(sch.date) && sch.isManDay,
-          ).length || 0;
-        const avgA =
-          localManDaysA > 0 ? a.productivityTotal / localManDaysA : 0;
-        const avgB =
-          localManDaysB > 0 ? b.productivityTotal / localManDaysB : 0;
-        return avgB - avgA;
-      })
-      .slice(0, 5);
-
-    const bpoArrStr = bpoList
-      .map((b) => `${b.bpo} ${formatNum(b.avg, 0)}`)
-      .join(" · ");
-
-    return [
-      { label: "BPO:", value: bpoArrStr, colorType: "neutral" },
-      { isSeparator: true },
-      ...buildRankingItems(
-        sortedTLs.map((t) => ({ name: t.tl, value: formatNum(t.avg, 0) })),
-        "TL:",
-        3,
-      ),
-      { isSeparator: true },
-      ...buildRankingItems(
-        sortedAgents.map((a) => {
-          const localManDays =
-            a.dailyHistory?.schedule?.filter(
-              (sch) => uniqueDates.includes(sch.date) && sch.isManDay,
-            ).length || 0;
-          const avg = localManDays > 0 ? a.productivityTotal / localManDays : 0;
-          return {
-            name: (a.name || a.csId).split(" ")[0],
-            value: formatNum(avg, 0),
-          };
-        }),
-        "Agent:",
-        5,
-      ),
-      { isSeparator: true },
-    ];
-  }, [totalAvg, bpoList, tlList, tableData, uniqueDates]);
+  const hourlyData = useMemo(() => {
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    return hours.map((hr) => {
+      const total = tableData.reduce(
+        (sum, agent) => sum + (agent.hourlyProductivity?.[hr] || 0),
+        0,
+      );
+      return {
+        hour: `${String(hr).padStart(2, "0")}:00`,
+        total,
+      };
+    });
+  }, [tableData]);
 
   return (
     <div className="flex flex-col gap-6 p-2">
@@ -277,8 +238,41 @@ export const ProductivityDetail: React.FC<{ data: AgentKPI[] }> = ({
         </div>
       </div>
 
-      {/* SUMMARY WIDGETS ROW */}
-      <KpiTicker items={tickerItems} />
+      {/* HOURLY PRODUCTIVITY CHART */}
+      <div className="bg-card border border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl p-4 flex flex-col gap-4">
+        <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+          <Activity className="w-4 h-4 text-primary" />
+          Hourly Traffic Distribution (Chat/Tiket per Jam)
+        </h2>
+        <div className="h-[200px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+              <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
+              <RechartsTooltip 
+                cursor={{ fill: 'var(--color-surface-muted)' }}
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="bg-card border border-border p-2 rounded-lg shadow-lg">
+                        <div className="text-xs font-bold text-text-primary">{payload[0].payload.hour}</div>
+                        <div className="text-xs text-text-secondary mt-1">Traffic: <span className="font-bold text-primary">{formatNum(payload[0].value as number, 0)}</span> chats</div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                {hourlyData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.total > 0 ? "var(--color-primary)" : "var(--color-border)"} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all max-h-[calc(100vh-280px)]">
         <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">

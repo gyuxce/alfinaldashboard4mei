@@ -99,6 +99,7 @@ export interface AgentKPI {
   qaScoreCount: number;
   qaHistory: QAEntry[];
   csatHistory: CSATEntry[];
+  hourlyProductivity: number[];
   dailyHistory: {
     productivity: HistoryEntry[];
     csat: HistoryEntry[];
@@ -382,6 +383,7 @@ export const processKPIs = (
         qaScoreCount: 0,
         qaHistory: [],
         csatHistory: [],
+        hourlyProductivity: new Array(24).fill(0),
         dailyHistory: {
           productivity: [],
           csat: [],
@@ -680,6 +682,20 @@ export const processKPIs = (
       const ticketId = String(row[idIdx + 1] || "").trim();
       const chatId = String(row[idIdx - 1] || "").trim();
       const uid = String(row[idIdx + 5] || "").trim();
+
+      // Extract hour from column W (index 22) for hourly productivity
+      const timestampStr = String(row[22] || "").trim();
+      if (timestampStr) {
+        const timeParts = timestampStr.split(" ");
+        if (timeParts.length > 1) {
+           const time = timeParts[1]; // e.g. "21:12:00"
+           const hrStr = time.split(":")[0];
+           const hr = parseInt(hrStr, 10);
+           if (!isNaN(hr) && hr >= 0 && hr < 24) {
+             agent.hourlyProductivity[hr] += 1;
+           }
+        }
+      }
 
       // Find RCA columns from header row dynamically, or use fixed offsets
       // RCA columns are appended at end - find by scanning headers
