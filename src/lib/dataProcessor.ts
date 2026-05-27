@@ -25,6 +25,7 @@ export interface QAEntry {
   score: number;
   hasScore?: boolean;
   feedback: string;
+  crmKode?: string;
 }
 
 export interface HistoryEntry {
@@ -909,6 +910,7 @@ export const processKPIs = (
       const category = String(row[30] || "").trim(); // AE
       const remarks = String(row[32] || "").trim(); // AG
       const feedback = ""; // Not mentioned, left empty
+      const crmKode = String(row[28] || "").trim(); // AC
 
       // Column R (Index 17) is QC Score
       const scoreStr = String(row[17] || "")
@@ -941,6 +943,7 @@ export const processKPIs = (
         score: isNaN(score) ? 0 : score,
         hasScore: !isNaN(score),
         feedback,
+        crmKode,
       });
     }
   }

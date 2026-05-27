@@ -607,6 +607,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       <th className="p-3.5 font-semibold w-24">Date</th>
                       <th className="p-3.5 font-semibold w-32">Mistake Level</th>
                       <th className="p-3.5 font-semibold min-w-[200px]">Category (Indicator)</th>
+                      <th className="p-3.5 font-semibold min-w-[120px]">CRM KODE</th>
                       <th className="p-3.5 font-semibold min-w-[250px]">Remarks & Feedback</th>
                       <th className="p-3.5 font-semibold w-40">Ticket & Chat ID</th>
                       <th className="p-3.5 font-semibold w-32">UID</th>
@@ -633,7 +634,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                               }}
                               className="cursor-pointer bg-surface-muted hover:bg-surface border-b border-border transition-colors"
                             >
-                               <td colSpan={8} className="p-3.5">
+                               <td colSpan={9} className="p-3.5">
                                   <div className="flex items-center gap-2">
                                      {isExpanded ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
                                      <span className="font-bold text-text-primary">{date}</span>
@@ -666,6 +667,9 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                                     </td>
                                     <td className="p-3.5 leading-relaxed font-medium">
                                       {q.category || '-'}
+                                    </td>
+                                    <td className="p-3.5 text-text-primary font-bold text-xs">
+                                      {q.crmKode || '-'}
                                     </td>
                                     <td className="p-3.5 text-text-secondary leading-relaxed max-w-sm whitespace-pre-wrap">
                                       <div className="flex flex-col gap-1">
@@ -722,7 +726,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   ) : (
                     <tbody>
                       <tr>
-                        <td colSpan={8} className="p-16 text-center">
+                        <td colSpan={9} className="p-16 text-center">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-16 h-16 bg-surface-muted border border-border rounded-full flex items-center justify-center mb-4">
                                <BarChart2 className="w-8 h-8 text-text-disabled" />
