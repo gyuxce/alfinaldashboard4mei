@@ -602,14 +602,14 @@ const WeeklyReportPanel = ({
             {getWeekLabel(prevEnd)}: {formatDate(prevStart)} – {formatDate(prevEnd)}
           </div>
           {hasPrev2 && (
-            <div className="flex items-center gap-1.5 bg-surface-muted/50 text-text-muted/70 px-2.5 py-1 rounded-full font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-text-muted/50"></span>
+            <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
               {getWeekLabel(prev2End)}: {formatDate(prev2Start)} – {formatDate(prev2End)}
             </div>
           )}
           {hasPrev3 && (
-            <div className="flex items-center gap-1.5 bg-surface-muted/30 text-text-muted/50 px-2.5 py-1 rounded-full font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-text-muted/30"></span>
+            <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
               {getWeekLabel(prev3End)}: {formatDate(prev3Start)} – {formatDate(prev3End)}
             </div>
           )}
@@ -625,8 +625,8 @@ const WeeklyReportPanel = ({
               <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">Target</th>
               <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(endDate)}</th>
               <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(prevEnd)}</th>
-              {hasPrev2 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted/70 uppercase tracking-widest">{getWeekLabel(prev2End)}</th>}
-              {hasPrev3 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted/50 uppercase tracking-widest">{getWeekLabel(prev3End)}</th>}
+              {hasPrev2 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(prev2End)}</th>}
+              {hasPrev3 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(prev3End)}</th>}
               <th className="text-right px-5 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">Perubahan</th>
             </tr>
           </thead>
@@ -642,18 +642,18 @@ const WeeklyReportPanel = ({
 
               const meetsPrevTarget = row.target === null ? null : row.rawPrev >= row.target;
               const prevColor = meetsPrevTarget === null
-                ? 'text-text-secondary'
-                : meetsPrevTarget ? 'text-success/80' : 'text-danger/80';
+                ? 'text-text-primary'
+                : meetsPrevTarget ? 'text-success' : 'text-danger';
                 
               const meetsPrev2Target = row.target === null ? null : row.rawPrev2 >= row.target;
               const prev2Color = meetsPrev2Target === null
-                ? 'text-text-secondary/70'
-                : meetsPrev2Target ? 'text-success/60' : 'text-danger/60';
+                ? 'text-text-primary'
+                : meetsPrev2Target ? 'text-success' : 'text-danger';
                 
               const meetsPrev3Target = row.target === null ? null : row.rawPrev3 >= row.target;
               const prev3Color = meetsPrev3Target === null
-                ? 'text-text-secondary/50'
-                : meetsPrev3Target ? 'text-success/40' : 'text-danger/40';
+                ? 'text-text-primary'
+                : meetsPrev3Target ? 'text-success' : 'text-danger';
 
               return (
                 <tr key={i} className={`border-b border-border/50 transition-colors ${ i % 2 === 0 ? 'bg-surface/20' : '' }`}>
@@ -663,12 +663,12 @@ const WeeklyReportPanel = ({
                   <td className="px-4 py-3 text-right text-[12px] font-medium text-text-muted">
                     {row.target !== null ? `${row.target}%` : '—'}
                   </td>
-                  <td className={`px-4 py-3 text-right font-bold text-[15px] ${currColor}`}>
+                  <td className={`px-4 py-3 text-right font-bold text-[14px] ${currColor}`}>
                     {row.curr}
                   </td>
-                  <td className={`px-4 py-3 text-right text-[13px] font-semibold ${prevColor}`}>{row.prev}</td>
-                  {hasPrev2 && <td className={`px-4 py-3 text-right text-[13px] font-medium ${prev2Color}`}>{row.prev2}</td>}
-                  {hasPrev3 && <td className={`px-4 py-3 text-right text-[13px] font-medium ${prev3Color}`}>{row.prev3}</td>}
+                  <td className={`px-4 py-3 text-right text-[14px] font-bold ${prevColor}`}>{row.prev}</td>
+                  {hasPrev2 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev2Color}`}>{row.prev2}</td>}
+                  {hasPrev3 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev3Color}`}>{row.prev3}</td>}
                   <td className="px-5 py-3 text-right">
                     {isFlat ? (
                       <span className="text-[11px] font-semibold text-text-muted">—</span>
