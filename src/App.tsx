@@ -469,7 +469,7 @@ export default function App() {
         <div className="w-full pb-8">
           {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
           {activeTab === 'leaderboard' && <Leaderboard />}
-          {activeTab === 'productivity' && <ProductivityDetail data={kpiData} />}
+          {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
           {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
           {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
           {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}

@@ -15,11 +15,19 @@ import {
   Target,
   TrendingDown,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from "recharts";
 import { SortableHeader } from '../ui/SortableHeader';
 
-export const ProductivityDetail: React.FC<{ data: AgentKPI[] }> = ({
+export const ProductivityDetail: React.FC<{ 
+  data: AgentKPI[];
+  previousData?: AgentKPI[];
+  previousData2?: AgentKPI[];
+  previousData3?: AgentKPI[];
+}> = ({
   data,
+  previousData = [],
+  previousData2 = [],
+  previousData3 = [],
 }) => {
   const [search, setSearch] = useState("");
   const [filterTL, setFilterTL] = useState<string | null>(null);
@@ -34,7 +42,7 @@ export const ProductivityDetail: React.FC<{ data: AgentKPI[] }> = ({
   };
 
   const dict = useStore((state) => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore();
+  const { startDate, endDate, setDateRange, isComparisonEnabled } = useStore();
 
   const filteredData = useMemo(() => {
     return data.filter((a) => {
@@ -204,19 +212,36 @@ export const ProductivityDetail: React.FC<{ data: AgentKPI[] }> = ({
     };
   }, [data, uniqueDates]);
 
-  const hourlyData = useMemo(() => {
+  const hourlyDataWow = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
+    
+    const filterAgent = (a: AgentKPI) => {
+      const matchSearch =
+        a.csId.toLowerCase().includes(search.toLowerCase()) ||
+        (a.name || "").toLowerCase().includes(search.toLowerCase());
+      const matchTL = filterTL ? a.teamLeader === filterTL : true;
+      return matchSearch && matchTL && a.productivityBase > 0;
+    };
+    
+    const prevFiltered = previousData.filter(filterAgent);
+    const prev2Filtered = previousData2.filter(filterAgent);
+    const prev3Filtered = previousData3.filter(filterAgent);
+
     return hours.map((hr) => {
-      const total = tableData.reduce(
+      const getSum = (dataset: AgentKPI[]) => dataset.reduce(
         (sum, agent) => sum + (agent.hourlyProductivity?.[hr] || 0),
-        0,
+        0
       );
+      
       return {
         hour: `${String(hr).padStart(2, "0")}:00`,
-        total,
+        total: getSum(tableData),
+        prev: previousData.length ? getSum(prevFiltered) : null,
+        prev2: previousData2.length ? getSum(prev2Filtered) : null,
+        prev3: previousData3.length ? getSum(prev3Filtered) : null,
       };
     });
-  }, [tableData]);
+  }, [tableData, previousData, previousData2, previousData3, search, filterTL]);
 
   return (
     <div className="flex flex-col gap-6 p-2">
@@ -246,30 +271,62 @@ export const ProductivityDetail: React.FC<{ data: AgentKPI[] }> = ({
         </h2>
         <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
-              <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
-              <RechartsTooltip 
-                cursor={{ fill: 'var(--color-surface-muted)' }}
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-card border border-border p-2 rounded-lg shadow-lg">
-                        <div className="text-xs font-bold text-text-primary">{payload[0].payload.hour}</div>
-                        <div className="text-xs text-text-secondary mt-1">Traffic: <span className="font-bold text-primary">{formatNum(payload[0].value as number, 0)}</span> chats</div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                {hourlyData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.total > 0 ? "var(--color-primary)" : "var(--color-border)"} />
-                ))}
-              </Bar>
-            </BarChart>
+            {isComparisonEnabled && previousData.length > 0 ? (
+              <LineChart data={hourlyDataWow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
+                <RechartsTooltip 
+                  cursor={{ fill: 'var(--color-surface-muted)', strokeWidth: 2 }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-card border border-border p-2 rounded-lg shadow-lg">
+                          <div className="text-xs font-bold text-text-primary mb-1">{payload[0].payload.hour}</div>
+                          {payload.map((p, i) => (
+                             <div key={i} className="text-xs text-text-secondary mt-1 flex items-center gap-2">
+                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }}></span>
+                               {p.name}: <span className="font-bold text-primary" style={{ color: p.color }}>{formatNum(p.value as number, 0)}</span>
+                             </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                <Line type="monotone" name="Minggu Ini" dataKey="total" stroke="#E31E24" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" name="Minggu Lalu" dataKey="prev" stroke="#6B7280" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                {previousData2.length > 0 && <Line type="monotone" name="2 Minggu Lalu" dataKey="prev2" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="3 3" dot={false} />}
+                {previousData3.length > 0 && <Line type="monotone" name="3 Minggu Lalu" dataKey="prev3" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="2 2" dot={false} />}
+              </LineChart>
+            ) : (
+              <BarChart data={hourlyDataWow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
+                <RechartsTooltip 
+                  cursor={{ fill: 'var(--color-surface-muted)' }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-card border border-border p-2 rounded-lg shadow-lg">
+                          <div className="text-xs font-bold text-text-primary">{payload[0].payload.hour}</div>
+                          <div className="text-xs text-text-secondary mt-1">Traffic: <span className="font-bold text-primary">{formatNum(payload[0].value as number, 0)}</span> chats</div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                  {hourlyDataWow.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.total > 0 ? "var(--color-primary)" : "var(--color-border)"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
