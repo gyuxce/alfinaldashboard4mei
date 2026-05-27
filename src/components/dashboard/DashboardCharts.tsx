@@ -30,12 +30,12 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
           </h2>
           <div className="flex items-center gap-4 text-xs font-semibold text-text-primary">
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-1.5 rounded-full bg-[#3B82F6]"></div>
-              <span>Actual</span>
+              <div className="w-4 h-1.5 rounded-full bg-[#111827]"></div>
+              <span className="text-[#111827]">Actual</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-1.5 rounded-full bg-[#94A3B8]"></div>
-              <span className="text-text-muted">Target</span>
+              <div className="w-4 h-1.5 rounded-full bg-[#EF4444]"></div>
+              <span className="text-[#EF4444]">Target</span>
             </div>
           </div>
         </div>
@@ -105,13 +105,13 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                   />
                   {
                     [
-                      { color: '#F59E0B' },
-                      { color: '#F59E0B' },
-                      { color: '#F59E0B' },
-                      { color: '#3B82F6' },
-                      { color: '#22C55E' },
-                      { color: '#22C55E' },
-                      { color: '#22C55E' }
+                      { color: '#111827' },
+                      { color: '#111827' },
+                      { color: '#111827' },
+                      { color: '#111827' },
+                      { color: '#111827' },
+                      { color: '#111827' },
+                      { color: '#111827' }
                     ].map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))
@@ -130,7 +130,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                           y1={y} 
                           x2={x + width + 10} 
                           y2={y} 
-                          stroke="#94A3B8" 
+                          stroke="#EF4444" 
                           strokeWidth={2} 
                         />
                         <rect 
@@ -139,13 +139,13 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                           width={28} 
                           height={16} 
                           rx={4} 
-                          fill="var(--color-surface-muted)" 
+                          fill="#FEE2E2" 
                         />
                         <text 
                           x={x + width + 24} 
                           y={y} 
                           textAnchor="middle" 
-                          fill="var(--color-text-muted)" 
+                          fill="#EF4444" 
                           fontSize={9} 
                           fontWeight={700}
                           dy={3}
