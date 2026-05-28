@@ -687,7 +687,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                                        </div>
                                     </td>
                                     <td className="p-3.5">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] uppercase shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${badgeClass}`}>
+                                      <span className={`whitespace-nowrap px-2 py-0.5 rounded text-[10px] uppercase shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${badgeClass}`}>
                                         {q.mistakeLevel || 'N/A'}
                                       </span>
                                     </td>
