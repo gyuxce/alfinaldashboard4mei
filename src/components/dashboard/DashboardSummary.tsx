@@ -139,7 +139,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
         productivity: totalProd,
         avgProductivity: sumManDays > 0 ? totalProd / sumManDays : 0,
         csat: csatCount > 0 ? sumCsat / csatCount : 0,
-        csatPoin: csatCount > 0 ? (sumCsat / csatCount / 100) * 5 : 0,  // convert % back to 1-5 scale
+        csatPercent: csatCount > 0 ? (sumCsat / csatCount / 5) * 100 : 0,
         csatScFull: countCsatScFull > 0 ? (sumCsatScFull / countCsatScFull) * 100 : 0,
         csatScFullCount: countCsatScFull,
         csatScFair: countCsatScFair > 0 ? (sumCsatScFair / countCsatScFair) * 100 : 0,
@@ -329,10 +329,10 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
             />
             <StatCard
               title="CSAT Official"
-              value={formatNum(currentStats.csat) + "%"}
-              subValue={currentStats.csatPoin > 0 ? formatNum(currentStats.csatPoin, 2) + " poin" : undefined}
-              delta={getDelta(currentStats.csat, previousStats.csat)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.csat) + "%" : undefined}
+              value={formatNum(currentStats.csat)}
+              subValue={currentStats.csatPercent > 0 ? formatNum(currentStats.csatPercent, 2) + "%" : undefined}
+              delta={getDelta(currentStats.csatPercent, previousStats.csatPercent)}
+              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.csatPercent) + "%" : undefined}
               kpiTheme="csat"
             />
             <StatCard
@@ -565,7 +565,7 @@ const WeeklyReportPanel = ({
   const rows = [
     { label: 'Total Productivity', curr: formatNum(currentStats.productivity, 0),  prev: formatNum(previousStats.productivity, 0), prev2: formatNum(previousStats2?.productivity || 0, 0), prev3: formatNum(previousStats3?.productivity || 0, 0), delta: currentStats.productivity - previousStats.productivity,   isCount: true,  target: null,  rawCurr: currentStats.productivity,    rawPrev: previousStats.productivity, rawPrev2: previousStats2?.productivity || 0, rawPrev3: previousStats3?.productivity || 0 },
     { label: 'Avg Productivity',   curr: formatNum(currentStats.avgProductivity, 0),prev: formatNum(previousStats.avgProductivity, 0),prev2: formatNum(previousStats2?.avgProductivity || 0, 0),prev3: formatNum(previousStats3?.avgProductivity || 0, 0),delta: currentStats.avgProductivity - previousStats.avgProductivity,isCount: true,  target: 100,   rawCurr: currentStats.avgProductivity, rawPrev: previousStats.avgProductivity, rawPrev2: previousStats2?.avgProductivity || 0, rawPrev3: previousStats3?.avgProductivity || 0 },
-    { label: 'CSAT Official',      curr: formatNum(currentStats.csat) + '%',        prev: formatNum(previousStats.csat) + '%', prev2: formatNum(previousStats2?.csat || 0) + '%', prev3: formatNum(previousStats3?.csat || 0) + '%', delta: currentStats.csat - previousStats.csat,                     isCount: false, target: 75,    rawCurr: currentStats.csat,            rawPrev: previousStats.csat, rawPrev2: previousStats2?.csat || 0, rawPrev3: previousStats3?.csat || 0 },
+    { label: 'CSAT Official',      curr: formatNum(currentStats.csat),        prev: formatNum(previousStats.csat), prev2: formatNum(previousStats2?.csat || 0), prev3: formatNum(previousStats3?.csat || 0), delta: currentStats.csat - previousStats.csat,                     isCount: false, target: 3.75,    rawCurr: currentStats.csat,            rawPrev: previousStats.csat, rawPrev2: previousStats2?.csat || 0, rawPrev3: previousStats3?.csat || 0 },
     { label: 'CSAT SC Full',       curr: formatNum(currentStats.csatScFull) + '%',  prev: formatNum(previousStats.csatScFull) + '%', prev2: formatNum(previousStats2?.csatScFull || 0) + '%', prev3: formatNum(previousStats3?.csatScFull || 0) + '%', delta: currentStats.csatScFull - previousStats.csatScFull,         isCount: false, target: 75,    rawCurr: currentStats.csatScFull,      rawPrev: previousStats.csatScFull, rawPrev2: previousStats2?.csatScFull || 0, rawPrev3: previousStats3?.csatScFull || 0 },
     { label: 'CSAT SC Takeout',    curr: formatNum(currentStats.csatScFair) + '%',  prev: formatNum(previousStats.csatScFair) + '%', prev2: formatNum(previousStats2?.csatScFair || 0) + '%', prev3: formatNum(previousStats3?.csatScFair || 0) + '%', delta: currentStats.csatScFair - previousStats.csatScFair,         isCount: false, target: 92,    rawCurr: currentStats.csatScFair,      rawPrev: previousStats.csatScFair, rawPrev2: previousStats2?.csatScFair || 0, rawPrev3: previousStats3?.csatScFair || 0 },
     { label: 'SLA 1 Menit',        curr: formatNum(currentStats.sla1m) + '%',       prev: formatNum(previousStats.sla1m) + '%', prev2: formatNum(previousStats2?.sla1m || 0) + '%', prev3: formatNum(previousStats3?.sla1m || 0) + '%', delta: currentStats.sla1m - previousStats.sla1m,                   isCount: false, target: 92,    rawCurr: currentStats.sla1m,           rawPrev: previousStats.sla1m, rawPrev2: previousStats2?.sla1m || 0, rawPrev3: previousStats3?.sla1m || 0 },

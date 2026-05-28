@@ -45,8 +45,9 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={[
+                  { name: 'CSAT Official', actual: parseFloat(((stats.csat / 5) * 100 || 0).toFixed(2)), target: 75, color: '#F59E0B', isCsat: true, rawVal: stats.csat || 0 },
                   { name: 'CSAT SC Full', actual: parseFloat((stats.csatScFull || 0).toFixed(2)), target: 75, color: '#F59E0B' },
-                  { name: 'CSAT SC Fair', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: '#F59E0B' },
+                  { name: 'CSAT SC Takeout', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: '#F59E0B' },
                   { name: 'QA Score', actual: parseFloat(stats.qa.toFixed(2)), target: 92, color: '#F59E0B' },
                   { name: 'Avg Attendance', actual: parseFloat(stats.attendance.toFixed(2)), target: 95, color: '#3B82F6' },
                   { name: 'WHU (%)', actual: parseFloat(stats.whu.toFixed(2)), target: 96, color: '#22C55E' },
@@ -101,10 +102,16 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                     fill="var(--color-text-primary)" 
                     fontSize={11} 
                     fontWeight={700} 
-                    formatter={(val: number) => val > 0 ? `${val}%` : ""} 
+                    formatter={(val: number, name: string, props: any) => {
+                      if (props && props.payload && props.payload.isCsat) {
+                        return parseFloat(props.payload.rawVal.toFixed(2)).toString();
+                      }
+                      return val > 0 ? `${val}%` : "";
+                    }} 
                   />
                   {
                     [
+                      { color: '#F59E0B' },
                       { color: '#F59E0B' },
                       { color: '#F59E0B' },
                       { color: '#F59E0B' },
