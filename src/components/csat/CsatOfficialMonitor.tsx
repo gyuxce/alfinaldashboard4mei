@@ -311,7 +311,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
               <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 5]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
                 <Bar dataKey="CSAT Official" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50}>
                   <LabelList dataKey="CSAT Official" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: '#3b82f6'}} />
@@ -331,7 +331,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
               <BarChart data={dailyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 5]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
                 <Bar dataKey="CSAT" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={50}>
                   <LabelList dataKey="CSAT" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: '#f59e0b'}} />

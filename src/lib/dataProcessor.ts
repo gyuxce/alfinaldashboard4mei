@@ -593,21 +593,20 @@ export const processKPIs = (
         });
       }
 
-      const goodRatingAsli = dVal + eVal; // 5 + 4
-      const badRatingAsli = gVal + hVal;  // 2 + 1
-      const totalValidAsli = goodRatingAsli + badRatingAsli;
+      const pointsAsli = (dVal * 5) + (eVal * 4) + (fVal * 3) + (gVal * 2) + (hVal * 1);
+      const totalResAsli = dVal + eVal + fVal + gVal + hVal;
       
-      const csatDaily = totalValidAsli > 0 
-        ? (goodRatingAsli / totalValidAsli) * 100 
+      const csatDaily = totalResAsli > 0 
+        ? (pointsAsli / totalResAsli)
         : null;
 
       if (csatDaily !== null) {
         if (!totalProdCsatAsliSum[agent.csId])
           totalProdCsatAsliSum[agent.csId] = { sum: 0, count: 0 };
         
-        // Store sums of good and total for overall agent average
-        totalProdCsatAsliSum[agent.csId].sum += goodRatingAsli;
-        totalProdCsatAsliSum[agent.csId].count += totalValidAsli;
+        // Store sums of points and respondents for overall agent average
+        totalProdCsatAsliSum[agent.csId].sum += pointsAsli;
+        totalProdCsatAsliSum[agent.csId].count += totalResAsli;
 
         let existingCsat = agent.dailyHistory.csat.find(
           (h) => h.date === targetDateLabel,
@@ -999,7 +998,7 @@ export const processKPIs = (
     ) {
       agent.csatAsli =
         (totalProdCsatAsliSum[agent.csId].sum /
-        totalProdCsatAsliSum[agent.csId].count) * 100;
+        totalProdCsatAsliSum[agent.csId].count);
     }
     if (totalWhuSum[agent.csId] && totalWhuSum[agent.csId].count > 0) {
       agent.whu = totalWhuSum[agent.csId].sum / totalWhuSum[agent.csId].count;

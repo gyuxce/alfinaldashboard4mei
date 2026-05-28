@@ -73,7 +73,7 @@ export function getKpiColor(val: number | null | undefined, type: KpiType): stri
     case 'whu': target = 96.00; break;
     case 'csatFull': target = 75.00; break;
     case 'csatFair': target = 92.00; break;
-    case 'csatOfficial': target = 75.00; break;
+    case 'csatOfficial': target = 3.75; break;
     case 'attendance': target = 95.00; break;
   }
 
