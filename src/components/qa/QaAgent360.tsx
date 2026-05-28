@@ -10,7 +10,7 @@ import { SortableHeader } from '../ui/SortableHeader';
 export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
-  const [selectedAgent, setSelectedAgent] = useState<{agent: AgentKPI, date?: string, type?: 'all' | 'defects'} | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<{agent: AgentKPI, date?: string, type?: 'all' | 'defects' | 'no_mistake'} | null>(null);
   const [viewMode, setViewMode] = useState<'performance' | 'defect'>('performance');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -71,9 +71,10 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return tableData.map(agent => {
       const defects = agent.qaHistory.filter((q) => {
          const level = (q.mistakeLevel || '').toUpperCase();
-         return level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
+         return level.includes('LOW') || level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
       }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+      let lowCount = 0;
       let mediumCount = 0;
       let highCount = 0;
       let veryHighCount = 0;
@@ -85,12 +86,13 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         if (level.includes('VERY HIGH')) veryHighCount++;
         else if (level.includes('HIGH')) highCount++;
         else if (level.includes('MEDIUM')) mediumCount++;
+        else if (level.includes('LOW')) lowCount++;
 
         const category = d.category || '-';
         mistakeCounts[category] = (mistakeCounts[category] || 0) + 1;
       });
 
-      const totalDefect = mediumCount + highCount + veryHighCount;
+      const totalDefect = lowCount + mediumCount + highCount + veryHighCount;
       
       let mostFrequentMistake = '-';
       let maxCount = 0;
@@ -104,6 +106,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       return {
         ...agent,
         defects,
+        lowCount,
         mediumCount,
         highCount,
         veryHighCount,
@@ -245,6 +248,10 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           case 'teamLeader':
             aVal = a.teamLeader || '';
             bVal = b.teamLeader || '';
+            break;
+          case 'low':
+            aVal = a.lowCount || 0;
+            bVal = b.lowCount || 0;
             break;
           case 'medium':
             aVal = a.mediumCount || 0;
@@ -445,6 +452,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="Name / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                   <SortableHeader label="BPO" sortKey="bpo" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                   <SortableHeader label="Team Leader" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                  <SortableHeader label="Low" sortKey="low" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
                   <SortableHeader label="Medium" sortKey="medium" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
                   <SortableHeader label="High" sortKey="high" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
                   <SortableHeader label="Very High" sortKey="veryHigh" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
@@ -473,6 +481,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       </td>
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                       
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.lowCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.lowCount || '-'}</span></td>
                       <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.mediumCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.mediumCount || '-'}</span></td>
                       <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.highCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.highCount || '-'}</span></td>
                       <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.veryHighCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.veryHighCount || '-'}</span></td>
@@ -510,16 +519,21 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
       {selectedAgent && (() => {
         const currentAgentData = defectData.find(a => a.csId === selectedAgent.agent.csId);
-        const rawList = selectedAgent.type === 'all' 
-             ? (currentAgentData?.qaHistory || []) 
-             : (currentAgentData?.defects || []);
         
-        const defectsList = rawList.filter(q => {
-          const level = (q.mistakeLevel || '').toUpperCase();
-          return level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
-        });
-
-        const filteredDefects = selectedAgent.date ? defectsList.filter(q => q.date === selectedAgent.date) : defectsList;
+        let filteredDefectsList = currentAgentData?.qaHistory || [];
+        if (selectedAgent.type === 'defects') {
+           filteredDefectsList = filteredDefectsList.filter(q => {
+              const level = (q.mistakeLevel || '').toUpperCase();
+              return level.includes('LOW') || level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
+           });
+        } else if (selectedAgent.type === 'no_mistake') {
+           filteredDefectsList = filteredDefectsList.filter(q => {
+              const level = (q.mistakeLevel || '').toUpperCase();
+              return level.includes('NO MISTAKE');
+           });
+        }
+        
+        const filteredDefects = selectedAgent.date ? filteredDefectsList.filter(q => q.date === selectedAgent.date) : filteredDefectsList;
 
         const categoryCounts: Record<string, number> = {};
         filteredDefects.forEach(d => {
@@ -550,8 +564,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <div className="flex flex-col gap-2 md:gap-3">
                   <div>
                     <h3 className="font-bold text-base md:text-lg text-text-primary flex flex-wrap items-center gap-1.5 md:gap-2">
-                      <AlertCircle className={`w-4 h-4 md:w-5 md:h-5 ${selectedAgent.type === 'defects' ? 'text-danger' : 'text-primary'}`} />
-                      {selectedAgent.type === 'all' ? 'QA Evaluation History:' : 'Historical Audit Trail:'} {selectedAgent.agent.name || selectedAgent.agent.csId} 
+                      <AlertCircle className={`w-4 h-4 md:w-5 md:h-5 ${selectedAgent.type === 'defects' ? 'text-danger' : selectedAgent.type === 'no_mistake' ? 'text-success' : 'text-primary'}`} />
+                      {selectedAgent.type === 'all' ? 'QA Evaluation History:' : selectedAgent.type === 'no_mistake' ? 'No Mistake Evaluations:' : 'Historical Audit Trail:'} {selectedAgent.agent.name || selectedAgent.agent.csId} 
                       {selectedAgent.date && <span className="text-text-muted font-normal text-xs md:text-sm ml-1 md:ml-2">({selectedAgent.date})</span>}
                     </h3>
                     <p className="text-[10px] md:text-xs text-text-muted mt-0.5 md:mt-1 ml-6 md:ml-7 flex flex-wrap items-center gap-1">
@@ -559,12 +573,22 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       <span className="text-border">&bull;</span> 
                       <span>Team Leader: <span className="font-semibold text-text-primary">{selectedAgent.agent.teamLeader || '-'}</span></span>
                     </p>
+                    
+                    {!selectedAgent.date && (
+                      <div className="mt-4 flex gap-6 border-b border-border w-full ml-6 md:ml-7">
+                        <button onClick={() => setSelectedAgent({...selectedAgent, type: 'defects'})} className={`pb-2 px-1 font-semibold text-sm border-b-2 transition-colors ${selectedAgent.type === 'defects' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-primary'}`}>Defects</button>
+                        <button onClick={() => setSelectedAgent({...selectedAgent, type: 'no_mistake'})} className={`pb-2 px-1 font-semibold text-sm border-b-2 transition-colors ${selectedAgent.type === 'no_mistake' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-primary'}`}>No Mistake</button>
+                        <button onClick={() => setSelectedAgent({...selectedAgent, type: 'all'})} className={`pb-2 px-1 font-semibold text-sm border-b-2 transition-colors ${selectedAgent.type === 'all' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-primary'}`}>All Evaluations</button>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex flex-wrap items-center gap-4 md:gap-8 ml-0 md:ml-7 mt-1 md:mt-0 pl-0 md:pl-4">
                      <div className="flex flex-col bg-card md:bg-transparent border border-border md:border-transparent px-3 py-1.5 md:px-0 md:py-0 rounded-lg shrink-0 shadow-sm md:shadow-none">
-                        <span className="text-[9px] md:text-[10px] font-bold text-text-muted uppercase tracking-wider mb-0.5">{selectedAgent.type === 'defects' ? 'Total Defects' : 'Total Evaluations'}</span>
-                        <span className={`text-base md:text-lg font-black leading-none ${selectedAgent.type === 'defects' ? 'text-danger' : 'text-primary'}`}>{filteredDefects.length}</span>
+                        <span className="text-[9px] md:text-[10px] font-bold text-text-muted uppercase tracking-wider mb-0.5">
+                          {selectedAgent.type === 'defects' ? 'Total Defects' : selectedAgent.type === 'no_mistake' ? 'No Mistake Count' : 'Total Evaluations'}
+                        </span>
+                        <span className={`text-base md:text-lg font-black leading-none ${selectedAgent.type === 'defects' ? 'text-danger' : selectedAgent.type === 'no_mistake' ? 'text-success' : 'text-primary'}`}>{filteredDefects.length}</span>
                      </div>
                      
                      <div className="flex md:hidden flex-col flex-1 min-w-[120px]">
@@ -578,7 +602,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   </div>
                 </div>
                 
-                <div className="hidden md:flex gap-8 items-start">
+                <div className="hidden md:flex gap-8 items-start mt-4">
                   <div className="flex flex-col mr-4 mt-0.5">
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Top Categories (Max 3)</span>
                       <ul className="flex flex-col gap-1.5 text-xs">
@@ -638,8 +662,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                                   <div className="flex items-center gap-2">
                                      {isExpanded ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
                                      <span className="font-bold text-text-primary">{date}</span>
-                                     <span className="text-danger text-[10px] font-bold px-2 py-0.5 rounded-full ml-2">
-                                        {defects.length} Defect{defects.length > 1 ? 's' : ''} Found
+                                     <span className={`${selectedAgent.type === 'no_mistake' ? 'text-success' : 'text-danger'} text-[10px] font-bold px-2 py-0.5 rounded-full ml-2`}>
+                                        {defects.length} Record{defects.length > 1 ? 's' : ''} Found
                                      </span>
                                   </div>
                                </td>
@@ -651,6 +675,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                                 if (levelStr.includes('VERY HIGH')) badgeClass = 'text-danger border border-danger';
                                 else if (levelStr.includes('HIGH') || levelStr.includes('MAJOR')) badgeClass = 'bg-danger-soft text-danger border border-danger';
                                 else if (levelStr.includes('MEDIUM') || levelStr.includes('MINOR')) badgeClass = 'bg-warning-soft text-warning border border-warning';
+                                else if (levelStr.includes('LOW')) badgeClass = 'bg-primary-soft text-primary border border-primary';
+                                else if (levelStr.includes('NO MISTAKE')) badgeClass = 'bg-success-soft text-success border border-success';
                                 
                                 return (
                                   <tr key={`${date}-${i}`} className="border-b border-border hover:bg-surface-muted/50 transition-colors last:border-b-0 text-text-primary group">
