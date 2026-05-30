@@ -1460,12 +1460,29 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                   
                   <div className="mt-auto pt-2 border-t border-border/50 w-full text-center flex flex-col gap-1">
                     <span className="text-[11px] text-text-secondary">Rate: <strong className="text-text-primary">{w.rate}%</strong></span>
-                    <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-text-secondary bg-surface/50 py-1.5 px-2 rounded-md mt-1">
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-success shadow-sm"></span>5★ {w.s5}</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#84cc16] shadow-sm"></span>4★ {w.s4}</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-warning shadow-sm"></span>3★ {w.s3}</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-sm"></span>2★ {w.s2}</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-danger shadow-sm"></span>1★ {w.s1}</span>
+                    <div 
+                      className="flex items-end justify-center gap-2 mt-2 h-12 w-full px-2"
+                      title={`5★: ${w.s5} | 4★: ${w.s4} | 3★: ${w.s3} | 2★: ${w.s2} | 1★: ${w.s1}`}
+                    >
+                      {[
+                        { label: '1★', value: w.s1, color: 'bg-danger' },
+                        { label: '2★', value: w.s2, color: 'bg-orange-500' },
+                        { label: '3★', value: w.s3, color: 'bg-warning' },
+                        { label: '4★', value: w.s4, color: 'bg-[#84cc16]' },
+                        { label: '5★', value: w.s5, color: 'bg-success' }
+                      ].map(bar => {
+                        const maxVal = Math.max(w.s1, w.s2, w.s3, w.s4, w.s5) || 1;
+                        const heightPct = (bar.value / maxVal) * 100;
+                        return (
+                          <div key={bar.label} className="flex flex-col items-center gap-1 group/bar flex-1 max-w-[28px] h-full relative">
+                            <span className="text-[9px] font-bold text-text-primary opacity-0 group-hover/bar:opacity-100 transition-opacity absolute -top-4 bg-surface px-1 rounded shadow-sm z-10">{bar.value}</span>
+                            <div className="w-full bg-surface-muted/50 rounded h-full flex items-end overflow-hidden border border-border/30">
+                              <div className={`w-full rounded-sm ${bar.color} transition-all duration-700`} style={{ height: `${heightPct}%` }}></div>
+                            </div>
+                            <span className="text-[9px] font-bold text-text-muted leading-none">{bar.label}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
