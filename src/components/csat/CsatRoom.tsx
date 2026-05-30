@@ -1467,7 +1467,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                   <div className="mt-auto pt-2 border-t border-border/50 w-full text-center flex flex-col gap-1">
                     <span className="text-[11px] text-text-secondary">Rate: <strong className="text-text-primary">{w.rate}%</strong></span>
                     <div 
-                      className="flex items-end justify-center gap-2 mt-2 h-12 w-full px-2"
+                      className="flex items-end justify-center gap-2 mt-2 h-16 w-full px-2"
                       title={`5★: ${w.s5} | 4★: ${w.s4} | 3★: ${w.s3} | 2★: ${w.s2} | 1★: ${w.s1}`}
                     >
                       {[
@@ -1480,10 +1480,10 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                         const maxVal = Math.max(w.s1, w.s2, w.s3, w.s4, w.s5) || 1;
                         const heightPct = (bar.value / maxVal) * 100;
                         return (
-                          <div key={bar.label} className="flex flex-col items-center gap-1 group/bar flex-1 max-w-[28px] h-full relative">
-                            <span className="text-[9px] font-bold text-text-muted leading-none mt-1">{bar.label}</span>
-                            <span className="text-[9px] font-bold text-text-primary opacity-0 group-hover/bar:opacity-100 transition-opacity absolute top-1/2 -translate-y-1/2 bg-surface px-1 py-0.5 rounded shadow-sm z-10 pointer-events-none">{bar.value}</span>
-                            <div className="w-full bg-surface-muted/50 rounded flex-1 flex items-end overflow-hidden border border-border/30">
+                          <div key={bar.label} className="flex flex-col items-center gap-0.5 group/bar flex-1 max-w-[28px] h-full relative">
+                            <span className="text-[9px] font-bold text-text-primary leading-none">{bar.value}</span>
+                            <span className="text-[8px] font-bold text-text-muted leading-none mt-0.5">{bar.label}</span>
+                            <div className="w-full bg-surface-muted/50 rounded flex-1 flex items-end overflow-hidden border border-border/30 mt-0.5">
                               <div className={`w-full rounded-sm ${bar.color} transition-all duration-700`} style={{ height: `${heightPct}%` }}></div>
                             </div>
                           </div>
