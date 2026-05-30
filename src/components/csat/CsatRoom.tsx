@@ -1434,7 +1434,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           <div className="flex items-center justify-center mb-4">
             <h4 className="text-xs font-bold text-text-secondary text-center">4-Week Respondents</h4>
           </div>
-          <div className="grid grid-cols-2 gap-4 h-80">
+          <div className="grid grid-cols-2 gap-4 h-96">
             {weeksData.map((w, idx) => {
               const prevW = idx > 0 ? weeksData[idx - 1] : null;
               let diff = 0;
@@ -1445,10 +1445,10 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
               const isDown = diff < 0;
 
               return (
-                <div key={idx} className="bg-surface/30 rounded-xl p-4 border border-border/50 flex flex-col justify-center items-center relative overflow-hidden group hover:border-primary/30 transition-colors">
+                <div key={idx} className="bg-surface/30 rounded-xl p-4 pb-3 border border-border/50 flex flex-col justify-between items-center relative overflow-hidden group hover:border-primary/30 transition-colors">
                   <div className="absolute top-0 w-full h-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
-                  <span className="text-sm text-text-secondary font-bold mb-2 mt-2">{w.name}</span>
-                  <span className="text-4xl font-bold text-text-primary mb-2">{formatNum(w.respondents, 0)}</span>
+                  <span className="text-sm text-text-secondary font-bold mb-1 mt-1">{w.name}</span>
+                  <span className="text-3xl xl:text-4xl font-bold text-text-primary mb-1">{formatNum(w.respondents, 0)}</span>
                   
                   {idx > 0 ? (
                     <div className={`flex items-center gap-1 text-[11px] font-bold ${isUp ? 'text-green-500' : isDown ? 'text-red-500' : 'text-text-tertiary'}`}>
@@ -1496,7 +1496,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           <div className="flex items-center justify-center mb-4">
             <h4 className="text-xs font-bold text-text-secondary text-center">Daily Respondents (Current Week)</h4>
           </div>
-          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+          <div className="h-96 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={dailyRespData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                 <defs>
