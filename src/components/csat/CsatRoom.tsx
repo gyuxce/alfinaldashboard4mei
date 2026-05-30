@@ -1440,7 +1440,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           <div className="flex items-center justify-center mb-4">
             <h4 className="text-xs font-bold text-text-secondary text-center">4-Week Respondents</h4>
           </div>
-          <div className="grid grid-cols-2 gap-4 h-96">
+          <div className="grid grid-cols-2 gap-4 h-full">
             {weeksData.map((w, idx) => {
               const prevW = idx > 0 ? weeksData[idx - 1] : null;
               let diff = 0;
@@ -1481,11 +1481,11 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                         const heightPct = (bar.value / maxVal) * 100;
                         return (
                           <div key={bar.label} className="flex flex-col items-center gap-1 group/bar flex-1 max-w-[28px] h-full relative">
-                            <span className="text-[9px] font-bold text-text-primary opacity-0 group-hover/bar:opacity-100 transition-opacity absolute -top-4 bg-surface px-1 rounded shadow-sm z-10">{bar.value}</span>
+                            <span className="text-[9px] font-bold text-text-muted leading-none mt-1">{bar.label}</span>
+                            <span className="text-[9px] font-bold text-text-primary opacity-0 group-hover/bar:opacity-100 transition-opacity absolute top-1/2 -translate-y-1/2 bg-surface px-1 py-0.5 rounded shadow-sm z-10 pointer-events-none">{bar.value}</span>
                             <div className="w-full bg-surface-muted/50 rounded flex-1 flex items-end overflow-hidden border border-border/30">
                               <div className={`w-full rounded-sm ${bar.color} transition-all duration-700`} style={{ height: `${heightPct}%` }}></div>
                             </div>
-                            <span className="text-[9px] font-bold text-text-muted leading-none">{bar.label}</span>
                           </div>
                         );
                       })}
@@ -1502,7 +1502,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           <div className="flex items-center justify-center mb-4">
             <h4 className="text-xs font-bold text-text-secondary text-center">Daily Respondents (Current Week)</h4>
           </div>
-          <div className="h-96 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+          <div className="h-full min-h-[380px] w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={dailyRespData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                 <defs>
