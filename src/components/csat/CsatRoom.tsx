@@ -1391,7 +1391,13 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
     return Array.from(dates.entries())
       .map(([date, stats]) => {
         const d = new Date(date);
-        const validDate = isNaN(d.getTime()) ? date : new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(d);
+        let validDate = date;
+        if (!isNaN(d.getTime())) {
+          validDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(d);
+        } else {
+          const parts = date.split(' ');
+          if (parts.length === 3) validDate = `${parts[0]} ${parts[1]}`;
+        }
         return {
           date: validDate,
           Respondents: stats.respondents,
@@ -1476,7 +1482,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                         return (
                           <div key={bar.label} className="flex flex-col items-center gap-1 group/bar flex-1 max-w-[28px] h-full relative">
                             <span className="text-[9px] font-bold text-text-primary opacity-0 group-hover/bar:opacity-100 transition-opacity absolute -top-4 bg-surface px-1 rounded shadow-sm z-10">{bar.value}</span>
-                            <div className="w-full bg-surface-muted/50 rounded h-full flex items-end overflow-hidden border border-border/30">
+                            <div className="w-full bg-surface-muted/50 rounded flex-1 flex items-end overflow-hidden border border-border/30">
                               <div className={`w-full rounded-sm ${bar.color} transition-all duration-700`} style={{ height: `${heightPct}%` }}></div>
                             </div>
                             <span className="text-[9px] font-bold text-text-muted leading-none">{bar.label}</span>
@@ -1506,7 +1512,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
+                <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} minTickGap={10} />
                 <YAxis tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{stroke: 'rgba(0,0,0,0.1)', strokeWidth: 2}} />
                 <Area type="monotone" dataKey="Respondents" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorResp)">
