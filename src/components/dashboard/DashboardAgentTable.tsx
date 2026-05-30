@@ -86,9 +86,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                       </span>
                       <span className="text-[9px] text-text-muted font-medium">
                         (
-                        {formatNum(
-                          agent.csatScTotalValid,
-                        )}
+                        {formatNum((agent.csatScFull / 100) * 5)}
                         )
                       </span>
                     </div>
@@ -109,9 +107,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                       </span>
                       <span className="text-[9px] text-text-muted font-medium">
                         (
-                        {formatNum(
-                          agent.csatScFairTotalValid,
-                        )}
+                        {formatNum((agent.csatScFair / 100) * 5)}
                         )
                       </span>
                     </div>

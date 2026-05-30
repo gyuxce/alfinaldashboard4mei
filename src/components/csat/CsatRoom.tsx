@@ -753,7 +753,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    {agentRankings.critical.map((agent, i) => (
                      <tr key={agent.csId} className="border-b border-border hover:bg-surface-muted transition-colors group">
                        <td className="p-2 text-center text-text-muted font-medium">{i+1}</td>
-                       <td className="p-2 font-medium text-primary max-w-[200px] truncate" title={agent.name}>{agent.name}</td>
+                       <td className="p-2 font-medium text-text-primary max-w-[200px] truncate" title={agent.name}>{agent.name}</td>
                        <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{agent.badScoreCount}</td>
                      </tr>
                    ))}

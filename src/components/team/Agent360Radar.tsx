@@ -26,13 +26,13 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
     const qaScore = agent.qaScoreCount > 0 ? (agent.qaScoreSum / agent.qaScoreCount) : 0;
 
     // CSAT
-    const csatOfficial = agent.csatAsli || 0;
-    const csatSc = agent.csatScFairCount > 0 ? (agent.csatScFairScore / agent.csatScFairCount) : 0;
+    const csatOfficial = agent.csatAsli || 0; // max 5
+    const csatSc = agent.csatScFair || 0; // max 100
     
-    // Use Official CSAT if available, else CSAT SC
+    // Scale csatOfficial to 100 if it exists
+    const csatRadar = csatOfficial > 0 ? (csatOfficial / 5) * 100 : csatSc;
     const origCsat = csatOfficial > 0 ? csatOfficial : csatSc;
-    // CSAT is already on a 0-100 scale
-    const csatRadar = origCsat;
+    const csatSuffix = csatOfficial > 0 ? '' : '%';
 
     // SLA
     const sla1m = agent.sla1m || 0;
@@ -59,7 +59,7 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
         A: Math.round(csatRadar),
         fullMark: 100,
         original: origCsat,
-        suffix: ''
+        suffix: csatSuffix
       },
       {
         subject: 'QA',
