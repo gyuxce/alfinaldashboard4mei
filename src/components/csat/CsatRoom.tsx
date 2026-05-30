@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
-import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown } from 'lucide-react';
+import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useStore } from '../../store';
 import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 
@@ -378,10 +378,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  className={cn(
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    viewMode === 'full' 
-                     ? "bg-card text-primary font-medium" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+                     ? "bg-blue-600 text-white font-medium shadow-sm" 
+                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
                  )}
                >
+                 <CheckCircle className="w-3.5 h-3.5" />
                  Full Score
                </button>
                <button
@@ -389,10 +390,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  className={cn(
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    viewMode === 'fair' 
-                     ? "bg-card text-primary font-medium" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+                     ? "bg-blue-600 text-white font-medium shadow-sm" 
+                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
                  )}
                >
+                 <Filter className="w-3.5 h-3.5" />
                  After Takeout
                </button>
              </div>
@@ -403,8 +405,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  className={cn(
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'agent' 
-                     ? "bg-card text-primary font-medium" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+                     ? "bg-blue-600 text-white font-medium shadow-sm" 
+                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <BarChart2 className="w-3.5 h-3.5" />
@@ -415,8 +417,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  className={cn(
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'defect' 
-                     ? "bg-card text-primary font-medium" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+                     ? "bg-blue-600 text-white font-medium shadow-sm" 
+                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <AlertCircle className="w-3.5 h-3.5" />
@@ -427,10 +429,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  className={cn(
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'category' 
-                     ? "bg-card text-primary font-medium" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+                     ? "bg-blue-600 text-white font-medium shadow-sm" 
+                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
                  )}
                >
+                 <Layers className="w-3.5 h-3.5" />
                  Category Analysis
                </button>
                <button
@@ -438,10 +441,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  className={cn(
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'score' 
-                     ? "bg-card text-primary font-medium" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50"
+                     ? "bg-blue-600 text-white font-medium shadow-sm" 
+                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
                  )}
                >
+                 <TrendingUp className="w-3.5 h-3.5" />
                  Score Analysis
                </button>
              </div>
