@@ -298,7 +298,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                  "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                  viewMode === 'performance'
                    ? "bg-blue-600 text-white font-medium shadow-sm"
-                   : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                   : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                )}
              >
                 <BarChart2 className="w-3.5 h-3.5" />
@@ -310,7 +310,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                  "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                  viewMode === 'defect'
                    ? "bg-blue-600 text-white font-medium shadow-sm"
-                   : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                   : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                )}
              >
                 <AlertCircle className="w-3.5 h-3.5" />

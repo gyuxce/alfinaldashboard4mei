@@ -136,7 +136,7 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                 viewMode === '1m'
                   ? "bg-blue-600 text-white font-medium shadow-sm"
-                  : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                  : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
               )}
             >
               SLA 1m
@@ -147,7 +147,7 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                 viewMode === '3m'
                   ? "bg-blue-600 text-white font-medium shadow-sm"
-                  : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                  : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
               )}
             >
               SLA 3m

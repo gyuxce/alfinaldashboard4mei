@@ -379,7 +379,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    viewMode === 'full' 
                      ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <CheckCircle className="w-3.5 h-3.5" />
@@ -391,7 +391,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    viewMode === 'fair' 
                      ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <Filter className="w-3.5 h-3.5" />
@@ -406,7 +406,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'agent' 
                      ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <BarChart2 className="w-3.5 h-3.5" />
@@ -418,7 +418,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'defect' 
                      ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <AlertCircle className="w-3.5 h-3.5" />
@@ -430,7 +430,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'category' 
                      ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <Layers className="w-3.5 h-3.5" />
@@ -442,7 +442,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
                    analysisMode === 'score' 
                      ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-surface"
+                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
                  )}
                >
                  <TrendingUp className="w-3.5 h-3.5" />
