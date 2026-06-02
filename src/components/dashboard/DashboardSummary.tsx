@@ -570,7 +570,7 @@ const CountUpValue = ({ value }: { value: string }) => {
     }
 
     let animationFrame = 0;
-    const durationMs = 750;
+    const durationMs = 2400;
     const startedAt = performance.now();
 
     const tick = (now: number) => {
