@@ -3,6 +3,7 @@ import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
 import { Search, Users, Activity, HeartPulse, UserMinus } from 'lucide-react';
 import { useStore } from '../../store';
+import { EmptyState } from '../ui/EmptyState';
 
 export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -159,8 +160,13 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-text-muted text-sm z-10 relative">
-                    Tidak ada data yang sesuai filter.
+                  <td colSpan={11} className="p-4 z-10 relative">
+                    <EmptyState
+                      title="Tidak ada data attendance"
+                      description="Coba ubah search atau range tanggal."
+                      variant="filter"
+                      className="border-0 bg-transparent py-6"
+                    />
                   </td>
                 </tr>
               )}

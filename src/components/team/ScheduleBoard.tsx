@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { useStore } from '../../store';
 import { parseDateForSort } from '../../lib/utils';
+import { EmptyState } from '../ui/EmptyState';
 
 export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -63,7 +64,16 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
             </thead>
             <tbody className="">
               {tableData.length === 0 ? (
-                <tr><td colSpan={5 + uniqueDates.length} className="text-center p-8 text-text-muted z-10 relative">No data match search</td></tr>
+                <tr>
+                  <td colSpan={5 + uniqueDates.length} className="p-4 z-10 relative">
+                    <EmptyState
+                      title="Tidak ada data schedule"
+                      description="Coba ubah search atau range tanggal."
+                      variant="filter"
+                      className="border-0 bg-transparent py-6"
+                    />
+                  </td>
+                </tr>
               ) : tableData.map((agent, idx) => {
                 const displayName = agent.name || agent.csId;
 

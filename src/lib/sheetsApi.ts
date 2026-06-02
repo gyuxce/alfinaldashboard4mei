@@ -45,7 +45,7 @@ export interface SheetConfig {
   qaSheetName: string;
 }
 
-// Default config — user bisa override di env atau settings
+// Default config, user bisa override di env atau settings
 const DEFAULT_CONFIG: SheetConfig = {
   csidSheetName: import.meta.env.VITE_SHEET_CSID || 'CSID',
   productivitySheetName: import.meta.env.VITE_SHEET_PRODUCTIVITY || 'Productivity CSAT WHU',

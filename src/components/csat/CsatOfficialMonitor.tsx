@@ -5,6 +5,7 @@ import { Search, Star } from 'lucide-react';
 import { useStore } from '../../store';
 import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 import { SortableHeader } from '../ui/SortableHeader';
+import { EmptyState } from '../ui/EmptyState';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 
 export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
@@ -215,8 +216,13 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
               })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={5 + uniqueDates.length} className="p-4 text-center text-text-muted text-sm z-10">
-                    Tidak ada data yang sesuai filter.
+                  <td colSpan={5 + uniqueDates.length} className="p-4 z-10">
+                    <EmptyState
+                      title="Tidak ada data CSAT official"
+                      description="Coba ubah search, filter Team Leader, atau range tanggal."
+                      variant="filter"
+                      className="border-0 bg-transparent py-6"
+                    />
                   </td>
                 </tr>
               )}

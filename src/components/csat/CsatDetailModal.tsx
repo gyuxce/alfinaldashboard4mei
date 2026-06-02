@@ -1,7 +1,8 @@
 import React from 'react';
-import { AgentKPI } from '../../lib/dataProcessor';
+import { AgentKPI, CSATEntry } from '../../lib/dataProcessor';
 import { parseDateForSort, cn } from '../../lib/utils';
 import { AlertCircle, X, ChevronUp, ChevronDown, Star, Copy, Eye, EyeOff } from 'lucide-react';
+import { EmptyState } from '../ui/EmptyState';
 
 const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = React.useState(false);
@@ -44,6 +45,28 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
       return true;
     });
   }, [filteredSurveys, selectedDetailFilter]);
+
+  const scoreCounts = React.useMemo(() => {
+    const counts: Record<number, number> = {};
+    return filteredSurveys.reduce((acc, survey) => {
+      acc[survey.score] = (acc[survey.score] || 0) + 1;
+      return acc;
+    }, counts);
+  }, [filteredSurveys]);
+
+  const surveysByDate = React.useMemo(() => {
+    const grouped = new Map<string, { surveys: CSATEntry[]; scoreCounts: Record<number, number> }>();
+    tableSurveys.forEach((survey) => {
+      const existing = grouped.get(survey.date) || { surveys: [], scoreCounts: {} };
+      existing.surveys.push(survey);
+      existing.scoreCounts[survey.score] = (existing.scoreCounts[survey.score] || 0) + 1;
+      grouped.set(survey.date, existing);
+    });
+
+    return Array.from(grouped.entries())
+      .sort((a, b) => parseDateForSort(a[0]) - parseDateForSort(b[0]))
+      .map(([date, value]) => ({ date, ...value }));
+  }, [tableSurveys]);
 
   const topCategoriesAll = React.useMemo(() => {
     const agg: Record<string, { total: number, s5: number, s4: number, s3: number, s2: number, s1: number }> = {};
@@ -149,7 +172,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     <Star className="w-2.5 h-2.5 fill-current" /> 5 Total
                   </span>
                   <span className="text-base font-black text-success">
-                    {filteredSurveys.filter(s => s.score === 5).length}
+                    {scoreCounts[5] || 0}
                   </span>
                 </div>
                 <div className="flex flex-col px-3 py-2 bg-success/5 rounded-lg border border-success/20 shadow-sm min-w-[80px]">
@@ -157,7 +180,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     <Star className="w-2.5 h-2.5 fill-current" /> 4 Total
                   </span>
                   <span className="text-base font-black text-success/80">
-                    {filteredSurveys.filter(s => s.score === 4).length}
+                    {scoreCounts[4] || 0}
                   </span>
                 </div>
                 <div className="flex flex-col px-3 py-2 bg-warning/5 rounded-lg border border-warning/20 shadow-sm min-w-[80px]">
@@ -165,7 +188,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     <Star className="w-2.5 h-2.5 fill-current" /> 3 Total
                   </span>
                   <span className="text-base font-black text-warning">
-                    {filteredSurveys.filter(s => s.score === 3).length}
+                    {scoreCounts[3] || 0}
                   </span>
                 </div>
                 <div className="flex flex-col px-3 py-2 bg-orange-500/5 rounded-lg border border-orange-500/20 shadow-sm min-w-[80px]">
@@ -173,7 +196,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     <Star className="w-2.5 h-2.5 fill-current" /> 2 Total
                   </span>
                   <span className="text-base font-black text-orange-500">
-                    {filteredSurveys.filter(s => s.score === 2).length}
+                    {scoreCounts[2] || 0}
                   </span>
                 </div>
                 <div className="flex flex-col px-3 py-2 bg-danger/5 rounded-lg border border-danger/20 shadow-sm min-w-[80px]">
@@ -181,7 +204,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     <Star className="w-2.5 h-2.5 fill-current" /> 1 Total
                   </span>
                   <span className="text-base font-black text-danger">
-                    {filteredSurveys.filter(s => s.score === 1).length}
+                    {scoreCounts[1] || 0}
                   </span>
                 </div>
               </div>
@@ -351,11 +374,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
             </div>
           )}
           
-          {Array.from(new Set<string>(
-             tableSurveys.map(h => h.date)
-          )).sort((a,b) => parseDateForSort(a) - parseDateForSort(b)).map(date => {
-            const dateSurveys = tableSurveys.filter(h => h.date === date);
-            if (dateSurveys.length === 0) return null;
+          {surveysByDate.map(({ date, surveys: dateSurveys, scoreCounts: dateScoreCounts }) => {
             const isExpanded = expandedDates.has(date);
             
             return (
@@ -371,7 +390,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     </span>
                     <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto mt-1 sm:mt-0">
                       {[5, 4, 3, 2, 1].map(score => {
-                        const count = dateSurveys.filter(s => s.score === score).length;
+                        const count = dateScoreCounts[score] || 0;
                         if (count === 0) return null;
                         return (
                           <span key={score} className={cn("px-1.5 py-0.5 rounded text-[10px] md:text-[9px] font-bold text-white flex items-center gap-0.5", score === 5 ? 'bg-success' : score === 4 ? 'bg-success/80' : score === 3 ? 'bg-warning' : score === 2 ? 'bg-orange-500' : 'bg-danger')}>
@@ -451,9 +470,12 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
             );
           })}
           {tableSurveys.length === 0 && (
-             <div className="text-center p-8 text-text-muted mt-4 bg-surface rounded-lg border border-dashed border-border text-sm">
-               Tidak ada data detail.
-             </div>
+             <EmptyState
+               title="Tidak ada data detail"
+               description="Coba ubah filter kategori/agent di modal ini."
+               variant="filter"
+               className="mt-4"
+             />
           )}
         </div>
       </div>

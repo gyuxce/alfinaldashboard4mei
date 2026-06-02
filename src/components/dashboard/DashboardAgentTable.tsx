@@ -1,6 +1,7 @@
 import React from "react";
 import { AgentKPI } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor } from "../../lib/utils";
+import { EmptyState } from "../ui/EmptyState";
 
 interface DashboardAgentTableProps {
   tableData: AgentKPI[];
@@ -152,9 +153,14 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
               <tr>
                 <td
                   colSpan={13}
-                  className="p-6 text-center text-text-muted font-medium text-sm"
+                  className="p-4"
                 >
-                  Tidak ada data agent untuk ditampilkan.
+                  <EmptyState
+                    title="Tidak ada agent yang cocok"
+                    description="Coba ubah pencarian, filter BPO, Team Leader, Agent, atau range tanggal."
+                    variant="filter"
+                    className="border-0 bg-transparent py-6"
+                  />
                 </td>
               </tr>
             )}

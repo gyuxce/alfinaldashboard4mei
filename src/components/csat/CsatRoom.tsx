@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { AgentKPI } from '../../lib/dataProcessor';
+import { AgentKPI, CSATEntry } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useStore } from '../../store';
 import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 
 import { SortableHeader } from '../ui/SortableHeader';
+import { EmptyState } from '../ui/EmptyState';
 import { CsatDetailModal } from "./CsatDetailModal";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, AreaChart, Area } from 'recharts';
 
@@ -930,8 +931,13 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
               )})}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={6 + uniqueDates.length} className="p-4 text-center text-text-muted text-sm z-10">
-                    Tidak ada data yang sesuai filter.
+                  <td colSpan={6 + uniqueDates.length} className="p-4 z-10">
+                    <EmptyState
+                      title="Tidak ada data CSAT survey"
+                      description="Coba ubah search, filter Team Leader, view mode, atau range tanggal."
+                      variant="filter"
+                      className="border-0 bg-transparent py-6"
+                    />
                   </td>
                 </tr>
               )}
@@ -1034,8 +1040,13 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
               )})}
               {tableData.filter(agent => (viewMode === 'full' ? agent.csatScBadScoreFullCount : agent.csatScBadScoreFairCount) > 0).length === 0 && (
                 <tr>
-                  <td colSpan={11} className="p-4 text-center text-text-muted text-sm z-10">
-                    Tidak ada defect csat.
+                  <td colSpan={11} className="p-4 z-10">
+                    <EmptyState
+                      title="Tidak ada defect CSAT"
+                      description="Tidak ada score buruk pada filter dan view mode saat ini."
+                      variant="data"
+                      className="border-0 bg-transparent py-6"
+                    />
                   </td>
                 </tr>
               )}

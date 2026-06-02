@@ -4,7 +4,6 @@ import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
 import { useStore } from "../../store";
 import {
   Search,
-  MessageSquare,
   TrendingUp,
   Activity,
   BarChart3,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from "recharts";
 import { SortableHeader } from '../ui/SortableHeader';
+import { EmptyState } from "../ui/EmptyState";
 
 export const ProductivityDetail: React.FC<{ 
   data: AgentKPI[];
@@ -64,6 +64,8 @@ export const ProductivityDetail: React.FC<{
     );
   }, [filteredData]);
 
+  const uniqueDateSet = useMemo(() => new Set(uniqueDates), [uniqueDates]);
+
   const tableData = useMemo(() => {
     let sorted = [...filteredData];
     if (sortConfig) {
@@ -73,9 +75,16 @@ export const ProductivityDetail: React.FC<{
 
         const getLocalGap = (agent: AgentKPI) => {
           const localManDays = agent.dailyHistory?.schedule?.filter(
-            (sch) => uniqueDates.includes(sch.date) && sch.isManDay,
+            (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
           ).length || 0;
           return agent.productivityTotal - (localManDays * 100);
+        };
+
+        const getLocalAverage = (agent: AgentKPI) => {
+          const localManDays = agent.dailyHistory?.schedule?.filter(
+            (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
+          ).length || 0;
+          return localManDays > 0 ? agent.productivityTotal / localManDays : 0;
         };
 
         switch (sortConfig.key) {
@@ -92,8 +101,8 @@ export const ProductivityDetail: React.FC<{
             bVal = b.teamLeader || '';
             break;
           case 'average':
-            aVal = a.prodAvg || 0;
-            bVal = b.prodAvg || 0;
+            aVal = getLocalAverage(a);
+            bVal = getLocalAverage(b);
             break;
           case 'gap':
             aVal = getLocalGap(a);
@@ -107,7 +116,7 @@ export const ProductivityDetail: React.FC<{
       });
     }
     return sorted;
-  }, [filteredData, sortConfig, uniqueDates]);
+  }, [filteredData, sortConfig, uniqueDateSet]);
 
   // --- CUSTOM BENTO DASHBOARD WIDGETS ---
   const {
@@ -145,7 +154,7 @@ export const ProductivityDetail: React.FC<{
       sumChat += agent.productivityTotal;
       const localManDays =
         agent.dailyHistory?.schedule?.filter(
-          (sch) => uniqueDates.includes(sch.date) && sch.isManDay,
+          (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
         ).length || 0;
       sumManDays += localManDays;
       const localTargetQuota = localManDays * 100;
@@ -210,7 +219,7 @@ export const ProductivityDetail: React.FC<{
       bpoList: bpoArr,
       tlList: tlArr,
     };
-  }, [data, uniqueDates]);
+  }, [data, uniqueDateSet]);
 
   const hourlyDataWow = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -367,7 +376,7 @@ export const ProductivityDetail: React.FC<{
               const displayName = agent.name || agent.csId;
               const localManDays =
                 agent.dailyHistory?.schedule?.filter(
-                  (sch) => uniqueDates.includes(sch.date) && sch.isManDay,
+                  (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
                 ).length || 0;
               const localTargetQuota = localManDays * 100;
               const localGap = agent.productivityTotal - localTargetQuota;
@@ -498,12 +507,14 @@ export const ProductivityDetail: React.FC<{
               <tr>
                 <td
                   colSpan={8 + uniqueDates.length}
-                  className="p-8 text-center text-text-muted text-sm z-10"
+                  className="p-4 z-10"
                 >
-                  <div className="flex flex-col items-center justify-center text-text-secondary">
-                    <MessageSquare className="w-8 h-8 mb-2 opacity-50" />
-                    Tidak ada data yang sesuai filter.
-                  </div>
+                  <EmptyState
+                    title="Tidak ada data productivity"
+                    description="Coba ubah search, filter Team Leader, atau range tanggal."
+                    variant="filter"
+                    className="border-0 bg-transparent py-6"
+                  />
                 </td>
               </tr>
             )}

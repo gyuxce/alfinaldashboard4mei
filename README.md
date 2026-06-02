@@ -1,20 +1,57 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Live Chat KPI Dashboard
 
-# Run and deploy your AI Studio app
+Dashboard React/Vite untuk memantau KPI live chat: productivity, CSAT, SLA, WHU, QA, attendance, schedule, dan leaderboard.
 
-This contains everything you need to run your app locally.
+## Prerequisites
 
-View your app in AI Studio: https://ai.studio/apps/56828921-33c8-4701-b6aa-73d028b847c1
+- Node.js
+- npm
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+```bash
+npm install
+npm run dev
+```
 
+Default dev server berjalan di `http://localhost:3000`.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Data Source
+
+Aplikasi bisa dipakai dengan upload CSV manual melalui File Center tanpa konfigurasi environment.
+
+Untuk mode Google Sheets, buat file `.env.local`:
+
+```env
+VITE_SHEETS_API_KEY=your_google_sheets_api_key
+VITE_SPREADSHEET_ID=your_spreadsheet_id
+```
+
+Nama tab default yang dibaca:
+
+- `CSID`
+- `Productivity CSAT WHU`
+- `CSAT SC`
+- `SLA`
+- `Schedule`
+- `QA`
+
+Jika nama tab berbeda, override dengan env berikut:
+
+```env
+VITE_SHEET_CSID=CSID
+VITE_SHEET_PRODUCTIVITY=Productivity CSAT WHU
+VITE_SHEET_CSAT_SC=CSAT SC
+VITE_SHEET_SLA=SLA
+VITE_SHEET_SCHEDULE=Schedule
+VITE_SHEET_QA=QA
+```
+
+## Scripts
+
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run preview
+```

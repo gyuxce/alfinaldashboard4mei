@@ -6,6 +6,12 @@ import { useStore } from '../../store';
 import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 
 import { SortableHeader } from '../ui/SortableHeader';
+import { EmptyState } from '../ui/EmptyState';
+
+const isQaDefect = (entry: QAEntry) => {
+  const level = (entry.mistakeLevel || '').toUpperCase();
+  return level.includes('LOW') || level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
+};
 
 export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -69,10 +75,9 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
   const defectData = useMemo(() => {
     return tableData.map(agent => {
-      const defects = agent.qaHistory.filter((q) => {
-         const level = (q.mistakeLevel || '').toUpperCase();
-         return level.includes('LOW') || level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
-      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const defects = agent.qaHistory
+        .filter(isQaDefect)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       let lowCount = 0;
       let mediumCount = 0;
@@ -140,7 +145,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
              tlStats[tl].count += agent.qaScoreCount;
           }
        } else {
-          const defectCount = agent.qaHistory.filter(h => h.status !== 'Pass').length;
+          const defectCount = agent.qaHistory.filter(isQaDefect).length;
           totalSum += defectCount;
           totalCount += agent.qaHistory.length || 1; 
           const bpo = agent.bpo || 'Unknown';
@@ -161,7 +166,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
        const sortedTLs = tlArr.slice(0, 5);
        const sortedAgents = [...tableData].filter(a => a.qaScoreCount > 0).map(a => ({ ...a, avg: a.qaScoreSum / a.qaScoreCount })).sort((a, b) => b.avg - a.avg).slice(0, 5);
 
-       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 1)}%`).join(' · ');
+       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 1)}%`).join(' | ');
        const overallAvg = totalCount > 0 ? formatNum(totalSum / totalCount, 1) + '%' : '-';
 
        return [
@@ -177,9 +182,9 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
        const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, count: st.sum })).sort((a,b) => a.count - b.count);
        const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, count: st.sum })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => a.count - b.count);
        const sortedTLs = tlArr.slice(0, 5);
-       const sortedAgents = [...tableData].map(a => ({ ...a, defectCount: a.qaHistory.filter(h => h.status !== 'Pass').length })).sort((a, b) => a.defectCount - b.defectCount).slice(0, 5);
+       const sortedAgents = [...tableData].map(a => ({ ...a, defectCount: a.qaHistory.filter(isQaDefect).length })).sort((a, b) => a.defectCount - b.defectCount).slice(0, 5);
        
-       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${b.count} defect`).join(' · ');
+       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${b.count} defect`).join(' | ');
        const overallAvg = totalSum.toString();
        
        return [
@@ -435,8 +440,13 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 })}
                 {sortedPerformanceData.length === 0 && (
                   <tr>
-                    <td colSpan={6 + uniqueDates.length} className="p-4 text-center text-text-muted text-sm z-10">
-                      Tidak ada data yang sesuai filter.
+                    <td colSpan={6 + uniqueDates.length} className="p-4 z-10">
+                      <EmptyState
+                        title="Tidak ada data QA performance"
+                        description="Coba ubah search, filter Team Leader, view mode, atau range tanggal."
+                        variant="filter"
+                        className="border-0 bg-transparent py-6"
+                      />
                     </td>
                   </tr>
                 )}
@@ -507,8 +517,13 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 })}
                 {sortedDefectData.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-text-muted z-10">
-                      Tidak ada data yang sesuai filter.
+                    <td colSpan={9} className="p-4 z-10">
+                      <EmptyState
+                        title="Tidak ada defect QA"
+                        description="Tidak ada defect pada filter dan view mode saat ini."
+                        variant="data"
+                        className="border-0 bg-transparent py-6"
+                      />
                     </td>
                   </tr>
                 )}
@@ -522,10 +537,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         
         let filteredDefectsList = currentAgentData?.qaHistory || [];
         if (selectedAgent.type === 'defects') {
-           filteredDefectsList = filteredDefectsList.filter(q => {
-              const level = (q.mistakeLevel || '').toUpperCase();
-              return level.includes('LOW') || level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
-           });
+           filteredDefectsList = filteredDefectsList.filter(isQaDefect);
         } else if (selectedAgent.type === 'no_mistake') {
            filteredDefectsList = filteredDefectsList.filter(q => {
               const level = (q.mistakeLevel || '').toUpperCase();

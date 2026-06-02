@@ -1,10 +1,12 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { AgentKPI } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
-import { Activity, Star, Clock, CheckCircle, TrendingUp, Smile, Users } from "lucide-react";
+import { Activity, Star, Clock, CheckCircle, TrendingUp, Smile, Users, Info, ChevronDown } from "lucide-react";
 import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
 import { DashboardAgentTable } from "./DashboardAgentTable";
+import { EmptyState } from "../ui/EmptyState";
+import { calculateAgentCompositeScore } from "../../lib/kpiScoring";
 
 interface Props {
   data: AgentKPI[];
@@ -15,6 +17,7 @@ interface Props {
 
 export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const [search, setSearch] = useState("");
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
   const dict = useStore((state) => state.agentDictionary);
   const { startDate, endDate, setDateRange } = useStore();
 
@@ -32,62 +35,11 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
   const topAgentsList = useMemo(() => {
     const aList: { name: string; score: number }[] = [];
     tableData.forEach((agent) => {
-      // 1. QA
-      const qaOriginal =
-        agent.qaScoreCount > 0 ? agent.qaScoreSum / agent.qaScoreCount : null;
-      const qa_pct = qaOriginal;
-
-      // 2. Productivity
-      const prodOriginal =
-        agent.targetQuota > 0
-          ? (agent.productivityTotal / agent.targetQuota) * 100
-          : null;
-      const prod_pct =
-        prodOriginal !== null ? Math.min(prodOriginal, 100) : null;
-
-      // 3. CSAT
-      const csatOriginal = agent.csatAsli;
-      let csat_pct = null;
-      if (csatOriginal !== null && !isNaN(csatOriginal)) {
-        if (csatOriginal > 5) {
-          csat_pct = csatOriginal;
-        } else {
-          csat_pct = (csatOriginal / 5) * 100;
-        }
-      }
-
-      // Calculate points
-      const qa_points = qa_pct !== null ? (qa_pct / 100) * 50 : null;
-      const prod_points = prod_pct !== null ? (prod_pct / 100) * 20 : null;
-      const csat_points = csat_pct !== null ? (csat_pct / 100) * 20 : null;
-      const fixed_points = 10;
-
-      const kpiList = [
-        { points: qa_points, maxWeight: 50, valid: qa_points !== null },
-        { points: prod_points, maxWeight: 20, valid: prod_points !== null },
-        { points: csat_points, maxWeight: 20, valid: csat_points !== null },
-      ];
-
-      const validKpis = kpiList.filter((k) => k.valid);
-
-      let compScore = null;
-      if (validKpis.length > 0) {
-        const totalAvailableWeight = validKpis.reduce(
-          (acc, k) => acc + k.maxWeight,
-          0
-        );
-        const rawWeightedSum = validKpis.reduce(
-          (acc, k) => acc + (k.points as number),
-          0
-        );
-        const scaledScore = (rawWeightedSum / totalAvailableWeight) * 90;
-        compScore = scaledScore + fixed_points;
-      }
-
-      if (compScore !== null) {
+      const composite = calculateAgentCompositeScore(agent);
+      if (composite.score !== null) {
         aList.push({
           name: agent.name && agent.name !== "-" ? agent.name : agent.csId,
-          score: compScore,
+          score: composite.score,
         });
       }
     });
@@ -303,9 +255,11 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
       </div>
 
       {!data.length && (
-        <div className="text-warning p-4 rounded border border-warning/20 text-sm">
-          Belum ada data. Silakan upload file CSV di File Center.
-        </div>
+        <EmptyState
+          title="Belum ada data KPI untuk ditampilkan"
+          description="Upload data di File Center atau cek filter global seperti BPO, Team Leader, Agent, dan range tanggal."
+          variant="data"
+        />
       )}
 
       {data.length > 0 && (
@@ -388,6 +342,11 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
             />
           </div>
 
+          <KpiRulesPanel
+            isOpen={isRulesOpen}
+            onToggle={() => setIsRulesOpen((value) => !value)}
+          />
+
           {/* Weekly Report Panel - only shown when comparison is active */}
           {isComparisonEnabled && previousData.length > 0 && (
             <WeeklyReportPanel
@@ -407,6 +366,184 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
         </>
       )}
     </div>
+  );
+};
+
+type KpiFormula = {
+  target?: string;
+  formula: string;
+  source: string;
+  note?: string;
+};
+
+const KPI_FORMULAS: Record<string, KpiFormula> = {
+  "Total Productivity": {
+    formula: "Sum productivity dari semua agent yang masuk filter.",
+    source: "Productivity CSAT WHU",
+  },
+  "Avg Productivity": {
+    target: "100",
+    formula: "Total Productivity / Man-Days.",
+    source: "Productivity CSAT WHU + Schedule",
+  },
+  "CSAT Official": {
+    target: "3.75 / 5",
+    formula: "Rata-rata nilai CSAT official dari data productivity.",
+    source: "Productivity CSAT WHU",
+  },
+  "CSAT SC Full": {
+    target: "75%",
+    formula: "Score good (4-5) / total score valid, score 3 tidak dihitung.",
+    source: "CSAT SC",
+    note: "Data takeout tetap ikut dihitung.",
+  },
+  "CSAT SC Takeout": {
+    target: "92%",
+    formula: "Score good (4-5) / total score valid setelah data takeout dikeluarkan.",
+    source: "CSAT SC",
+    note: "Kategori takeout dikeluarkan dari pembagi dan pembilang.",
+  },
+  "SLA 1 Menit": {
+    target: "92%",
+    formula: "Rata-rata SLA response 1 menit dari semua agent valid.",
+    source: "SLA Responses",
+  },
+  "SLA 3 Menit": {
+    target: "96%",
+    formula: "Rata-rata SLA response 3 menit dari semua agent valid.",
+    source: "SLA Responses",
+  },
+  "WHU (%)": {
+    target: "96%",
+    formula: "Rata-rata WHU percentage dari semua agent valid.",
+    source: "Productivity CSAT WHU",
+  },
+  "QA Score": {
+    target: "92%",
+    formula: "Total QC score / jumlah QA yang punya score.",
+    source: "QA Score",
+  },
+  "Attendance": {
+    target: "95%",
+    formula: "Presence / Duty * 100.",
+    source: "Schedule",
+    note: "PULLOUT dihitung sebagai duty dan presence.",
+  },
+};
+
+const FormulaTooltip = ({ title }: { title: string }) => {
+  const formula = KPI_FORMULAS[title];
+  if (!formula) return null;
+
+  return (
+    <span className="group/formula relative inline-flex shrink-0 items-center">
+      <button
+        type="button"
+        aria-label={`Formula ${title}`}
+        title={`${title}: ${formula.formula}`}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-text-muted hover:bg-surface-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+      >
+        <Info size={12} />
+      </button>
+      <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-border bg-card p-3 text-left shadow-xl group-hover/formula:block group-focus-within/formula:block">
+        <span className="block text-[11px] font-bold uppercase tracking-wide text-text-primary">
+          {title}
+        </span>
+        {formula.target && (
+          <span className="mt-1 block text-[11px] text-text-muted">
+            Target: <span className="font-semibold text-text-secondary">{formula.target}</span>
+          </span>
+        )}
+        <span className="mt-2 block text-[11px] leading-relaxed text-text-secondary">
+          {formula.formula}
+        </span>
+        <span className="mt-2 block text-[10px] text-text-muted">
+          Source: {formula.source}
+        </span>
+        {formula.note && (
+          <span className="mt-1 block text-[10px] leading-relaxed text-text-muted">
+            Note: {formula.note}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+};
+
+const KpiRulesPanel = ({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) => {
+  const rules = Object.entries(KPI_FORMULAS);
+
+  return (
+    <section className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-surface/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        aria-expanded={isOpen}
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Info size={14} className="shrink-0 text-primary" />
+            <h2 className="text-sm font-bold text-text-primary">KPI Rules</h2>
+          </div>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Target, formula, source data, dan catatan hitungan KPI.
+          </p>
+        </div>
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-border">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[11px]">
+              <thead className="bg-surface text-text-muted">
+                <tr>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">KPI</th>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Target</th>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Formula</th>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Source</th>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rules.map(([name, rule], index) => (
+                  <tr
+                    key={name}
+                    className={`border-t border-border/60 ${index % 2 === 0 ? 'bg-surface/20' : ''}`}
+                  >
+                    <td className="px-4 py-3 font-semibold text-text-primary whitespace-nowrap">
+                      {name}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-text-secondary whitespace-nowrap">
+                      {rule.target || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-text-secondary min-w-[260px]">
+                      {rule.formula}
+                    </td>
+                    <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                      {rule.source}
+                    </td>
+                    <td className="px-4 py-3 text-text-muted min-w-[220px]">
+                      {rule.note || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
   );
 };
 
@@ -446,12 +583,13 @@ const StatCard = ({
   const isCompareMode = previousValue !== undefined;
 
   return (
-    <div className={`bg-card w-full border border-border rounded-xl p-4 lg:p-5 flex flex-col justify-start hover:shadow-md transition-all ${ isCompareMode ? 'h-36' : 'h-28' } relative overflow-hidden`}>
+    <div className={`bg-card w-full border border-border rounded-xl p-4 lg:p-5 flex flex-col justify-start hover:shadow-md transition-all ${ isCompareMode ? 'h-36' : 'h-28' } relative overflow-visible`}>
       <div className="flex items-center gap-2 mb-1.5 w-full">
         <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-surface-muted border border-border/50">
           <Icon size={12} style={{ color }} />
         </div>
-        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide truncate">{title}</p>
+        <p className="min-w-0 flex-1 text-xs font-semibold text-text-secondary uppercase tracking-wide truncate">{title}</p>
+        <FormulaTooltip title={title} />
       </div>
 
       {/* Current Period */}
@@ -463,7 +601,7 @@ const StatCard = ({
           <div className={`flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
             delta > 0 ? 'text-success bg-success/10' : 'text-danger bg-danger/10'
           }`}>
-            {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}
+            {delta > 0 ? '+' : '-'} {Math.abs(delta).toFixed(1)}
           </div>
         )}
       </div>
@@ -595,22 +733,22 @@ const WeeklyReportPanel = ({
         <div className="flex items-center gap-4 text-[11px] flex-wrap justify-end mt-2 sm:mt-0">
           <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold">
             <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-            {getWeekLabel(endDate)}: {formatDate(startDate)} – {formatDate(endDate)}
+            {getWeekLabel(endDate)}: {formatDate(startDate)} to {formatDate(endDate)}
           </div>
           <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-            {getWeekLabel(prevEnd)}: {formatDate(prevStart)} – {formatDate(prevEnd)}
+            {getWeekLabel(prevEnd)}: {formatDate(prevStart)} to {formatDate(prevEnd)}
           </div>
           {hasPrev2 && (
             <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-              {getWeekLabel(prev2End)}: {formatDate(prev2Start)} – {formatDate(prev2End)}
+              {getWeekLabel(prev2End)}: {formatDate(prev2Start)} to {formatDate(prev2End)}
             </div>
           )}
           {hasPrev3 && (
             <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-              {getWeekLabel(prev3End)}: {formatDate(prev3Start)} – {formatDate(prev3End)}
+              {getWeekLabel(prev3End)}: {formatDate(prev3Start)} to {formatDate(prev3End)}
             </div>
           )}
         </div>
@@ -658,10 +796,13 @@ const WeeklyReportPanel = ({
               return (
                 <tr key={i} className={`border-b border-border/50 transition-colors ${ i % 2 === 0 ? 'bg-surface/20' : '' }`}>
                   <td className="px-5 py-3 font-semibold text-text-primary text-[13px] whitespace-nowrap">
-                    {row.label}
+                    <span className="inline-flex items-center gap-1.5">
+                      {row.label}
+                      <FormulaTooltip title={row.label} />
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right text-[12px] font-medium text-text-muted">
-                    {row.target !== null ? `${row.target}%` : '—'}
+                    {row.target !== null ? row.label === 'CSAT Official' ? formatNum(row.target) : `${row.target}%` : '-'}
                   </td>
                   <td className={`px-4 py-3 text-right font-bold text-[14px] ${currColor}`}>
                     {row.curr}
@@ -671,12 +812,12 @@ const WeeklyReportPanel = ({
                   {hasPrev3 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev3Color}`}>{row.prev3}</td>}
                   <td className="px-5 py-3 text-right">
                     {isFlat ? (
-                      <span className="text-[11px] font-semibold text-text-muted">—</span>
+                      <span className="text-[11px] font-semibold text-text-muted">-</span>
                     ) : (
                       <span className={`inline-flex items-center gap-1 text-[12px] font-bold px-2 py-0.5 rounded-full ${
                         isUp ? 'text-success bg-success/10' : 'text-danger bg-danger/10'
                       }`}>
-                        {isUp ? '▲' : '▼'}
+                        {isUp ? '+' : '-'}
                         {Math.abs(row.delta).toFixed(row.isCount ? 0 : 2)}
                         {row.isCount ? '' : ' poin'}
                       </span>

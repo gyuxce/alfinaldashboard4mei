@@ -4,13 +4,16 @@ import { useStore, AppState } from '../../store';
 import { UploadCloud, CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { 
+  countDataRows,
   validateCsidFile, 
   validateProductivityFile, 
   validateCsatScFile, 
   validateSlaFile, 
   validateScheduleFile, 
-  validateQaFile 
+  validateQaFile,
+  ValidationResult
 } from '../../lib/csvValidator';
+import { normalizeDateStr } from '../../lib/dataProcessor';
 
 function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
@@ -22,13 +25,348 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString('id-ID');
 }
 
-const validators: Record<string, (data: any[][]) => any> = {
+const validators: Record<string, (data: any[][]) => ValidationResult> = {
   csidFile: validateCsidFile,
   productivityFile: validateProductivityFile,
   csatScFile: validateCsatScFile,
   slaFile: validateSlaFile,
   scheduleFile: validateScheduleFile,
   qaFile: validateQaFile,
+};
+
+const dataSources = [
+  { label: 'Master CSID', fileKey: 'csidFile', dataKey: 'csidData' },
+  { label: 'Productivity, CSAT, WHU', fileKey: 'productivityFile', dataKey: 'productivityData' },
+  { label: 'CSAT SC Raw Data', fileKey: 'csatScFile', dataKey: 'csatScData' },
+  { label: 'SLA Responses', fileKey: 'slaFile', dataKey: 'slaData' },
+  { label: 'Agent Scheduling', fileKey: 'scheduleFile', dataKey: 'scheduleData' },
+  { label: 'QA Score', fileKey: 'qaFile', dataKey: 'qaData' },
+] as const;
+
+type HealthStatus = 'ok' | 'warning' | 'error' | 'missing';
+type DataSource = typeof dataSources[number];
+
+const getHealthStyles = (status: HealthStatus) => {
+  switch (status) {
+    case 'ok':
+      return {
+        icon: <CheckCircle2 className="w-4 h-4 text-success" />,
+        label: 'OK',
+        className: 'border-success/20 bg-success/5 text-success',
+      };
+    case 'warning':
+      return {
+        icon: <AlertTriangle className="w-4 h-4 text-warning" />,
+        label: 'Warning',
+        className: 'border-warning/20 bg-warning/5 text-warning',
+      };
+    case 'error':
+      return {
+        icon: <AlertCircle className="w-4 h-4 text-danger" />,
+        label: 'Error',
+        className: 'border-danger/20 bg-danger/5 text-danger',
+      };
+    default:
+      return {
+        icon: <FileText className="w-4 h-4 text-text-muted" />,
+        label: 'Missing',
+        className: 'border-border bg-surface/40 text-text-muted',
+      };
+  }
+};
+
+const extractCsIds = (data: any[][]) => {
+  const ids = new Set<string>();
+  data.forEach((row) => {
+    row?.forEach((cell) => {
+      const value = String(cell || '').trim();
+      if (value.startsWith('3-1-')) ids.add(value);
+    });
+  });
+  return ids;
+};
+
+const getDateHealth = (source: DataSource, data: any[][]) => {
+  if (source.dataKey === 'csidData') {
+    return { checked: 0, invalid: 0, samples: [] as string[], ruleLabel: 'No date expected' };
+  }
+
+  const samples: string[] = [];
+  let checked = 0;
+  let invalid = 0;
+
+  const checkValue = (raw: unknown) => {
+    const value = String(raw || '').trim();
+    if (!value) return;
+    checked += 1;
+    if (!normalizeDateStr(value)) {
+      invalid += 1;
+      if (samples.length < 3) samples.push(value);
+    }
+  };
+
+  if (source.dataKey === 'scheduleData') {
+    const header = data[0] || [];
+    for (let c = 5; c < header.length; c++) {
+      checkValue(header[c]);
+    }
+    return { checked, invalid, samples, ruleLabel: 'Schedule header dates' };
+  }
+
+  const config: Record<string, { startRow: number; dateCol: number; label: string }> = {
+    productivityData: { startRow: 2, dateCol: 0, label: 'Productivity date column' },
+    csatScData: { startRow: 1, dateCol: 0, label: 'CSAT SC date column' },
+    slaData: { startRow: 1, dateCol: 0, label: 'SLA date column' },
+    qaData: { startRow: 1, dateCol: 13, label: 'QA checking date column' },
+  };
+  const sourceConfig = config[source.dataKey];
+  if (!sourceConfig) return { checked, invalid, samples, ruleLabel: 'No date rule' };
+
+  for (let r = sourceConfig.startRow; r < data.length; r++) {
+    const row = data[r];
+    if (!row || !row.some(cell => String(cell || '').trim() !== '')) continue;
+    checkValue(row[sourceConfig.dateCol]);
+  }
+
+  return { checked, invalid, samples, ruleLabel: sourceConfig.label };
+};
+
+const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
+  const store = useStore() as any;
+
+  const healthItems = React.useMemo(() => {
+    return dataSources.map((source) => {
+      const data = (store[source.dataKey] || []) as any[][];
+      const rows = countDataRows(data);
+      const hasData = data.length > 0 && rows > 0;
+      const persistedValidation = store.fileValidations?.[source.fileKey] as ValidationResult | null | undefined;
+      const validation = hasData
+        ? (isSheetMode ? validators[source.fileKey](data) : persistedValidation || validators[source.fileKey](data))
+        : null;
+      const status: HealthStatus = !hasData
+        ? 'missing'
+        : validation?.severity === 'error'
+          ? 'error'
+          : validation?.severity === 'warning'
+            ? 'warning'
+            : 'ok';
+
+      return {
+        ...source,
+        rows,
+        status,
+        message: validation?.message || '',
+        errorType: validation?.errorType || '',
+        fileName: store.fileNames?.[source.fileKey] || '',
+      };
+    });
+  }, [
+    isSheetMode,
+    store.csidData,
+    store.productivityData,
+    store.csatScData,
+    store.slaData,
+    store.scheduleData,
+    store.qaData,
+    store.fileValidations,
+    store.fileNames,
+  ]);
+
+  const summary = healthItems.reduce(
+    (acc, item) => {
+      acc[item.status] += 1;
+      acc.rows += item.rows;
+      return acc;
+    },
+    { ok: 0, warning: 0, error: 0, missing: 0, rows: 0 } as Record<HealthStatus, number> & { rows: number },
+  );
+
+  const agentCount = Object.keys(store.agentDictionary || {}).length;
+  const masterIds = React.useMemo(() => new Set(Object.keys(store.agentDictionary || {})), [store.agentDictionary]);
+
+  const orphanChecks = React.useMemo(() => {
+    return dataSources
+      .filter((source) => source.dataKey !== 'csidData')
+      .map((source) => {
+        const data = (store[source.dataKey] || []) as any[][];
+        const ids = extractCsIds(data);
+        const orphanIds = Array.from(ids).filter((id) => !masterIds.has(id)).sort();
+        return {
+          label: source.label,
+          totalIds: ids.size,
+          orphanIds,
+        };
+      });
+  }, [
+    masterIds,
+    store.productivityData,
+    store.csatScData,
+    store.slaData,
+    store.scheduleData,
+    store.qaData,
+  ]);
+
+  const totalOrphanIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    orphanChecks.forEach((check) => check.orphanIds.forEach((id) => ids.add(id)));
+    return ids.size;
+  }, [orphanChecks]);
+
+  const dateChecks = React.useMemo(() => {
+    return dataSources
+      .filter((source) => source.dataKey !== 'csidData')
+      .map((source) => {
+        const data = (store[source.dataKey] || []) as any[][];
+        return {
+          sourceLabel: source.label,
+          ...getDateHealth(source, data),
+        };
+      });
+  }, [
+    store.productivityData,
+    store.csatScData,
+    store.slaData,
+    store.scheduleData,
+    store.qaData,
+  ]);
+
+  const totalInvalidDates = dateChecks.reduce((sum, check) => sum + check.invalid, 0);
+
+  return (
+    <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="p-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-text-primary">Data Health</h2>
+          <p className="text-[11px] text-text-muted mt-1">
+            Status input data sebelum KPI diproses.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 sm:flex gap-2 text-[11px] font-bold">
+          <span className="px-2 py-1 rounded-lg bg-success/5 text-success border border-success/20">OK {summary.ok}</span>
+          <span className="px-2 py-1 rounded-lg bg-warning/5 text-warning border border-warning/20">Warning {summary.warning}</span>
+          <span className="px-2 py-1 rounded-lg bg-danger/5 text-danger border border-danger/20">Error {summary.error}</span>
+          <span className="px-2 py-1 rounded-lg bg-surface text-text-muted border border-border">Missing {summary.missing}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 border-b border-border bg-surface/30">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Total Rows</div>
+          <div className="text-lg font-black text-text-primary mt-0.5">{summary.rows}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Known Agents</div>
+          <div className="text-lg font-black text-text-primary mt-0.5">{agentCount}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Mode</div>
+          <div className="text-lg font-black text-text-primary mt-0.5">{isSheetMode ? 'Google Sheets' : 'CSV Upload'}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 p-4">
+        {healthItems.map((item) => {
+          const style = getHealthStyles(item.status);
+          return (
+            <div key={item.fileKey} className="border border-border rounded-lg p-3 bg-surface/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-text-primary truncate">{item.label}</div>
+                  <div className="text-[10px] text-text-muted mt-1">
+                    {item.rows > 0 ? `${item.rows} rows detected` : 'No data detected'}
+                  </div>
+                  {item.fileName && (
+                    <div className="text-[10px] text-text-muted mt-1 truncate" title={item.fileName}>
+                      {item.fileName}
+                    </div>
+                  )}
+                </div>
+                <div className={cn('shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-bold', style.className)}>
+                  {style.icon}
+                  {style.label}
+                </div>
+              </div>
+              {item.message && (
+                <div className="mt-3 text-[10px] leading-relaxed text-text-secondary bg-card border border-border rounded-lg p-2">
+                  {item.errorType && <span className="font-bold">{item.errorType}: </span>}
+                  {item.message}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 p-4 border-t border-border bg-surface/20">
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 className="text-xs font-bold text-text-primary">Orphan CS ID</h3>
+              <p className="text-[10px] text-text-muted mt-1">CS ID muncul di data KPI tapi tidak ada di Master CSID.</p>
+            </div>
+            <span className={cn(
+              'px-2 py-1 rounded-lg border text-[10px] font-bold',
+              totalOrphanIds > 0 ? 'bg-warning/5 border-warning/20 text-warning' : 'bg-success/5 border-success/20 text-success'
+            )}>
+              {totalOrphanIds} orphan
+            </span>
+          </div>
+          <div className="space-y-2">
+            {orphanChecks.map((check) => (
+              <div key={check.label} className="flex items-start justify-between gap-3 text-[11px] border-b border-border/60 last:border-0 pb-2 last:pb-0">
+                <div className="min-w-0">
+                  <div className="font-semibold text-text-primary">{check.label}</div>
+                  <div className="text-text-muted mt-0.5">{check.totalIds} unique CS ID found</div>
+                  {check.orphanIds.length > 0 && (
+                    <div className="text-warning mt-1 truncate" title={check.orphanIds.join(', ')}>
+                      {check.orphanIds.slice(0, 5).join(', ')}{check.orphanIds.length > 5 ? ` +${check.orphanIds.length - 5} more` : ''}
+                    </div>
+                  )}
+                </div>
+                <span className={cn('shrink-0 font-bold', check.orphanIds.length ? 'text-warning' : 'text-success')}>
+                  {check.orphanIds.length}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 className="text-xs font-bold text-text-primary">Date Parse Health</h3>
+              <p className="text-[10px] text-text-muted mt-1">Tanggal yang tidak bisa dibaca tidak akan terfilter dengan akurat.</p>
+            </div>
+            <span className={cn(
+              'px-2 py-1 rounded-lg border text-[10px] font-bold',
+              totalInvalidDates > 0 ? 'bg-warning/5 border-warning/20 text-warning' : 'bg-success/5 border-success/20 text-success'
+            )}>
+              {totalInvalidDates} invalid
+            </span>
+          </div>
+          <div className="space-y-2">
+            {dateChecks.map((check) => (
+              <div key={check.sourceLabel} className="flex items-start justify-between gap-3 text-[11px] border-b border-border/60 last:border-0 pb-2 last:pb-0">
+                <div className="min-w-0">
+                  <div className="font-semibold text-text-primary">{check.sourceLabel}</div>
+                  <div className="text-text-muted mt-0.5">{check.ruleLabel}</div>
+                  <div className="text-text-muted mt-0.5">{check.checked} date values checked</div>
+                  {check.samples.length > 0 && (
+                    <div className="text-warning mt-1 truncate" title={check.samples.join(', ')}>
+                      Sample: {check.samples.join(', ')}
+                    </div>
+                  )}
+                </div>
+                <span className={cn('shrink-0 font-bold', check.invalid ? 'text-warning' : 'text-success')}>
+                  {check.invalid}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const UploadCard = ({ title, fileKey }: { title: string, fileKey: keyof AppState }) => {
@@ -200,6 +538,8 @@ export const FileCenter = () => {
           </div>
         )}
 
+        <DataHealthPanel isSheetMode={isSheetMode} />
+
         {!isFetchingSheets && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sheetNames.map((sheet, idx) => (
@@ -246,6 +586,8 @@ export const FileCenter = () => {
           {isConfirming ? 'Click Again to Confirm' : 'Reset All Data'}
         </button>
       </div>
+
+      <DataHealthPanel isSheetMode={isSheetMode} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <UploadCard title="Master CSID" fileKey="csidFile" />

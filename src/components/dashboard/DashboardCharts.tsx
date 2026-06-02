@@ -102,11 +102,9 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                     fill="var(--color-text-primary)" 
                     fontSize={11} 
                     fontWeight={700} 
-                    formatter={(val: number, name: string, props: any) => {
-                      if (props && props.payload && props.payload.isCsat) {
-                        return parseFloat(props.payload.rawVal.toFixed(2)).toString();
-                      }
-                      return val > 0 ? `${val}%` : "";
+                    formatter={(val: unknown) => {
+                      const num = Number(val);
+                      return num > 0 ? `${num}%` : "";
                     }} 
                   />
                   {

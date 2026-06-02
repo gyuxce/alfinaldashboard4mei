@@ -5,6 +5,7 @@ import { Search, Clock } from 'lucide-react';
 import { useStore } from '../../store';
 import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 import { SortableHeader } from '../ui/SortableHeader';
+import { EmptyState } from '../ui/EmptyState';
 
 export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -210,8 +211,13 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={5 + uniqueDates.length} className="p-4 text-center text-text-muted text-sm z-10">
-                    Tidak ada data yang sesuai filter.
+                  <td colSpan={5 + uniqueDates.length} className="p-4 z-10">
+                    <EmptyState
+                      title="Tidak ada data WHU"
+                      description="Coba ubah search, filter Team Leader, atau range tanggal."
+                      variant="filter"
+                      className="border-0 bg-transparent py-6"
+                    />
                   </td>
                 </tr>
               )}

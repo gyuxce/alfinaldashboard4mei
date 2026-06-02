@@ -6,6 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
 } from 'recharts';
 import { AlertCircle } from 'lucide-react';
+import { EmptyState } from '../ui/EmptyState';
 
 const COLORS = {
   agent: '#f43f5e',
@@ -50,15 +51,15 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       if (!agentCaseSummary[a.csId]) {
         agentCaseSummary[a.csId] = { agentCases: 0, customerCases: 0, akulakuCases: 0, name, tl: a.teamLeader };
       }
-      Object.entries(a.rcaAgentAreaCounts).forEach(([k, v]) => {
+      Object.entries(a.rcaAgentAreaCounts as Record<string, number>).forEach(([k, v]) => {
         agentTotal[k] = (agentTotal[k] || 0) + v;
         agentCaseSummary[a.csId].agentCases += v;
       });
-      Object.entries(a.rcaCustomerAreaCounts).forEach(([k, v]) => {
+      Object.entries(a.rcaCustomerAreaCounts as Record<string, number>).forEach(([k, v]) => {
         customerTotal[k] = (customerTotal[k] || 0) + v;
         agentCaseSummary[a.csId].customerCases += v;
       });
-      Object.entries(a.rcaAkulakuProcessCounts).forEach(([k, v]) => {
+      Object.entries(a.rcaAkulakuProcessCounts as Record<string, number>).forEach(([k, v]) => {
         akulakuTotal[k] = (akulakuTotal[k] || 0) + v;
         agentCaseSummary[a.csId].akulakuCases += v;
       });
@@ -104,7 +105,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const activeFilterText = [
     selectedBpo && selectedBpo !== 'All BPO' ? `BPO: ${selectedBpo}` : '',
     selectedTL && selectedTL !== 'All TL' ? `TL: ${selectedTL}` : '',
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(' | ');
 
   const grandTotal = totalAgent + totalCustomer + totalAkulaku;
 
@@ -120,7 +121,12 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col">
         <h4 className="text-[11px] font-bold text-text-secondary mb-4 uppercase tracking-widest">{title}</h4>
         {barData.length === 0 ? (
-          <p className="text-xs text-text-muted text-center py-10">Belum ada data</p>
+          <EmptyState
+            title="Belum ada data RCA"
+            description="Tidak ada kasus RCA pada kategori ini untuk filter saat ini."
+            variant="data"
+            className="border-0 bg-transparent py-6"
+          />
         ) : (
           <ResponsiveContainer width="100%" height={dynamicHeight}>
             <BarChart data={barData} layout="vertical" margin={{ top: 0, right: 40, left: 0, bottom: 0 }}>
@@ -147,7 +153,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       <div>
         <h2 className="text-lg font-bold text-text-primary">CSAT Root Cause Analysis</h2>
         <p className="text-xs text-text-muted mt-0.5">
-          Analisa akar masalah berdasarkan kasus after-takeout · {activeFilterText || 'All Data'}
+          Analisa akar masalah berdasarkan kasus after-takeout | {activeFilterText || 'All Data'}
         </p>
       </div>
 
@@ -172,7 +178,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         <h3 className="text-sm font-bold text-text-primary mb-6 text-center tracking-wide">Distribusi Penyebab Bad CSAT</h3>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-center">
 
-          {/* Pie — takes 3/5 width */}
+          {/* Pie chart */}
           <div className="md:col-span-3 h-72 flex items-center justify-center">
             {pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -199,11 +205,16 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-text-muted text-xs">Belum ada data RCA</div>
+              <EmptyState
+                title="Belum ada data RCA"
+                description="Pastikan data CSAT SC memiliki kolom RCA dan kasus bad CSAT."
+                variant="data"
+                className="w-full border-0 bg-transparent py-6"
+              />
             )}
           </div>
 
-          {/* Legend Cards — 2/5 width */}
+          {/* Legend cards */}
           <div className="md:col-span-2 flex flex-col gap-3">
             {legendItems.map(item => (
               <div
@@ -230,9 +241,9 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
       {/* Tier 2: 3 Detail Bar Charts */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <DetailBarChart data={agentDetailBar} color={COLORS.agent} title="Top Issue — Agent Area" />
-        <DetailBarChart data={customerDetailBar} color={COLORS.customer} title="Top Issue — Customer Area" />
-        <DetailBarChart data={akulakuDetailBar} color={COLORS.akulaku} title="Top Issue — Akulaku Process" />
+        <DetailBarChart data={agentDetailBar} color={COLORS.agent} title="Top Issue - Agent Area" />
+        <DetailBarChart data={customerDetailBar} color={COLORS.customer} title="Top Issue - Customer Area" />
+        <DetailBarChart data={akulakuDetailBar} color={COLORS.akulaku} title="Top Issue - Akulaku Process" />
       </div>
 
       {/* Tier 3: Agent RCA Table */}
@@ -251,7 +262,12 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           />
         </div>
         {filteredAgentRanking.length === 0 ? (
-          <p className="text-xs text-text-muted text-center py-10">Belum ada data RCA agent</p>
+          <EmptyState
+            title="Belum ada data RCA agent"
+            description="Coba ubah pencarian agent/TL atau filter global."
+            variant="filter"
+            className="border-0 bg-transparent py-6"
+          />
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="w-full text-left text-[11px]">

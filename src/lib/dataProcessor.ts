@@ -147,7 +147,7 @@ export function getPreviousPeriod(startDate: string, endDate: string) {
 
 const dateStrCache = new Map<string, string | null>();
 
-function normalizeDateStr(raw: string): string | null {
+export function normalizeDateStr(raw: string): string | null {
   if (!raw) return null;
   const rawKey = String(raw).trim();
   if (dateStrCache.has(rawKey))
@@ -652,6 +652,11 @@ export const processKPIs = (
 
   // 2. CSAT SC
   if (csatData.length > 1) {
+    const headerRow = csatData[0] || [];
+    const rcaAgentIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca agent area');
+    const rcaCustomerIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca customer area');
+    const rcaAkulakuIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca akulaku process');
+
     for (let i = 1; i < csatData.length; i++) {
       const row = csatData[i];
       if (!row || row.length < 2) continue;
@@ -701,12 +706,6 @@ export const processKPIs = (
         }
       }
 
-      // Find RCA columns from header row dynamically, or use fixed offsets
-      // RCA columns are appended at end - find by scanning headers
-      const headerRow = csatData[0] || [];
-      const rcaAgentIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca agent area');
-      const rcaCustomerIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca customer area');
-      const rcaAkulakuIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca akulaku process');
       const rcaAgent = rcaAgentIdx !== -1 ? String(row[rcaAgentIdx] || '').trim() : '';
       const rcaCustomer = rcaCustomerIdx !== -1 ? String(row[rcaCustomerIdx] || '').trim() : '';
       const rcaAkulaku = rcaAkulakuIdx !== -1 ? String(row[rcaAkulakuIdx] || '').trim() : '';

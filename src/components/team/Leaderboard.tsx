@@ -5,6 +5,8 @@ import { Trophy, Users, User, ArrowRight } from "lucide-react";
 import { formatNum, getKpiColor } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { KpiTicker, TickerItem } from '../ui/KpiTicker';
+import { EmptyState } from '../ui/EmptyState';
+import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
 
 interface AgentKpiRowProps {
   label: string;
@@ -42,7 +44,7 @@ const AgentKpiRow = ({
         <div className={`text-sm font-semibold ${textColorClass}`}>
           {value !== null ? fmt(value) : '-'}
           {isMaxCapped && (
-            <span className="text-success-text text-xs ml-1 font-bold">✅ Maksimal</span>
+            <span className="text-success-text text-xs ml-1 font-bold">Max</span>
           )}
         </div>
       </div>
@@ -140,70 +142,20 @@ export const Leaderboard: React.FC = () => {
     > = {};
 
     rawData.forEach((agent) => {
-      // 1. QA
-      const qaOriginal =
-        agent.qaScoreCount > 0 ? agent.qaScoreSum / agent.qaScoreCount : null;
-      const qa_pct = qaOriginal;
+      const composite = calculateAgentCompositeScore(agent);
 
-      // 2. Productivity
-      const prodOriginal =
-        agent.targetQuota > 0
-          ? (agent.productivityTotal / agent.targetQuota) * 100
-          : null;
-      const prod_pct =
-        prodOriginal !== null ? Math.min(prodOriginal, 100) : null;
-
-      // 3. CSAT
-      const csatOriginal = agent.csatAsli;
-      let csat_pct = null;
-      if (csatOriginal !== null && !isNaN(csatOriginal)) {
-        if (csatOriginal > 5) {
-          csat_pct = csatOriginal;
-        } else {
-          csat_pct = (csatOriginal / 5) * 100;
-        }
-      }
-
-      // Calculate points
-      const qa_points = qa_pct !== null ? (qa_pct / 100) * 50 : null;
-      const prod_points = prod_pct !== null ? (prod_pct / 100) * 20 : null;
-      const csat_points = csat_pct !== null ? (csat_pct / 100) * 20 : null;
-      const fixed_points = 10;
-
-      const kpiList = [
-        { points: qa_points, maxWeight: 50, valid: qa_points !== null },
-        { points: prod_points, maxWeight: 20, valid: prod_points !== null },
-        { points: csat_points, maxWeight: 20, valid: csat_points !== null },
-      ];
-
-      const validKpis = kpiList.filter((k) => k.valid);
-
-      let compScore = null;
-      if (validKpis.length > 0) {
-        const totalAvailableWeight = validKpis.reduce(
-          (acc, k) => acc + k.maxWeight,
-          0
-        );
-        const rawWeightedSum = validKpis.reduce(
-          (acc, k) => acc + (k.points as number),
-          0
-        );
-        const scaledScore = (rawWeightedSum / totalAvailableWeight) * 90;
-        compScore = scaledScore + fixed_points;
-      }
-
-      if (compScore !== null) {
+      if (composite.score !== null) {
         aList.push({
           csId: agent.csId,
           name: agent.name || agent.csId,
           tl: agent.teamLeader || "-",
-          score: compScore,
-          qa: qaOriginal,
-          qa_pct: qa_pct,
-          prod: prodOriginal,
-          prod_pct: prod_pct,
-          csat: csatOriginal,
-          csat_pct: csat_pct,
+          score: composite.score,
+          qa: composite.qaOriginal,
+          qa_pct: composite.qaPct,
+          prod: composite.productivityOriginal,
+          prod_pct: composite.productivityPct,
+          csat: composite.csatOriginal,
+          csat_pct: composite.csatPct,
           train: 5,
           quiz: 5,
         });
@@ -231,22 +183,22 @@ export const Leaderboard: React.FC = () => {
         }
         tlMap[tl].agents.add(agent.csId);
 
-        if (qa_pct !== null) {
-          tlMap[tl].qaPctSum += qa_pct;
+        if (composite.qaPct !== null) {
+          tlMap[tl].qaPctSum += composite.qaPct;
           tlMap[tl].qaPctCount++;
-          tlMap[tl].qaOrigSum += qaOriginal!;
+          tlMap[tl].qaOrigSum += composite.qaOriginal!;
           tlMap[tl].qaOrigCount++;
         }
-        if (prod_pct !== null) {
-          tlMap[tl].prodPctSum += prod_pct;
+        if (composite.productivityPct !== null) {
+          tlMap[tl].prodPctSum += composite.productivityPct;
           tlMap[tl].prodPctCount++;
-          tlMap[tl].prodOrigSum += prodOriginal!;
+          tlMap[tl].prodOrigSum += composite.productivityOriginal!;
           tlMap[tl].prodOrigCount++;
         }
-        if (csat_pct !== null) {
-          tlMap[tl].csatPctSum += csat_pct;
+        if (composite.csatPct !== null) {
+          tlMap[tl].csatPctSum += composite.csatPct;
           tlMap[tl].csatPctCount++;
-          tlMap[tl].csatOrigSum += csatOriginal!;
+          tlMap[tl].csatOrigSum += composite.csatOriginal!;
           tlMap[tl].csatOrigCount++;
         }
       }
@@ -275,39 +227,16 @@ export const Leaderboard: React.FC = () => {
           ? stats.csatOrigSum / stats.csatOrigCount
           : null;
 
-      const qa_points = tl_qa_pct !== null ? (tl_qa_pct / 100) * 50 : null;
-      const prod_points =
-        tl_prod_pct !== null ? (tl_prod_pct / 100) * 20 : null;
-      const csat_points =
-        tl_csat_pct !== null ? (tl_csat_pct / 100) * 20 : null;
-      const fixed_points = 10;
+      const composite = calculateCompositeScore({
+        qaPct: tl_qa_pct,
+        productivityPct: tl_prod_pct,
+        csatPct: tl_csat_pct,
+      });
 
-      const kpiList = [
-        { points: qa_points, maxWeight: 50, valid: qa_points !== null },
-        { points: prod_points, maxWeight: 20, valid: prod_points !== null },
-        { points: csat_points, maxWeight: 20, valid: csat_points !== null },
-      ];
-
-      const validKpis = kpiList.filter((k) => k.valid);
-
-      let compScore = null;
-      if (validKpis.length > 0) {
-        const totalAvailableWeight = validKpis.reduce(
-          (acc, k) => acc + k.maxWeight,
-          0
-        );
-        const rawWeightedSum = validKpis.reduce(
-          (acc, k) => acc + (k.points as number),
-          0
-        );
-        const scaledScore = (rawWeightedSum / totalAvailableWeight) * 90;
-        compScore = scaledScore + fixed_points;
-      }
-
-      if (compScore !== null) {
+      if (composite.score !== null) {
         tList.push({
           name: tlName,
-          score: compScore,
+          score: composite.score,
           qa: tl_qa_orig,
           qa_pct: tl_qa_pct,
           prod: tl_prod_orig,
@@ -335,8 +264,14 @@ export const Leaderboard: React.FC = () => {
   ]);
 
   const tickerItems: TickerItem[] = useMemo(() => {
-    const topAgentAvg = agentRows.slice(0, 5).reduce((acc, curr) => acc + curr.score, 0) / Math.min(agentRows.length, 5);
-    const topTlAvg = tlRows.slice(0, 5).reduce((acc, curr) => acc + curr.score, 0) / Math.min(tlRows.length, 5);
+    const topAgents = agentRows.slice(0, 5);
+    const topTls = tlRows.slice(0, 5);
+    const topAgentAvg = topAgents.length > 0
+      ? topAgents.reduce((acc, curr) => acc + curr.score, 0) / topAgents.length
+      : 0;
+    const topTlAvg = topTls.length > 0
+      ? topTls.reduce((acc, curr) => acc + curr.score, 0) / topTls.length
+      : 0;
     
     const globalAgentAvg = agentRows.length > 0 ? (agentRows.reduce((sum, a) => sum + a.score, 0) / agentRows.length) : 0;
 
@@ -368,9 +303,6 @@ export const Leaderboard: React.FC = () => {
   }
 
   const getRankEmoji = (rank: number) => {
-    if (rank === 1) return "🥇";
-    if (rank === 2) return "🥈";
-    if (rank === 3) return "🥉";
     return rank.toString();
   };
 
@@ -415,12 +347,12 @@ export const Leaderboard: React.FC = () => {
   if (selectedAgent) {
     if (isSelectedBottomThree) {
       scoreGap = safeScore - selectedAgent.score + 0.1;
-      targetDesc = "🎯 TARGET KELUAR BOTTOM 3:";
+      targetDesc = "TARGET KELUAR BOTTOM 3:";
     } else if (selectedRank > 1) {
       const nextRankAgent = activeData[selectedRank - 2];
       safeScore = nextRankAgent.score;
       scoreGap = safeScore - selectedAgent.score + 0.1;
-      targetDesc = `🎯 TARGET NAIK KE RANK #${selectedRank - 1}:`;
+      targetDesc = `TARGET NAIK KE RANK #${selectedRank - 1}:`;
     } else {
       isRank1 = true;
     }
@@ -525,7 +457,7 @@ export const Leaderboard: React.FC = () => {
                           #{rank}
                         </span>
                         <span className="text-[8px] bg-danger-soft text-danger-text px-1 rounded font-semibold whitespace-nowrap">
-                          ⚠️ PERLU PERHATIAN
+                          Perlu perhatian
                         </span>
                       </div>
                     ) : (
@@ -544,7 +476,7 @@ export const Leaderboard: React.FC = () => {
                       </span>
                       {isBottom && (
                         <span className="ml-1 text-[9px] text-danger-text">
-                          Tap untuk analisis →
+                          Tap untuk analisis
                         </span>
                       )}
                     </button>
@@ -592,12 +524,12 @@ export const Leaderboard: React.FC = () => {
                   </td>
                   <td className="p-2 text-center z-10 relative">
                     <span className="inline-flex items-center gap-1 font-bold text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded-sm">
-                      5/5 ✓
+                      5/5
                     </span>
                   </td>
                   <td className="p-2 text-center z-10 relative">
                     <span className="inline-flex items-center gap-1 font-bold text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded-sm">
-                      5/5 ✓
+                      5/5
                     </span>
                   </td>
                 </tr>
@@ -608,10 +540,14 @@ export const Leaderboard: React.FC = () => {
               <tr>
                 <td
                   colSpan={toggleMode === "agent" ? 9 : 8}
-                  className="p-8 text-center text-text-muted z-10 relative"
+                  className="p-4 z-10 relative"
                 >
-                  Tidak ada data yang memenuhi kriteria (Misal: TL kurang dari 3
-                  agent).
+                  <EmptyState
+                    title="Tidak ada data leaderboard"
+                    description="Coba ubah filter global. Untuk mode TL, pastikan TL memiliki minimal 3 agent."
+                    variant="filter"
+                    className="border-0 bg-transparent py-6"
+                  />
                 </td>
               </tr>
             )}
@@ -632,10 +568,10 @@ export const Leaderboard: React.FC = () => {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-                  <span>📊</span> KPI Analysis
+                  KPI Analysis
                 </h2>
                 <p className="text-text-secondary text-xs mt-0.5">
-                  {selectedAgent.name} {selectedAgent.csId && `· ${selectedAgent.csId}`}
+                  {selectedAgent.name} {selectedAgent.csId && `- ${selectedAgent.csId}`}
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs text-text-muted bg-surface-muted px-2 py-0.5 rounded-full border border-border">
@@ -646,7 +582,7 @@ export const Leaderboard: React.FC = () => {
                   </span>
                   {isSelectedBottomThree && (
                     <span className="text-[10px] bg-danger-soft text-danger-text px-2 py-0.5 rounded-full font-semibold border border-danger-soft">
-                      ⚠️ Bottom 3
+                      Bottom 3
                     </span>
                   )}
                 </div>
@@ -656,7 +592,7 @@ export const Leaderboard: React.FC = () => {
                 className="text-text-muted hover:text-text-primary transition-colors p-1 rounded hover:bg-surface-muted"
                 aria-label="Close modal"
               >
-                ✕
+                X
               </button>
             </div>
 
@@ -710,7 +646,7 @@ export const Leaderboard: React.FC = () => {
                   />
                 </div>
                 <p className="text-[10px] text-text-muted italic">
-                  📝 Auto 100% — pastikan selesaikan modul training tepat waktu
+                  Auto 100% - pastikan selesaikan modul training tepat waktu
                 </p>
               </div>
 
@@ -730,7 +666,7 @@ export const Leaderboard: React.FC = () => {
                   />
                 </div>
                 <p className="text-[10px] text-text-muted italic">
-                  📝 Auto 100% — pastikan kerjakan kuis sebelum deadline
+                  Auto 100% - pastikan kerjakan kuis sebelum deadline
                 </p>
               </div>
             </div>
@@ -740,7 +676,7 @@ export const Leaderboard: React.FC = () => {
             <div className="space-y-4 md:border-l md:border-border md:pl-6 md:pt-0 pt-6 border-t border-border md:border-t-0">
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                  💡 Prioritas Peningkatan
+                  Prioritas Peningkatan
                 </h3>
 
               {isRank1 ? (
@@ -767,7 +703,7 @@ export const Leaderboard: React.FC = () => {
                 if (isAllCapped) {
                   return (
                     <div className="p-3 bg-success-soft/20 border border-success-soft/50 rounded-lg text-center mt-2">
-                      <p className="text-sm font-bold text-success-text">Semua KPI sudah maksimal (100%). ✅</p>
+                      <p className="text-sm font-bold text-success-text">Semua KPI sudah maksimal (100%).</p>
                       <p className="text-xs text-text-secondary mt-1">Pertahankan! Tidak ada yang perlu ditingkatkan lagi.</p>
                     </div>
                   );
@@ -788,12 +724,12 @@ export const Leaderboard: React.FC = () => {
                       {scoreGap < 0.2 ? (
                         <p className="text-xs text-text-secondary mt-0.5">Hampir! Sedikit lagi naik rank.</p>
                       ) : (
-                        <p className="text-xs text-text-secondary mt-0.5">Butuh score ≥ {safeScore.toFixed(1)} | Gap: {scoreGap.toFixed(1)} poin</p>
+                        <p className="text-xs text-text-secondary mt-0.5">Butuh score &gt;= {safeScore.toFixed(1)} | Gap: {scoreGap.toFixed(1)} poin</p>
                       )}
                     </div>
 
                     <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'qa' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
-                      <span className="text-sm mt-0.5">{canQa ? (easiest === 'qa' ? '🔴' : '🟡') : '✅'}</span>
+                      <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canQa ? (easiest === 'qa' ? 'bg-danger' : 'bg-warning') : 'bg-success'}`} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-text-primary">QA Score</span>
@@ -801,8 +737,8 @@ export const Leaderboard: React.FC = () => {
                         </div>
                         {canQa ? (
                           <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Naik <span className="font-bold">+{qaNeeded.toFixed(1)}%</span> → dari {currQa.toFixed(1)}% ke {(currQa + qaNeeded).toFixed(1)}%<br/>
-                            <span className="text-success-text">Cukup untuk mencapai target ✅</span>
+                            Naik <span className="font-bold">+{qaNeeded.toFixed(1)}%</span> dari {currQa.toFixed(1)}% ke {(currQa + qaNeeded).toFixed(1)}%<br/>
+                            <span className="text-success-text">Cukup untuk mencapai target</span>
                           </div>
                         ) : (
                           <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
@@ -813,7 +749,7 @@ export const Leaderboard: React.FC = () => {
                     </div>
 
                     <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'prod' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
-                      <span className="text-sm mt-0.5">{canProd ? (easiest === 'prod' ? '🔴' : '🟡') : '✅'}</span>
+                      <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canProd ? (easiest === 'prod' ? 'bg-danger' : 'bg-warning') : 'bg-success'}`} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-text-primary">Produktivitas</span>
@@ -825,8 +761,8 @@ export const Leaderboard: React.FC = () => {
                           </div>
                         ) : canProd ? (
                           <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Naik <span className="font-bold">+{prodNeeded.toFixed(1)}%</span> → dari {currProd.toFixed(1)}% ke {(currProd + prodNeeded).toFixed(1)}%<br/>
-                            <span className="text-success-text">Cukup untuk mencapai target ✅</span>
+                            Naik <span className="font-bold">+{prodNeeded.toFixed(1)}%</span> dari {currProd.toFixed(1)}% ke {(currProd + prodNeeded).toFixed(1)}%<br/>
+                            <span className="text-success-text">Cukup untuk mencapai target</span>
                           </div>
                         ) : (
                           <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
@@ -837,7 +773,7 @@ export const Leaderboard: React.FC = () => {
                     </div>
 
                     <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'csat' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
-                      <span className="text-sm mt-0.5">{canCsat ? (easiest === 'csat' ? '🔴' : '🟡') : '✅'}</span>
+                      <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canCsat ? (easiest === 'csat' ? 'bg-danger' : 'bg-warning') : 'bg-success'}`} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-text-primary">CSAT Rating</span>
@@ -845,8 +781,8 @@ export const Leaderboard: React.FC = () => {
                         </div>
                         {canCsat ? (
                           <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Naik <span className="font-bold">+{csatNeeded.toFixed(2)}%</span> → dari {currCsat.toFixed(2)}% ke {(currCsat + csatNeeded).toFixed(2)}%<br/>
-                            <span className="text-success-text">Cukup untuk mencapai target ✅</span>
+                            Naik <span className="font-bold">+{csatNeeded.toFixed(2)}%</span> dari {currCsat.toFixed(2)}% ke {(currCsat + csatNeeded).toFixed(2)}%<br/>
+                            <span className="text-success-text">Cukup untuk mencapai target</span>
                           </div>
                         ) : (
                           <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
@@ -858,15 +794,15 @@ export const Leaderboard: React.FC = () => {
 
                     <div className="mt-3 p-2.5 bg-primary-soft/20 rounded-lg border border-primary-soft/50">
                       <p className="text-[11px] font-semibold text-primary">
-                        💡 Cara paling mudah:
+                        Cara paling mudah:
                       </p>
                       {easiest === 'none' ? (
                         <p className="text-[11px] font-medium text-primary mt-1">
-                          → Sulit untuk mencapai target ini dengan satu KPI saja. Coba tingkatkan semua KPI secara bertahap.
+                          Sulit untuk mencapai target ini dengan satu KPI saja. Coba tingkatkan semua KPI secara bertahap.
                         </p>
                       ) : (
                         <p className="text-[11px] font-medium text-primary mt-1 flex items-center gap-1">
-                          → Naikkan {easiest === 'qa' ? 'QA' : easiest === 'prod' ? 'Prod' : 'CSAT'} <span className="font-bold">+{easiest === 'qa' ? qaNeeded.toFixed(1) : easiest === 'prod' ? prodNeeded.toFixed(1) : csatNeeded.toFixed(2)}%</span> saja sudah cukup!
+                          Naikkan {easiest === 'qa' ? 'QA' : easiest === 'prod' ? 'Prod' : 'CSAT'} <span className="font-bold">+{easiest === 'qa' ? qaNeeded.toFixed(1) : easiest === 'prod' ? prodNeeded.toFixed(1) : csatNeeded.toFixed(2)}%</span> saja sudah cukup!
                         </p>
                       )}
                     </div>

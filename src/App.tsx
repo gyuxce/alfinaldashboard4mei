@@ -25,24 +25,23 @@ import {
   FileText
 } from 'lucide-react';
 
-import { ErrorBoundary } from './components/common/ErrorBoundary';
-
-import { FileCenter } from './components/dashboard/FileCenter';
-import { DashboardSummary } from './components/dashboard/DashboardSummary';
-import { ProductivityDetail } from './components/dashboard/ProductivityDetail';
-import { CsatOfficialMonitor } from './components/csat/CsatOfficialMonitor';
-import { CsatRoom } from './components/csat/CsatRoom';
-import { CsatRcaMonitor } from './components/csat/CsatRcaMonitor';
-import { SlaWhuMonitor } from './components/sla/SlaWhuMonitor';
-import { WhuMonitor } from './components/sla/WhuMonitor';
-import { QaAgent360 } from './components/qa/QaAgent360';
-import { Leaderboard } from './components/team/Leaderboard';
 import { cn } from './lib/utils';
 
-import { ScheduleBoard } from './components/team/ScheduleBoard';
-import { AttendanceMonitor } from './components/team/AttendanceMonitor';
-import { Agent360Radar } from './components/team/Agent360Radar';
 import { SearchableSelect } from './components/ui/SearchableSelect';
+
+const FileCenter = React.lazy(() => import('./components/dashboard/FileCenter').then(module => ({ default: module.FileCenter })));
+const DashboardSummary = React.lazy(() => import('./components/dashboard/DashboardSummary').then(module => ({ default: module.DashboardSummary })));
+const ProductivityDetail = React.lazy(() => import('./components/dashboard/ProductivityDetail').then(module => ({ default: module.ProductivityDetail })));
+const CsatOfficialMonitor = React.lazy(() => import('./components/csat/CsatOfficialMonitor').then(module => ({ default: module.CsatOfficialMonitor })));
+const CsatRoom = React.lazy(() => import('./components/csat/CsatRoom').then(module => ({ default: module.CsatRoom })));
+const CsatRcaMonitor = React.lazy(() => import('./components/csat/CsatRcaMonitor').then(module => ({ default: module.CsatRcaMonitor })));
+const SlaWhuMonitor = React.lazy(() => import('./components/sla/SlaWhuMonitor').then(module => ({ default: module.SlaWhuMonitor })));
+const WhuMonitor = React.lazy(() => import('./components/sla/WhuMonitor').then(module => ({ default: module.WhuMonitor })));
+const QaAgent360 = React.lazy(() => import('./components/qa/QaAgent360').then(module => ({ default: module.QaAgent360 })));
+const Leaderboard = React.lazy(() => import('./components/team/Leaderboard').then(module => ({ default: module.Leaderboard })));
+const ScheduleBoard = React.lazy(() => import('./components/team/ScheduleBoard').then(module => ({ default: module.ScheduleBoard })));
+const AttendanceMonitor = React.lazy(() => import('./components/team/AttendanceMonitor').then(module => ({ default: module.AttendanceMonitor })));
+const Agent360Radar = React.lazy(() => import('./components/team/Agent360Radar').then(module => ({ default: module.Agent360Radar })));
 
 function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
@@ -52,6 +51,47 @@ function formatRelativeTime(date: Date): string {
   const diffHour = Math.floor(diffMin / 60);
   if (diffHour < 24) return `${diffHour} jam lalu`;
   return date.toLocaleDateString('id-ID');
+}
+
+function TabLoading() {
+  return (
+    <div className="flex min-h-[240px] items-center justify-center text-text-muted">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+        <span>Memuat tampilan...</span>
+      </div>
+    </div>
+  );
+}
+
+interface ActiveFilterChipProps {
+  label: string;
+  value: string;
+  onClear: () => void;
+}
+
+function ActiveFilterChip({ label, value, onClear }: ActiveFilterChipProps) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-2.5 py-1 text-[11px] font-semibold text-primary">
+      <span className="shrink-0 text-primary/70">{label}:</span>
+      <span className="min-w-0 truncate">{value}</span>
+      <button
+        type="button"
+        onClick={onClear}
+        className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        aria-label={`Clear ${label} filter`}
+      >
+        <X size={11} />
+      </button>
+    </span>
+  );
+}
+
+function formatFilterDate(date: string) {
+  if (!date) return '';
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(parsed);
 }
 
 export default function App() {
@@ -224,6 +264,32 @@ export default function App() {
       end.setDate(end.getDate() + 6);
       setDateRange(t1, end.toISOString().split('T')[0]);
     }
+  };
+
+  const activeFilters = [
+    selectedBpo && selectedBpo !== 'All BPO'
+      ? { label: 'BPO', value: selectedBpo, onClear: () => setSelectedBpo('All BPO') }
+      : null,
+    selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders'
+      ? { label: 'TL', value: selectedTL, onClear: () => setSelectedTL('All TL') }
+      : null,
+    selectedGlobalAgent && selectedGlobalAgent !== 'All Agents'
+      ? { label: 'Agent', value: selectedGlobalAgent, onClear: () => setSelectedGlobalAgent('All Agents') }
+      : null,
+    startDate || endDate
+      ? {
+          label: 'Date',
+          value: `${startDate ? formatFilterDate(startDate) : 'awal'} to ${endDate ? formatFilterDate(endDate) : 'akhir'}`,
+          onClear: () => setDateRange('', ''),
+        }
+      : null,
+  ].filter((filter): filter is ActiveFilterChipProps => filter !== null);
+
+  const clearAllFilters = () => {
+    setSelectedBpo('All BPO');
+    setSelectedTL('All TL');
+    setSelectedGlobalAgent('All Agents');
+    setDateRange('', '');
   };
 
   return (
@@ -430,7 +496,7 @@ export default function App() {
 
             </div>
 
-            {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
+           {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
               <div className="xl:ml-auto inline-flex items-center px-3 py-1 rounded-full bg-primary-soft text-primary-text text-xs font-semibold border border-primary-soft-hover shadow-[0_1px_3px_rgba(0,0,0,0.04)] mt-2 xl:mt-0">
                 <span className="w-2 h-2 rounded-full bg-primary mr-2 animate-pulse"></span>
                 Viewing: Tim {selectedTL}
@@ -464,21 +530,47 @@ export default function App() {
              )}
            </div>
           </div>
+
+          {activeFilters.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                Active Filters
+              </span>
+              {activeFilters.map((filter) => (
+                <React.Fragment key={filter.label}>
+                  <ActiveFilterChip
+                    label={filter.label}
+                    value={filter.value}
+                    onClear={filter.onClear}
+                  />
+                </React.Fragment>
+              ))}
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-muted hover:bg-surface-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="w-full pb-8">
-          {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-          {activeTab === 'leaderboard' && <Leaderboard />}
-          {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-          {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-          {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-          {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
-          {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
-          {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
-          {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
-          {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
-          {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} />}
-          {activeTab === 'files' && <FileCenter />}
+          <React.Suspense fallback={<TabLoading />}>
+            {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+            {activeTab === 'leaderboard' && <Leaderboard />}
+            {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+            {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+            {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+            {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
+            {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
+            {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
+            {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
+            {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
+            {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} />}
+            {activeTab === 'files' && <FileCenter />}
+          </React.Suspense>
         </div>
       </main>
 
@@ -499,10 +591,12 @@ export default function App() {
 
       {/* Ultimate Agent 360 Pop-up */}
       {agent360Data && (
-        <Agent360Radar 
-           agent={agent360Data} 
-           onClose={() => setSelectedAgentFor360(null)} 
-        />
+        <React.Suspense fallback={null}>
+          <Agent360Radar
+             agent={agent360Data}
+             onClose={() => setSelectedAgentFor360(null)}
+          />
+        </React.Suspense>
       )}
     </div>
   );
