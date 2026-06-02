@@ -663,20 +663,20 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           </div>
         </div>
       ) : analysisMode === 'category' ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-6">
           {/* Categories Panel */}
           <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
-            <div className="px-3 py-2.5 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div className="px-4 py-3 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-3">
                <div>
-                 <h2 className="text-sm font-bold text-text-primary">Top Categories (Score 1 & 2)</h2>
-                 <p className="text-[11px] text-text-muted mt-0.5">Identifies categories and top contributors for bad scores</p>
+                 <h2 className="text-base font-bold text-text-primary">Top Categories (Score 1 & 2)</h2>
+                 <p className="text-xs text-text-muted mt-1 ">Identifies categories and top contributors for bad scores</p>
                </div>
-               <span className="text-[10px] text-text-secondary font-bold px-2 py-1 bg-card border border-border rounded-lg uppercase tracking-wider">
+               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
                  {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
                </span>
             </div>
 
-            <div className={isComparisonEnabled ? "p-2" : "p-3"}>
+            <div className={isComparisonEnabled ? "p-3" : "p-3"}>
               {isComparisonEnabled ? (
                 <WoWAnalysisPanel 
                   type="category"
@@ -750,12 +750,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
           {/* Agents Panel */}
           <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
-            <div className="px-3 py-2.5 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div className="px-4 py-3 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-3">
                <div>
-                 <h2 className="text-sm font-bold text-text-primary">Agent Bottom Score 1-2</h2>
-                 <p className="text-[11px] text-text-muted mt-0.5">Identifies agents with the highest bad scores</p>
+                 <h2 className="text-base font-bold text-text-primary">Agent Bottom Score 1-2</h2>
+                 <p className="text-xs text-text-muted mt-1 ">Identifies agents with the highest bad scores</p>
                </div>
-               <span className="text-[10px] text-text-secondary font-bold px-2 py-1 bg-card border border-border rounded-lg uppercase tracking-wider">
+               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
                  {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
                </span>
             </div>
@@ -1246,8 +1246,8 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
   const selectedBpo = useStore(state => state.selectedBpo);
   const upperBpo = (selectedBpo || '').toUpperCase();
   const isSmallBpo = upperBpo === 'TCID' || upperBpo === 'TCID X TIN' || upperBpo === 'TIN X TCID';
-  const topCatsLimit = type === 'category' ? 5 : (isSmallBpo ? 5 : 10);
-  const topAgentsLimit = type === 'agent' ? 3 : (isSmallBpo ? 2 : 5);
+  const topCatsLimit = isSmallBpo ? 5 : 10;
+  const topAgentsLimit = isSmallBpo ? 2 : 5;
 
   const calcTopCats = (dataset: AgentKPI[]) => {
     const agg: Record<string, number> = {};
@@ -1305,19 +1305,19 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
   ].filter(d => d.name !== 'WNaN Invalid Date');
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {weeks.map((week, wIdx) => (
-        <div key={wIdx} className="flex flex-col gap-2">
-          <div className="px-2 py-1 bg-primary/10 text-primary font-bold text-center rounded-lg border border-primary/20 text-[10px] uppercase tracking-wider">
+        <div key={wIdx} className="flex flex-col gap-4">
+          <div className="p-2 bg-primary/10 text-primary font-bold text-center rounded-xl border border-primary/20 text-[11px] uppercase tracking-wider">
             {week.name}
           </div>
           
           {(type === 'all' || type === 'category') && (
-            <div className="overflow-hidden border border-border rounded-lg bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
-              <div className="px-2 py-1.5 bg-surface-muted border-b border-border font-bold text-[9px] text-text-secondary text-center uppercase">
+            <div className="overflow-hidden border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
+              <div className="p-2 bg-surface-muted border-b border-border font-bold text-[10px] text-text-secondary text-center uppercase">
                 Top {topCatsLimit} Categories
               </div>
-            <table className="w-full text-left text-[9px]">
+            <table className="w-full text-left text-[10px]">
               <thead className="bg-surface text-text-secondary border-b border-border">
                 <tr>
                   <th className="p-1 font-bold w-6 text-center">#</th>
@@ -1353,11 +1353,11 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
           )}
 
           {(type === 'all' || type === 'agent') && (
-            <div className="overflow-hidden border border-border rounded-lg bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
-              <div className="px-2 py-1.5 bg-surface-muted border-b border-border font-bold text-[9px] text-text-secondary text-center uppercase">
+            <div className="overflow-hidden border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
+              <div className="p-2 bg-surface-muted border-b border-border font-bold text-[10px] text-text-secondary text-center uppercase">
                 Top {topAgentsLimit} Agents
               </div>
-            <table className="w-full text-left text-[9px]">
+            <table className="w-full text-left text-[10px]">
               <thead className="bg-surface text-text-secondary border-b border-border">
                 <tr>
                   <th className="p-1 font-bold w-6 text-center">#</th>
