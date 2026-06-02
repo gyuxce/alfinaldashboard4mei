@@ -10,6 +10,40 @@ export type SheetData = SheetRow[];
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+async function readGoogleSheetsError(response: Response): Promise<string> {
+  try {
+    const json = await response.json();
+    return String(json?.error?.message || response.statusText || '').trim();
+  } catch {
+    return response.statusText || '';
+  }
+}
+
+function buildSheetFetchError(sheetName: string, status: number, statusText: string, apiMessage: string): Error {
+  const normalizedMessage = apiMessage.toLowerCase();
+  const isMissingTab =
+    status === 400 &&
+    (normalizedMessage.includes('unable to parse range') ||
+      normalizedMessage.includes('cannot find') ||
+      normalizedMessage.includes('not found'));
+
+  if (isMissingTab) {
+    return new Error(
+      `Tab "${sheetName}" belum ditemukan. Buat tab ini dulu di Google Sheets atau pilih bulan lain.`
+    );
+  }
+
+  if (status === 403) {
+    return new Error(
+      `Akses ke Google Sheet ditolak saat membaca tab "${sheetName}". Cek API key, sharing sheet, dan permission.`
+    );
+  }
+
+  return new Error(
+    `Gagal mengambil tab "${sheetName}": ${status} ${statusText}${apiMessage ? ` - ${apiMessage}` : ''}`
+  );
+}
+
 // Fetch single sheet
 export async function fetchSheet(
   sheetName: string,
@@ -27,9 +61,8 @@ export async function fetchSheet(
 
     const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
     if (!shouldRetry) {
-      throw new Error(
-        `Failed to fetch sheet "${sheetName}": ${response.status} ${response.statusText}`
-      );
+      const apiMessage = await readGoogleSheetsError(response);
+      throw buildSheetFetchError(sheetName, response.status, response.statusText, apiMessage);
     }
 
     await sleep(1000 * Math.pow(2, attempt));

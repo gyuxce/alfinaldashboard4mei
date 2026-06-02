@@ -491,6 +491,7 @@ export const FileCenter = () => {
   const isSheetMode = !!import.meta.env.VITE_SHEETS_API_KEY;
   const activeMonth = getSheetMonthOption(selectedSheetMonth);
   const activeSheetConfig = getSheetConfigForMonth(selectedSheetMonth);
+  const failedSheetName = sheetsFetchError?.match(/"([^"]+)"/)?.[1] || null;
 
   const sheetNames = [
     { label: 'Master CSID', tabName: activeSheetConfig.csidSheetName },
@@ -549,9 +550,14 @@ export const FileCenter = () => {
         
         {/* Error state */}
         {sheetsFetchError && (
-          <div className="bg-danger-soft border border-danger/50 rounded-xl p-4 text-danger text-sm flex gap-3 items-center">
+          <div className="bg-danger-soft border border-danger/50 rounded-xl p-4 text-danger text-sm flex gap-3 items-start">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <p>{sheetsFetchError}</p>
+            <div>
+              <p>{sheetsFetchError}</p>
+              <p className="text-xs mt-1 text-danger/80">
+                Data yang sedang tampil tidak dihapus. Setelah tab dibuat, klik Sync Now lagi.
+              </p>
+            </div>
           </div>
         )}
 
@@ -581,10 +587,27 @@ export const FileCenter = () => {
         {!isFetchingSheets && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sheetNames.map((sheet, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-xl p-5 flex flex-col relative overflow-hidden group hover:border-primary/30 transition-colors shadow-sm">
+              <div
+                key={idx}
+                className={cn(
+                  "bg-card border rounded-xl p-5 flex flex-col relative overflow-hidden group transition-colors shadow-sm",
+                  failedSheetName === sheet.tabName
+                    ? "border-danger/50 hover:border-danger/70"
+                    : "border-border hover:border-primary/30"
+                )}
+              >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded bg-primary-soft flex items-center justify-center shrink-0">
-                    <CheckCircle2 size={18} className="text-primary"/>
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded flex items-center justify-center shrink-0",
+                      failedSheetName === sheet.tabName ? "bg-danger-soft" : "bg-primary-soft"
+                    )}
+                  >
+                    {failedSheetName === sheet.tabName ? (
+                      <AlertCircle size={18} className="text-danger" />
+                    ) : (
+                      <CheckCircle2 size={18} className="text-primary"/>
+                    )}
                   </div>
                   <div>
                     <h3 className="font-semibold text-text-primary text-sm">{sheet.label}</h3>
@@ -597,8 +620,10 @@ export const FileCenter = () => {
                   </p>
                   <p className="text-[11px] text-text-muted flex justify-between">
                     <span>Status:</span>
-                    <span className="font-medium text-success">
-                      {lastSyncTime ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Belum di-sync'}
+                    <span className={cn("font-medium", failedSheetName === sheet.tabName ? "text-danger" : "text-success")}>
+                      {failedSheetName === sheet.tabName
+                        ? 'Tab belum ditemukan'
+                        : lastSyncTime ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Belum di-sync'}
                     </span>
                   </p>
                 </div>
