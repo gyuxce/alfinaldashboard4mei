@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, getSheetConfigForMonth, getSheetMonthOption, sheetDataToParseResult } from './lib/sheetsApi';
+import { fetchAllSheets, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
 
 export interface AppState {
   // Data source mode
@@ -316,7 +316,17 @@ export const useStore = create<AppState>((set, get) => ({
       const selectedMonth = get().selectedSheetMonth;
       const sheetConfig = getSheetConfigForMonth(selectedMonth);
       const monthOption = getSheetMonthOption(selectedMonth);
-      const allData = await fetchAllSheets(sheetConfig);
+      const currentMonthData = await fetchAllSheets(sheetConfig);
+      const previousMonthKey = getPreviousSheetMonthKey(selectedMonth);
+      const allData = previousMonthKey
+        ? mergeAllSheetsData(
+            await fetchAllSheets(getSheetConfigForMonth(previousMonthKey)),
+            currentMonthData,
+          )
+        : currentMonthData;
+      const loadedMonthLabel = previousMonthKey
+        ? `${monthOption.label} + ${getSheetMonthOption(previousMonthKey).label}`
+        : monthOption.label;
       
       const csvCsid = sheetDataToParseResult(allData.csid);
       const csvProductivity = sheetDataToParseResult(allData.productivity);
@@ -369,12 +379,12 @@ export const useStore = create<AppState>((set, get) => ({
       
       set({
         // We set dummy files so the UI knows data is "present"
-        csidFile: new File([], `CSID (${monthOption.label})`),
-        productivityFile: new File([], `Productivity (${monthOption.label})`),
-        csatScFile: new File([], `CSAT SC (${monthOption.label})`),
-        slaFile: new File([], `SLA (${monthOption.label})`),
-        scheduleFile: new File([], `Schedule (${monthOption.label})`),
-        qaFile: new File([], `QA (${monthOption.label})`),
+        csidFile: new File([], `CSID (${loadedMonthLabel})`),
+        productivityFile: new File([], `Productivity (${loadedMonthLabel})`),
+        csatScFile: new File([], `CSAT SC (${loadedMonthLabel})`),
+        slaFile: new File([], `SLA (${loadedMonthLabel})`),
+        scheduleFile: new File([], `Schedule (${loadedMonthLabel})`),
+        qaFile: new File([], `QA (${loadedMonthLabel})`),
 
         csidData: csvCsid.data,
         productivityData: csvProductivity.data,

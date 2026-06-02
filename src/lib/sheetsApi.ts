@@ -159,6 +159,23 @@ export function getSheetMonthOption(monthKey: string): SheetMonthOption {
   return getSheetMonthOptions().find(option => option.key === monthKey) || LEGACY_MONTH_OPTION;
 }
 
+export function getPreviousSheetMonthKey(monthKey: string): string | null {
+  const option = getSheetMonthOption(monthKey);
+  if (!option.suffix) return null;
+  if (option.key === 'JUN_2026') return 'legacy';
+
+  const [monthCode, yearValue] = option.key.split('_');
+  const monthIndex = MONTHS.findIndex(month => month.code === monthCode);
+  const year = Number(yearValue);
+  if (monthIndex === -1 || !year) return null;
+
+  if (monthIndex === 0) {
+    return `DEC_${year - 1}`;
+  }
+
+  return `${MONTHS[monthIndex - 1].code}_${year}`;
+}
+
 export function getSheetConfigForMonth(monthKey: string): SheetConfig {
   const option = getSheetMonthOption(monthKey);
   if (!option.suffix) return DEFAULT_CONFIG;
@@ -190,6 +207,71 @@ export async function fetchAllSheets(
   const qa = await fetchSheet(config.qaSheetName);
   
   return { csid, productivity, csatSc, sla, schedule, qa };
+}
+
+function mergeSheetData(previous: SheetData, current: SheetData): SheetData {
+  if (!previous.length) return current;
+  if (!current.length) return previous;
+  return [...previous, ...current.slice(1)];
+}
+
+function mergeScheduleSheetData(previous: SheetData, current: SheetData): SheetData {
+  if (!previous.length) return current;
+  if (!current.length) return previous;
+
+  const previousHeader = previous[0] || [];
+  const currentHeader = current[0] || [];
+  const baseHeader = currentHeader.length >= 5 ? currentHeader.slice(0, 5) : previousHeader.slice(0, 5);
+  const dateHeaders: string[] = [];
+
+  [...previousHeader.slice(5), ...currentHeader.slice(5)].forEach(header => {
+    const date = String(header || '').trim();
+    if (date && !dateHeaders.includes(date)) dateHeaders.push(date);
+  });
+
+  const rowsById = new Map<string, string[]>();
+
+  const addRows = (sheet: SheetData) => {
+    const header = sheet[0] || [];
+    const headerDates = header.slice(5).map(cell => String(cell || '').trim());
+
+    sheet.slice(1).forEach(row => {
+      const csId = String(row[1] || '').trim();
+      if (!csId) return;
+
+      if (!rowsById.has(csId)) {
+        rowsById.set(csId, Array(baseHeader.length + dateHeaders.length).fill(''));
+      }
+
+      const mergedRow = rowsById.get(csId)!;
+      for (let i = 0; i < Math.min(5, row.length); i++) {
+        if (!mergedRow[i] && row[i]) mergedRow[i] = row[i];
+      }
+
+      headerDates.forEach((date, idx) => {
+        if (!date) return;
+        const targetIndex = baseHeader.length + dateHeaders.indexOf(date);
+        const value = row[idx + 5];
+        if (value !== undefined && value !== '') mergedRow[targetIndex] = value;
+      });
+    });
+  };
+
+  addRows(previous);
+  addRows(current);
+
+  return [[...baseHeader, ...dateHeaders], ...Array.from(rowsById.values())];
+}
+
+export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsData): AllSheetsData {
+  return {
+    csid: mergeSheetData(previous.csid, current.csid),
+    productivity: mergeSheetData(previous.productivity, current.productivity),
+    csatSc: mergeSheetData(previous.csatSc, current.csatSc),
+    sla: mergeSheetData(previous.sla, current.sla),
+    schedule: mergeScheduleSheetData(previous.schedule, current.schedule),
+    qa: mergeSheetData(previous.qa, current.qa),
+  };
 }
 
 // Convert SheetData ke format CSV string (agar kompatibel 
