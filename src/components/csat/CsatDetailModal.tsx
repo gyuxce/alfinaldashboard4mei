@@ -58,7 +58,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-card w-full max-w-5xl rounded-xl shadow-2xl flex flex-col max-h-[90vh] border border-border">
+      <div className="bg-card w-full max-w-[95vw] xl:max-w-7xl rounded-xl shadow-2xl flex flex-col max-h-[90vh] border border-border">
         <div className="flex flex-col md:flex-row md:items-start justify-between p-5 border-b border-border bg-surface-muted rounded-t-xl relative gap-4 pr-12 md:pr-5">
           <div className="flex flex-col gap-3">
             <div>
@@ -184,11 +184,11 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                       <thead className="bg-surface-muted text-text-secondary border-b border-border">
                         <tr>
                           <th className="p-3 font-bold">Score</th>
-                          <th className="p-3 font-bold">Category Case</th>
+                          <th className="p-3 font-bold min-w-[180px] max-w-[300px]">Category Case</th>
                           <th className="p-3 font-bold">Ticket & Chat ID</th>
                           <th className="p-3 font-bold">UID</th>
-                          <th className="p-3 font-bold">Agent / CS ID</th>
-                          <th className="p-3 font-bold min-w-[200px] max-w-[300px]">Response / Komentar</th>
+                          <th className="p-3 font-bold min-w-[180px]">Agent / CS ID</th>
+                          <th className="p-3 font-bold min-w-[250px] max-w-[350px]">Response / Komentar</th>
                           <th className="p-3 font-bold min-w-[150px]">Analisa TL (RCA)</th>
                         </tr>
                       </thead>
@@ -200,7 +200,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                                 {s.score} <Star className="w-3 h-3 fill-current" />
                               </span>
                             </td>
-                            <td className="p-3 align-top font-medium text-text-primary max-w-[150px] whitespace-normal">
+                            <td className="p-3 align-top font-medium text-text-primary min-w-[180px] max-w-[300px] whitespace-normal leading-relaxed">
                               {s.category}
                               {s.isTakeout && <div className="mt-1"><span className="text-[9px] bg-card border border-border px-1.5 py-0.5 rounded text-text-muted">Takeout</span></div>}
                             </td>
@@ -213,7 +213,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                             <td className="p-3 align-top font-mono text-text-muted">
                               {s.uid || '-'}
                             </td>
-                            <td className="p-3 align-top font-medium text-text-primary">
+                            <td className="p-3 align-top font-medium text-text-primary min-w-[180px] whitespace-normal">
                               {s.agentName || s.csId}
                               <div className="text-[10px] text-text-muted font-normal mt-0.5">{s.csId}</div>
                             </td>
