@@ -145,13 +145,6 @@ export default function App() {
     hydrateFromStorage();
   }, [hydrateFromStorage]);
 
-  useEffect(() => {
-    const hasSheetConfig = import.meta.env.VITE_SHEETS_API_KEY && import.meta.env.VITE_SPREADSHEET_ID;
-    if (hasSheetConfig) {
-      fetchFromSheets();
-    }
-  }, []);
-
   const { rawData, previousRawData, previousRawData2, previousRawData3, tlList: baseTlList } = useMemo(() => {
     let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary);
     
