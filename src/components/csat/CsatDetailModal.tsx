@@ -112,27 +112,51 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
             </div>
             
             <div className="flex items-start gap-4 ml-0 md:ml-7 mt-2 flex-wrap">
-              <div className="flex gap-2">
-                <div className="flex flex-col px-4 py-2 bg-card rounded-lg border border-border shadow-sm min-w-[100px]">
-                  <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-1">Total Surveys</span>
-                  <span className="text-lg font-black text-text-primary">
+              <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col px-3 py-2 bg-card rounded-lg border border-border shadow-sm min-w-[80px]">
+                  <span className="text-[9px] text-text-muted uppercase tracking-wider font-bold mb-1">Total Surveys</span>
+                  <span className="text-base font-black text-text-primary">
                     {filteredSurveys.length}
                   </span>
                 </div>
-                <div className="flex flex-col px-4 py-2 bg-danger/5 rounded-lg border border-danger/20 shadow-sm min-w-[100px]">
-                  <span className="text-[10px] text-danger uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-current" /> 1 Total
+                <div className="flex flex-col px-3 py-2 bg-success/5 rounded-lg border border-success/20 shadow-sm min-w-[80px]">
+                  <span className="text-[9px] text-success uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 fill-current" /> 5 Total
                   </span>
-                  <span className="text-lg font-black text-danger">
-                    {filteredSurveys.filter(s => s.score === 1).length}
+                  <span className="text-base font-black text-success">
+                    {filteredSurveys.filter(s => s.score === 5).length}
                   </span>
                 </div>
-                <div className="flex flex-col px-4 py-2 bg-orange-500/5 rounded-lg border border-orange-500/20 shadow-sm min-w-[100px]">
-                  <span className="text-[10px] text-orange-500 uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-current" /> 2 Total
+                <div className="flex flex-col px-3 py-2 bg-success/5 rounded-lg border border-success/20 shadow-sm min-w-[80px]">
+                  <span className="text-[9px] text-success/80 uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 fill-current" /> 4 Total
                   </span>
-                  <span className="text-lg font-black text-orange-500">
+                  <span className="text-base font-black text-success/80">
+                    {filteredSurveys.filter(s => s.score === 4).length}
+                  </span>
+                </div>
+                <div className="flex flex-col px-3 py-2 bg-warning/5 rounded-lg border border-warning/20 shadow-sm min-w-[80px]">
+                  <span className="text-[9px] text-warning uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 fill-current" /> 3 Total
+                  </span>
+                  <span className="text-base font-black text-warning">
+                    {filteredSurveys.filter(s => s.score === 3).length}
+                  </span>
+                </div>
+                <div className="flex flex-col px-3 py-2 bg-orange-500/5 rounded-lg border border-orange-500/20 shadow-sm min-w-[80px]">
+                  <span className="text-[9px] text-orange-500 uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 fill-current" /> 2 Total
+                  </span>
+                  <span className="text-base font-black text-orange-500">
                     {filteredSurveys.filter(s => s.score === 2).length}
+                  </span>
+                </div>
+                <div className="flex flex-col px-3 py-2 bg-danger/5 rounded-lg border border-danger/20 shadow-sm min-w-[80px]">
+                  <span className="text-[9px] text-danger uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 fill-current" /> 1 Total
+                  </span>
+                  <span className="text-base font-black text-danger">
+                    {filteredSurveys.filter(s => s.score === 1).length}
                   </span>
                 </div>
               </div>
@@ -146,13 +170,15 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     </span>
                     <div className="flex flex-col gap-2">
                       {modalType === 'category' ? topAgentsAll.map((agent, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-4 text-xs">
-                          <div className="flex items-center gap-2 flex-1">
-                            <span className="font-bold text-text-muted w-4">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate max-w-[200px]" title={agent.name}>{agent.name}</span>
+                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
+                            <span className="font-semibold text-text-primary truncate" title={agent.name}>{agent.name}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="font-bold text-text-secondary w-6 text-right mr-2">{agent.total}</span>
+                          <div className="flex items-center shrink-0 w-8 justify-end">
+                            <span className="font-bold text-text-secondary">{agent.total}</span>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[140px]">
                             {[
                               { score: 5, count: agent.s5, color: 'bg-success' },
                               { score: 4, count: agent.s4, color: 'bg-success/80' },
@@ -160,20 +186,22 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                               { score: 2, count: agent.s2, color: 'bg-orange-500' },
                               { score: 1, count: agent.s1, color: 'bg-danger' },
                             ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2.5 h-2.5 fill-current" /> {s.score} ({s.count})
+                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
                               </span>
                             ) : null)}
                           </div>
                         </div>
                       )) : topCategoriesAll.map((cat, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-4 text-xs">
-                          <div className="flex items-center gap-2 flex-1">
-                            <span className="font-bold text-text-muted w-4">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate max-w-[200px]" title={cat.name}>{cat.name}</span>
+                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
+                            <span className="font-semibold text-text-primary truncate" title={cat.name}>{cat.name}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="font-bold text-text-secondary w-6 text-right mr-2">{cat.total}</span>
+                          <div className="flex items-center shrink-0 w-8 justify-end">
+                            <span className="font-bold text-text-secondary">{cat.total}</span>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[140px]">
                             {[
                               { score: 5, count: cat.s5, color: 'bg-success' },
                               { score: 4, count: cat.s4, color: 'bg-success/80' },
@@ -181,8 +209,8 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                               { score: 2, count: cat.s2, color: 'bg-orange-500' },
                               { score: 1, count: cat.s1, color: 'bg-danger' },
                             ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2.5 h-2.5 fill-current" /> {s.score} ({s.count})
+                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
                               </span>
                             ) : null)}
                           </div>
@@ -200,37 +228,41 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     </span>
                     <div className="flex flex-col gap-2">
                       {modalType === 'category' ? topAgentsBad.map((agent, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-4 text-xs">
-                          <div className="flex items-center gap-2 flex-1">
-                            <span className="font-bold text-text-muted w-4">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate max-w-[200px]" title={agent.name}>{agent.name}</span>
+                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
+                            <span className="font-semibold text-text-primary truncate" title={agent.name}>{agent.name}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="font-bold text-text-secondary w-6 text-right mr-2">{agent.s1 + agent.s2}</span>
+                          <div className="flex items-center shrink-0 w-8 justify-end">
+                            <span className="font-bold text-text-secondary">{agent.s1 + agent.s2}</span>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[80px]">
                             {[
                               { score: 2, count: agent.s2, color: 'bg-orange-500' },
                               { score: 1, count: agent.s1, color: 'bg-danger' },
                             ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2.5 h-2.5 fill-current" /> {s.score} ({s.count})
+                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
                               </span>
                             ) : null)}
                           </div>
                         </div>
                       )) : topCategoriesBad.map((cat, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-4 text-xs">
-                          <div className="flex items-center gap-2 flex-1">
-                            <span className="font-bold text-text-muted w-4">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate max-w-[200px]" title={cat.name}>{cat.name}</span>
+                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
+                            <span className="font-semibold text-text-primary truncate" title={cat.name}>{cat.name}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="font-bold text-text-secondary w-6 text-right mr-2">{cat.s1 + cat.s2}</span>
+                          <div className="flex items-center shrink-0 w-8 justify-end">
+                            <span className="font-bold text-text-secondary">{cat.s1 + cat.s2}</span>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[80px]">
                             {[
                               { score: 2, count: cat.s2, color: 'bg-orange-500' },
                               { score: 1, count: cat.s1, color: 'bg-danger' },
                             ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2.5 h-2.5 fill-current" /> {s.score} ({s.count})
+                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
                               </span>
                             ) : null)}
                           </div>
