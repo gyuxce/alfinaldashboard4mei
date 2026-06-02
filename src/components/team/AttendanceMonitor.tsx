@@ -163,7 +163,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td colSpan={11} className="p-4 z-10 relative">
                     <EmptyState
                       title="Tidak ada data attendance"
-                      description="Coba ubah search atau range tanggal."
+                      description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search atau range tanggal."
                       variant="filter"
                       className="border-0 bg-transparent py-6"
                     />

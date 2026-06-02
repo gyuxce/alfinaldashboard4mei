@@ -68,7 +68,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td colSpan={5 + uniqueDates.length} className="p-4 z-10 relative">
                     <EmptyState
                       title="Tidak ada data schedule"
-                      description="Coba ubah search atau range tanggal."
+                      description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search atau range tanggal."
                       variant="filter"
                       className="border-0 bg-transparent py-6"
                     />

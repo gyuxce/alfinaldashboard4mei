@@ -511,7 +511,7 @@ export const ProductivityDetail: React.FC<{
                 >
                   <EmptyState
                     title="Tidak ada data productivity"
-                    description="Coba ubah search, filter Team Leader, atau range tanggal."
+                    description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search, filter Team Leader, atau range tanggal."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
                   />

@@ -257,7 +257,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
       {!data.length && (
         <EmptyState
           title="Belum ada data KPI untuk ditampilkan"
-          description="Upload data di File Center atau cek filter global seperti BPO, Team Leader, Agent, dan range tanggal."
+          description="Buka File Center, pilih bulan data, lalu klik Sync Now. Jika sudah sync tapi tetap kosong, cek filter BPO, Team Leader, Agent, atau range tanggal."
           variant="data"
         />
       )}

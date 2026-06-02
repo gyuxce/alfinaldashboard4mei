@@ -214,7 +214,7 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td colSpan={5 + uniqueDates.length} className="p-4 z-10">
                     <EmptyState
                       title="Tidak ada data WHU"
-                      description="Coba ubah search, filter Team Leader, atau range tanggal."
+                      description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search, filter Team Leader, atau range tanggal."
                       variant="filter"
                       className="border-0 bg-transparent py-6"
                     />

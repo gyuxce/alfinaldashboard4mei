@@ -264,7 +264,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         {filteredAgentRanking.length === 0 ? (
           <EmptyState
             title="Belum ada data RCA agent"
-            description="Coba ubah pencarian agent/TL atau filter global."
+            description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah pencarian agent/TL atau filter global."
             variant="filter"
             className="border-0 bg-transparent py-6"
           />

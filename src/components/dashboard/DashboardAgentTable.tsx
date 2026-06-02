@@ -157,7 +157,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                 >
                   <EmptyState
                     title="Tidak ada agent yang cocok"
-                    description="Coba ubah pencarian, filter BPO, Team Leader, Agent, atau range tanggal."
+                    description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah pencarian, filter BPO, Team Leader, Agent, atau range tanggal."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
                   />

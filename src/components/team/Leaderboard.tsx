@@ -290,7 +290,7 @@ export const Leaderboard: React.FC = () => {
           Belum Ada Data
         </h2>
         <p className="text-sm text-text-secondary mb-6 max-w-sm text-center">
-          Upload file CSV terlebih dahulu untuk melihat ranking Leaderboard.
+          Buka File Center, pilih bulan data, lalu klik Sync Now untuk melihat ranking Leaderboard.
         </p>
         <button
           onClick={handleOpenFiles}
@@ -544,7 +544,7 @@ export const Leaderboard: React.FC = () => {
                 >
                   <EmptyState
                     title="Tidak ada data leaderboard"
-                    description="Coba ubah filter global. Untuk mode TL, pastikan TL memiliki minimal 3 agent."
+                    description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah filter global. Untuk mode TL, pastikan TL memiliki minimal 3 agent."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
                   />
