@@ -38,7 +38,7 @@ export async function fetchSheet(
   return [];
 }
 
-// Fetch semua sheet sekaligus (parallel)
+// Fetch semua sheet dari Google Sheets
 export interface AllSheetsData {
   csid: SheetData;
   productivity: SheetData;
@@ -57,6 +57,13 @@ export interface SheetConfig {
   qaSheetName: string;
 }
 
+export interface SheetMonthOption {
+  key: string;
+  label: string;
+  suffix: string | null;
+  description: string;
+}
+
 // Default config, user bisa override di env atau settings
 const DEFAULT_CONFIG: SheetConfig = {
   csidSheetName: import.meta.env.VITE_SHEET_CSID || 'CSID',
@@ -66,6 +73,75 @@ const DEFAULT_CONFIG: SheetConfig = {
   scheduleSheetName: import.meta.env.VITE_SHEET_SCHEDULE || 'Schedule',
   qaSheetName: import.meta.env.VITE_SHEET_QA || 'QA',
 };
+
+export const SHEET_MONTH_OPTIONS: SheetMonthOption[] = [
+  {
+    key: 'legacy',
+    label: 'Mei 2026',
+    suffix: null,
+    description: 'Menggunakan nama tab dari env Vercel saat ini',
+  },
+  {
+    key: 'JUN_2026',
+    label: 'Juni 2026',
+    suffix: 'JUN_2026',
+    description: 'Menggunakan tab bulanan format *_JUN_2026',
+  },
+  {
+    key: 'JUL_2026',
+    label: 'Juli 2026',
+    suffix: 'JUL_2026',
+    description: 'Menggunakan tab bulanan format *_JUL_2026',
+  },
+  {
+    key: 'AUG_2026',
+    label: 'Agustus 2026',
+    suffix: 'AUG_2026',
+    description: 'Menggunakan tab bulanan format *_AUG_2026',
+  },
+  {
+    key: 'SEP_2026',
+    label: 'September 2026',
+    suffix: 'SEP_2026',
+    description: 'Menggunakan tab bulanan format *_SEP_2026',
+  },
+  {
+    key: 'OCT_2026',
+    label: 'Oktober 2026',
+    suffix: 'OCT_2026',
+    description: 'Menggunakan tab bulanan format *_OCT_2026',
+  },
+  {
+    key: 'NOV_2026',
+    label: 'November 2026',
+    suffix: 'NOV_2026',
+    description: 'Menggunakan tab bulanan format *_NOV_2026',
+  },
+  {
+    key: 'DEC_2026',
+    label: 'Desember 2026',
+    suffix: 'DEC_2026',
+    description: 'Menggunakan tab bulanan format *_DEC_2026',
+  },
+];
+
+export function getSheetMonthOption(monthKey: string): SheetMonthOption {
+  return SHEET_MONTH_OPTIONS.find(option => option.key === monthKey) || SHEET_MONTH_OPTIONS[0];
+}
+
+export function getSheetConfigForMonth(monthKey: string): SheetConfig {
+  const option = getSheetMonthOption(monthKey);
+  if (!option.suffix) return DEFAULT_CONFIG;
+
+  return {
+    csidSheetName: `CSID_${option.suffix}`,
+    productivitySheetName: `PRODUCTIVITY_${option.suffix}`,
+    csatScSheetName: `CSAT_SC_${option.suffix}`,
+    slaSheetName: `SLA_${option.suffix}`,
+    scheduleSheetName: `SCHEDULE_${option.suffix}`,
+    qaSheetName: `QA_${option.suffix}`,
+  };
+}
 
 export async function fetchAllSheets(
   config: SheetConfig = DEFAULT_CONFIG

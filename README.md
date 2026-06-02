@@ -47,6 +47,17 @@ VITE_SHEET_SCHEDULE=Schedule
 VITE_SHEET_QA=QA
 ```
 
+Untuk data bulanan, biarkan tab Mei tetap memakai env di atas. Mulai Juni 2026, File Center bisa memilih bulan dan membaca tab dengan format:
+
+- `CSID_JUN_2026`
+- `PRODUCTIVITY_JUN_2026`
+- `CSAT_SC_JUN_2026`
+- `SLA_JUN_2026`
+- `SCHEDULE_JUN_2026`
+- `QA_JUN_2026`
+
+Ganti suffix bulan untuk bulan berikutnya, misalnya `JUL_2026`, `AUG_2026`, dan seterusnya.
+
 ## Scripts
 
 ```bash

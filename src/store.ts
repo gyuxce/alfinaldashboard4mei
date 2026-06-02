@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, sheetDataToParseResult } from './lib/sheetsApi';
+import { fetchAllSheets, getSheetConfigForMonth, getSheetMonthOption, sheetDataToParseResult } from './lib/sheetsApi';
 
 export interface AppState {
   // Data source mode
@@ -11,6 +11,7 @@ export interface AppState {
   isFetchingSheets: boolean;
   sheetsFetchError: string | null;
   lastSyncTime: Date | null;
+  selectedSheetMonth: string;
   
   // Sheet configuration
   sheetsConfig: {
@@ -66,6 +67,7 @@ export interface AppState {
   
   // Sheet actions
   fetchFromSheets: () => Promise<void>;
+  setSelectedSheetMonth: (monthKey: string) => void;
   setDataSource: (mode: 'sheets' | 'csv') => void;
   setIsComparisonEnabled: (enabled: boolean) => void;
 }
@@ -75,6 +77,7 @@ export const useStore = create<AppState>((set, get) => ({
   isFetchingSheets: false,
   sheetsFetchError: null,
   lastSyncTime: null,
+  selectedSheetMonth: 'legacy',
   sheetsConfig: null,
 
   productivityFile: null,
@@ -300,12 +303,16 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   setDataSource: (mode) => set({ dataSource: mode }),
+  setSelectedSheetMonth: (monthKey) => set({ selectedSheetMonth: monthKey }),
 
   fetchFromSheets: async () => {
     set({ isFetchingSheets: true, sheetsFetchError: null });
     
     try {
-      const allData = await fetchAllSheets();
+      const selectedMonth = get().selectedSheetMonth;
+      const sheetConfig = getSheetConfigForMonth(selectedMonth);
+      const monthOption = getSheetMonthOption(selectedMonth);
+      const allData = await fetchAllSheets(sheetConfig);
       
       const csvCsid = sheetDataToParseResult(allData.csid);
       const csvProductivity = sheetDataToParseResult(allData.productivity);
@@ -358,12 +365,12 @@ export const useStore = create<AppState>((set, get) => ({
       
       set({
         // We set dummy files so the UI knows data is "present"
-        csidFile: new File([], "CSID (Google Sheets)"),
-        productivityFile: new File([], "Productivity (Google Sheets)"),
-        csatScFile: new File([], "CSAT SC (Google Sheets)"),
-        slaFile: new File([], "SLA (Google Sheets)"),
-        scheduleFile: new File([], "Schedule (Google Sheets)"),
-        qaFile: new File([], "QA (Google Sheets)"),
+        csidFile: new File([], `CSID (${monthOption.label})`),
+        productivityFile: new File([], `Productivity (${monthOption.label})`),
+        csatScFile: new File([], `CSAT SC (${monthOption.label})`),
+        slaFile: new File([], `SLA (${monthOption.label})`),
+        scheduleFile: new File([], `Schedule (${monthOption.label})`),
+        qaFile: new File([], `QA (${monthOption.label})`),
 
         csidData: csvCsid.data,
         productivityData: csvProductivity.data,

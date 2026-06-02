@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import { useStore, AppState } from '../../store';
 import { UploadCloud, CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getSheetConfigForMonth, getSheetMonthOption, SHEET_MONTH_OPTIONS } from '../../lib/sheetsApi';
 import { 
   countDataRows,
   validateCsidFile, 
@@ -465,7 +466,15 @@ const UploadCard = ({ title, fileKey }: { title: string, fileKey: keyof AppState
 };
 
 export const FileCenter = () => {
-  const { clearFiles, fetchFromSheets, isFetchingSheets, sheetsFetchError, lastSyncTime } = useStore();
+  const {
+    clearFiles,
+    fetchFromSheets,
+    isFetchingSheets,
+    sheetsFetchError,
+    lastSyncTime,
+    selectedSheetMonth,
+    setSelectedSheetMonth,
+  } = useStore();
 
   const [isConfirming, setIsConfirming] = React.useState(false);
 
@@ -480,14 +489,16 @@ export const FileCenter = () => {
   };
 
   const isSheetMode = !!import.meta.env.VITE_SHEETS_API_KEY;
+  const activeMonth = getSheetMonthOption(selectedSheetMonth);
+  const activeSheetConfig = getSheetConfigForMonth(selectedSheetMonth);
 
   const sheetNames = [
-    { label: 'Master CSID', tabName: import.meta.env.VITE_SHEET_CSID || 'CSID' },
-    { label: 'Productivity, CSAT, WHU', tabName: import.meta.env.VITE_SHEET_PRODUCTIVITY || 'Productivity CSAT WHU' },
-    { label: 'CSAT SC Raw Data', tabName: import.meta.env.VITE_SHEET_CSAT_SC || 'CSAT SC' },
-    { label: 'SLA Responses', tabName: import.meta.env.VITE_SHEET_SLA || 'SLA' },
-    { label: 'Agent Scheduling', tabName: import.meta.env.VITE_SHEET_SCHEDULE || 'Schedule' },
-    { label: 'QA Score', tabName: import.meta.env.VITE_SHEET_QA || 'QA' },
+    { label: 'Master CSID', tabName: activeSheetConfig.csidSheetName },
+    { label: 'Productivity, CSAT, WHU', tabName: activeSheetConfig.productivitySheetName },
+    { label: 'CSAT SC Raw Data', tabName: activeSheetConfig.csatScSheetName },
+    { label: 'SLA Responses', tabName: activeSheetConfig.slaSheetName },
+    { label: 'Agent Scheduling', tabName: activeSheetConfig.scheduleSheetName },
+    { label: 'QA Score', tabName: activeSheetConfig.qaSheetName },
   ];
 
   if (isSheetMode) {
@@ -502,7 +513,22 @@ export const FileCenter = () => {
               Data otomatis diambil dari Google Sheets
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <label className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
+              <span className="whitespace-nowrap">Data Bulan</span>
+              <select
+                value={selectedSheetMonth}
+                onChange={(event) => setSelectedSheetMonth(event.target.value)}
+                disabled={isFetchingSheets}
+                className="h-9 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-text-primary outline-none transition-colors hover:border-primary/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {SHEET_MONTH_OPTIONS.map(option => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button 
               onClick={handleClear}
               className="px-3 py-1.5 border-danger/20 border text-danger text-xs hover:bg-danger-soft transition-colors rounded-lg font-bold"
@@ -528,6 +554,18 @@ export const FileCenter = () => {
             <p>{sheetsFetchError}</p>
           </div>
         )}
+
+        <div className="bg-primary-soft border border-primary/20 rounded-xl p-4 text-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div>
+              <p className="font-bold text-text-primary">Sheet aktif: {activeMonth.label}</p>
+              <p className="text-xs text-text-muted mt-1">{activeMonth.description}</p>
+            </div>
+            <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
+              {activeMonth.suffix ? 'Monthly tabs' : 'Env default tabs'}
+            </span>
+          </div>
+        </div>
         
         {/* Loading state */}
         {isFetchingSheets && (
