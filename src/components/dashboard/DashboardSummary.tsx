@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
-import { AgentKPI } from "../../lib/dataProcessor";
+import { AgentKPI, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
 import { Activity, Star, Clock, CheckCircle, TrendingUp, Smile, Users, Info, ChevronDown } from "lucide-react";
 import { useStore } from "../../store";
@@ -19,7 +19,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
   const [search, setSearch] = useState("");
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const dict = useStore((state) => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore();
+  const { startDate, endDate, setDateRange, comparisonMode } = useStore();
 
   const tickerRef = useRef<HTMLDivElement>(null);
   const [tickerDuration, setTickerDuration] = useState(30);
@@ -358,6 +358,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
               hasPrev3={previousData3.length > 0}
               startDate={startDate}
               endDate={endDate}
+              comparisonMode={comparisonMode}
             />
           )}
 
@@ -634,6 +635,7 @@ const WeeklyReportPanel = ({
   hasPrev3,
   startDate,
   endDate,
+  comparisonMode,
 }: {
   currentStats: any;
   previousStats: any;
@@ -643,6 +645,7 @@ const WeeklyReportPanel = ({
   hasPrev3?: boolean;
   startDate: string;
   endDate: string;
+  comparisonMode: 'wow' | 'mom';
 }) => {
   const formatDate = (d: string) => {
     if (!d) return '-';
@@ -650,54 +653,42 @@ const WeeklyReportPanel = ({
     return isNaN(dt.getTime()) ? d : new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(dt);
   };
 
-  const getWeekLabel = (dateStr: string) => {
+  const getPeriodLabel = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(d);
+    if (comparisonMode === 'mom') {
+      return `${month} ${d.getFullYear()}`;
+    }
     const weekNum = Math.ceil(d.getDate() / 7);
     return `Week ${weekNum} ${month}`;
   };
 
-  // Compute previous period range label
+  const getPrevRange = comparisonMode === 'mom' ? getPreviousMonthPeriod : getPreviousPeriod;
+  const prevRange = getPrevRange(startDate, endDate);
+  const prev2Range = getPrevRange(prevRange.start, prevRange.end);
+  const prev3Range = getPrevRange(prev2Range.start, prev2Range.end);
+
   const prevStart = (() => {
-    if (!startDate || !endDate) return '';
-    const s = new Date(startDate);
-    const e = new Date(endDate);
-    const diff = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
-    const pe = new Date(s); pe.setDate(pe.getDate() - 1);
-    const ps = new Date(pe); ps.setDate(ps.getDate() - diff + 1);
-    return ps.toISOString().split('T')[0];
+    return prevRange.start;
   })();
   const prevEnd = (() => {
-    if (!startDate) return '';
-    const s = new Date(startDate);
-    const pe = new Date(s); pe.setDate(pe.getDate() - 1);
-    return pe.toISOString().split('T')[0];
+    return prevRange.end;
   })();
-
-  const diff = startDate && endDate ? Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1 : 0;
   
   const prev2Start = (() => {
-    if (!startDate || !prevStart) return '';
-    const d = new Date(prevStart); d.setDate(d.getDate() - diff);
-    return d.toISOString().split('T')[0];
+    return prev2Range.start;
   })();
   const prev2End = (() => {
-    if (!startDate || !prevEnd) return '';
-    const d = new Date(prevEnd); d.setDate(d.getDate() - diff);
-    return d.toISOString().split('T')[0];
+    return prev2Range.end;
   })();
   
   const prev3Start = (() => {
-    if (!startDate || !prev2Start) return '';
-    const d = new Date(prev2Start); d.setDate(d.getDate() - diff);
-    return d.toISOString().split('T')[0];
+    return prev3Range.start;
   })();
   const prev3End = (() => {
-    if (!startDate || !prev2End) return '';
-    const d = new Date(prev2End); d.setDate(d.getDate() - diff);
-    return d.toISOString().split('T')[0];
+    return prev3Range.end;
   })();
 
   const rows = [
@@ -725,7 +716,7 @@ const WeeklyReportPanel = ({
           </div>
           <div>
             <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
-              Weekly Performance Report
+              {comparisonMode === 'mom' ? 'Monthly Performance Report' : 'Weekly Performance Report'}
             </h2>
             <p className="text-[10px] text-text-muted mt-0.5">Perbandingan antar periode</p>
           </div>
@@ -733,22 +724,22 @@ const WeeklyReportPanel = ({
         <div className="flex items-center gap-4 text-[11px] flex-wrap justify-end mt-2 sm:mt-0">
           <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold">
             <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-            {getWeekLabel(endDate)}: {formatDate(startDate)} to {formatDate(endDate)}
+            {getPeriodLabel(endDate)}: {formatDate(startDate)} to {formatDate(endDate)}
           </div>
           <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-            {getWeekLabel(prevEnd)}: {formatDate(prevStart)} to {formatDate(prevEnd)}
+            {getPeriodLabel(prevEnd)}: {formatDate(prevStart)} to {formatDate(prevEnd)}
           </div>
           {hasPrev2 && (
             <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-              {getWeekLabel(prev2End)}: {formatDate(prev2Start)} to {formatDate(prev2End)}
+              {getPeriodLabel(prev2End)}: {formatDate(prev2Start)} to {formatDate(prev2End)}
             </div>
           )}
           {hasPrev3 && (
             <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-              {getWeekLabel(prev3End)}: {formatDate(prev3Start)} to {formatDate(prev3End)}
+              {getPeriodLabel(prev3End)}: {formatDate(prev3Start)} to {formatDate(prev3End)}
             </div>
           )}
         </div>
@@ -761,10 +752,10 @@ const WeeklyReportPanel = ({
             <tr className="border-b border-border">
               <th className="text-left px-5 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">KPI</th>
               <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">Target</th>
-              <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(endDate)}</th>
-              <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(prevEnd)}</th>
-              {hasPrev2 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(prev2End)}</th>}
-              {hasPrev3 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getWeekLabel(prev3End)}</th>}
+              <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(endDate)}</th>
+              <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prevEnd)}</th>
+              {hasPrev2 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prev2End)}</th>}
+              {hasPrev3 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prev3End)}</th>}
               <th className="text-right px-5 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">Perubahan</th>
             </tr>
           </thead>

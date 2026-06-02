@@ -235,11 +235,17 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
 
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
   const { startDate, endDate } = useStore();
+  const comparisonMode = useStore(state => state.comparisonMode);
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
+    if (comparisonMode === 'mom') {
+      end.setMonth(end.getMonth() - offset);
+      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+      return `${month} ${end.getFullYear()}`;
+    }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
     const weekNum = Math.ceil(end.getDate() / 7);
@@ -310,7 +316,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         {/* Weekly Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">4-Week Comparison Trend</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '4-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
@@ -330,7 +336,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         {/* Daily Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend (Current Week)</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">

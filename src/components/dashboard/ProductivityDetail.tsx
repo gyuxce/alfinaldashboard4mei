@@ -42,7 +42,7 @@ export const ProductivityDetail: React.FC<{
   };
 
   const dict = useStore((state) => state.agentDictionary);
-  const { startDate, endDate, setDateRange, isComparisonEnabled } = useStore();
+  const { startDate, endDate, setDateRange, isComparisonEnabled, comparisonMode } = useStore();
 
   const filteredData = useMemo(() => {
     return data.filter((a) => {
@@ -305,10 +305,10 @@ export const ProductivityDetail: React.FC<{
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Line type="monotone" name="Minggu Ini" dataKey="total" stroke="#E31E24" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
-                <Line type="monotone" name="Minggu Lalu" dataKey="prev" stroke="#6B7280" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                {previousData2.length > 0 && <Line type="monotone" name="2 Minggu Lalu" dataKey="prev2" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="3 3" dot={false} />}
-                {previousData3.length > 0 && <Line type="monotone" name="3 Minggu Lalu" dataKey="prev3" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="2 2" dot={false} />}
+                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Ini' : 'Minggu Ini'} dataKey="total" stroke="#E31E24" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Lalu' : 'Minggu Lalu'} dataKey="prev" stroke="#6B7280" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                {previousData2.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '2 Bulan Lalu' : '2 Minggu Lalu'} dataKey="prev2" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="3 3" dot={false} />}
+                {previousData3.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '3 Bulan Lalu' : '3 Minggu Lalu'} dataKey="prev3" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="2 2" dot={false} />}
               </LineChart>
             ) : (
               <BarChart data={hourlyDataWow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

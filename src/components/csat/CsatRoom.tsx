@@ -12,6 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
+  const comparisonMode = useStore(state => state.comparisonMode);
   const selectedBpo = useStore(state => state.selectedBpo);
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
@@ -699,7 +700,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                      <th className="p-2 font-bold w-12 text-center min-w-[60px] max-w-[60px]">Rank</th>
                      <th className="p-2 font-bold ">Category Name</th>
                      <th className="p-2 font-bold w-16 text-center">Freq</th>
-                     {isComparisonEnabled && <th className="p-2 font-bold w-16 text-center">WoW</th>}
+                     {isComparisonEnabled && <th className="p-2 font-bold w-16 text-center">{comparisonMode === 'mom' ? 'MoM' : 'WoW'}</th>}
                    </tr>
                  </thead>
                  <tbody className="">
@@ -1096,11 +1097,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
   const { startDate, endDate } = useStore();
+  const comparisonMode = useStore(state => state.comparisonMode);
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
+    if (comparisonMode === 'mom') {
+      end.setMonth(end.getMonth() - offset);
+      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+      return `${month} ${end.getFullYear()}`;
+    }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
     const weekNum = Math.ceil(end.getDate() / 7);
@@ -1176,7 +1183,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
         {/* Weekly Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">4-Week Comparison Trend</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '4-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
@@ -1199,7 +1206,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
         {/* Daily Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend (Current Week)</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
@@ -1226,11 +1233,17 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
 
 const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, viewMode, search, filterTL, type = 'all', onCategoryClick, onAgentClick }: any) => {
   const { startDate, endDate } = useStore();
+  const comparisonMode = useStore(state => state.comparisonMode);
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
+    if (comparisonMode === 'mom') {
+      end.setMonth(end.getMonth() - offset);
+      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+      return `${month} ${end.getFullYear()}`;
+    }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
     const weekNum = Math.ceil(end.getDate() / 7);
@@ -1399,11 +1412,17 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
 };
 const RespondentChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
   const { startDate, endDate } = useStore();
+  const comparisonMode = useStore(state => state.comparisonMode);
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
+    if (comparisonMode === 'mom') {
+      end.setMonth(end.getMonth() - offset);
+      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
+      return `${month} ${end.getFullYear()}`;
+    }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
     const weekNum = Math.ceil(end.getDate() / 7);
@@ -1513,7 +1532,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
         {/* Left: Weekly Cards */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h4 className="text-xs font-bold text-text-secondary text-center">4-Week Respondents</h4>
+            <h4 className="text-xs font-bold text-text-secondary text-center">{comparisonMode === 'mom' ? '4-Month Respondents' : '4-Week Respondents'}</h4>
           </div>
           <div className="grid grid-cols-2 gap-4 h-full">
             {weeksData.map((w, idx) => {
@@ -1575,7 +1594,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
         {/* Right: Daily Area Chart */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h4 className="text-xs font-bold text-text-secondary text-center">Daily Respondents (Current Week)</h4>
+            <h4 className="text-xs font-bold text-text-secondary text-center">Daily Respondents ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})</h4>
           </div>
           <div className="h-full min-h-[380px] w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">

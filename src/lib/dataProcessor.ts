@@ -145,6 +145,27 @@ export function getPreviousPeriod(startDate: string, endDate: string) {
   };
 }
 
+function toIsoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getPreviousMonthDate(date: Date) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  const previousMonthLastDay = new Date(year, month, 0).getDate();
+  return new Date(year, month - 1, Math.min(day, previousMonthLastDay));
+}
+
+export function getPreviousMonthPeriod(startDate: string, endDate: string) {
+  if (!startDate || !endDate) return { start: '', end: '' };
+
+  return {
+    start: toIsoDate(getPreviousMonthDate(new Date(startDate))),
+    end: toIsoDate(getPreviousMonthDate(new Date(endDate))),
+  };
+}
+
 const dateStrCache = new Map<string, string | null>();
 
 export function normalizeDateStr(raw: string): string | null {

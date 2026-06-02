@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from './store';
-import { processKPIs, getPreviousPeriod } from './lib/dataProcessor';
+import { processKPIs, getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
 
 import { 
   LayoutDashboard, 
@@ -94,6 +94,25 @@ function formatFilterDate(date: string) {
   return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(parsed);
 }
 
+function getMonthValue(date: string) {
+  return date ? date.slice(0, 7) : '';
+}
+
+function formatLocalDate(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function getMonthRange(monthValue: string) {
+  if (!monthValue) return { start: '', end: '' };
+  const [year, month] = monthValue.split('-').map(Number);
+  if (!year || !month) return { start: '', end: '' };
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    start: formatLocalDate(year, month, 1),
+    end: formatLocalDate(year, month, lastDay),
+  };
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('summary');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -119,7 +138,7 @@ export default function App() {
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedAgentFor360,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime,
-    isComparisonEnabled, setIsComparisonEnabled
+    isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode
   } = useStore();
 
   useEffect(() => {
@@ -140,13 +159,14 @@ export default function App() {
     let prevRaw2: any[] = [];
     let prevRaw3: any[] = [];
     if (isComparisonEnabled && startDate && endDate) {
-      const prevRange = getPreviousPeriod(startDate, endDate);
+      const getPrevRange = comparisonMode === 'mom' ? getPreviousMonthPeriod : getPreviousPeriod;
+      const prevRange = getPrevRange(startDate, endDate);
       prevRaw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange.start, prevRange.end, agentDictionary);
       
-      const prevRange2 = getPreviousPeriod(prevRange.start, prevRange.end);
+      const prevRange2 = getPrevRange(prevRange.start, prevRange.end);
       prevRaw2 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange2.start, prevRange2.end, agentDictionary);
       
-      const prevRange3 = getPreviousPeriod(prevRange2.start, prevRange2.end);
+      const prevRange3 = getPrevRange(prevRange2.start, prevRange2.end);
       prevRaw3 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange3.start, prevRange3.end, agentDictionary);
     }
 
@@ -157,7 +177,7 @@ export default function App() {
     const tlsArr = Array.from(tls).sort((a,b) => a.localeCompare(b));
     
     return { rawData: raw, previousRawData: prevRaw, previousRawData2: prevRaw2, previousRawData3: prevRaw3, tlList: tlsArr };
-  }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, isComparisonEnabled]);
+  }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, isComparisonEnabled, comparisonMode]);
 
   const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, tlList, agentList } = useMemo(() => {
     let data = rawData;
@@ -264,6 +284,12 @@ export default function App() {
       end.setDate(end.getDate() + 6);
       setDateRange(t1, end.toISOString().split('T')[0]);
     }
+  };
+
+  const selectedMonthFilter = getMonthValue(startDate);
+  const applyMonthFilter = (monthValue: string) => {
+    const range = getMonthRange(monthValue);
+    setDateRange(range.start, range.end);
   };
 
   const activeFilters = [
@@ -455,6 +481,15 @@ export default function App() {
             </div>
             
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full xl:w-auto">
+              <label className="flex items-center gap-2 text-[11px] font-semibold text-text-secondary w-full sm:w-auto">
+                <span className="whitespace-nowrap">Bulan</span>
+                <input
+                  type="month"
+                  className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto"
+                  value={selectedMonthFilter}
+                  onChange={e => applyMonthFilter(e.target.value)}
+                />
+              </label>
               <input type="date" className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
               <span className="text-text-muted text-sm shrink-0">to</span>
               <input type="date" className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
@@ -491,7 +526,30 @@ export default function App() {
                 <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
                   <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
                 </div>
-                <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare WoW</span>
+                <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare {comparisonMode === 'mom' ? 'MoM' : 'WoW'}</span>
+              </div>
+
+              <div className="flex bg-card rounded-xl border border-border p-0.5 gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setComparisonMode('wow')}
+                  className={cn(
+                    "text-[10px] px-2 py-1 rounded font-bold transition-colors cursor-pointer",
+                    comparisonMode === 'wow' ? "bg-primary text-white" : "text-text-secondary hover:bg-surface-muted"
+                  )}
+                >
+                  WoW
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComparisonMode('mom')}
+                  className={cn(
+                    "text-[10px] px-2 py-1 rounded font-bold transition-colors cursor-pointer",
+                    comparisonMode === 'mom' ? "bg-primary text-white" : "text-text-secondary hover:bg-surface-muted"
+                  )}
+                >
+                  MoM
+                </button>
               </div>
 
             </div>

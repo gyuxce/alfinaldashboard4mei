@@ -49,6 +49,7 @@ export interface AppState {
   selectedAgentFor360: string | null;
   agentDictionary: Record<string, { name: string; bpo: string; teamLeader: string }>;
   isComparisonEnabled: boolean;
+  comparisonMode: 'wow' | 'mom';
 
   isHydrating: boolean;
   isPersisting: boolean;
@@ -70,6 +71,7 @@ export interface AppState {
   setSelectedSheetMonth: (monthKey: string) => void;
   setDataSource: (mode: 'sheets' | 'csv') => void;
   setIsComparisonEnabled: (enabled: boolean) => void;
+  setComparisonMode: (mode: 'wow' | 'mom') => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -102,6 +104,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedAgentFor360: null,
   agentDictionary: {},
   isComparisonEnabled: false,
+  comparisonMode: 'wow',
   fileValidations: {},
   fileNames: {},
 
@@ -185,6 +188,7 @@ export const useStore = create<AppState>((set, get) => ({
   setSelectedGlobalAgent: (agent) => set(() => ({ selectedGlobalAgent: agent })),
   setSelectedAgentFor360: (agentId) => set(() => ({ selectedAgentFor360: agentId })),
   setIsComparisonEnabled: (enabled) => set(() => ({ isComparisonEnabled: enabled })),
+  setComparisonMode: (mode) => set(() => ({ comparisonMode: mode })),
 
   clearFiles: async () => {
     // Clear Zustand
