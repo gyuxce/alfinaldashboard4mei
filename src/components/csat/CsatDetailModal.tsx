@@ -74,11 +74,29 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
             </div>
             
             <div className="flex items-start gap-4 ml-0 md:ml-7 mt-2 flex-wrap">
-              <div className="flex flex-col px-4 py-2 bg-card rounded-lg border border-border shadow-sm">
-                <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-1">Total Surveys</span>
-                <span className="text-lg font-black text-text-primary">
-                  {filteredSurveys.length}
-                </span>
+              <div className="flex gap-2">
+                <div className="flex flex-col px-4 py-2 bg-card rounded-lg border border-border shadow-sm min-w-[100px]">
+                  <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-1">Total Surveys</span>
+                  <span className="text-lg font-black text-text-primary">
+                    {filteredSurveys.length}
+                  </span>
+                </div>
+                <div className="flex flex-col px-4 py-2 bg-danger/5 rounded-lg border border-danger/20 shadow-sm min-w-[100px]">
+                  <span className="text-[10px] text-danger uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-current" /> 1 Total
+                  </span>
+                  <span className="text-lg font-black text-danger">
+                    {filteredSurveys.filter(s => s.score === 1).length}
+                  </span>
+                </div>
+                <div className="flex flex-col px-4 py-2 bg-orange-500/5 rounded-lg border border-orange-500/20 shadow-sm min-w-[100px]">
+                  <span className="text-[10px] text-orange-500 uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-current" /> 2 Total
+                  </span>
+                  <span className="text-lg font-black text-orange-500">
+                    {filteredSurveys.filter(s => s.score === 2).length}
+                  </span>
+                </div>
               </div>
 
               {(modalType === 'category' ? topAgents.length > 0 : topCategories.length > 0) && (
