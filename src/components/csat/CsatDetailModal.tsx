@@ -8,6 +8,7 @@ interface CsatDetailModalProps {
   subtitle?: React.ReactNode;
   surveys: CSATEntry[];
   agentType?: 'csat' | 'defects';
+  modalType?: 'agent' | 'category';
   onClose: () => void;
   expandedDates: Set<string>;
   toggleExpandDate: (date: string) => void;
@@ -15,7 +16,7 @@ interface CsatDetailModalProps {
 }
 
 export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
-  title, subtitle, surveys, agentType, onClose, expandedDates, toggleExpandDate, viewMode
+  title, subtitle, surveys, agentType, modalType = 'agent', onClose, expandedDates, toggleExpandDate, viewMode
 }) => {
   const filteredSurveys = surveys.filter(h => (viewMode === 'full' || !h.isTakeout) && h.score > 0);
   
@@ -35,6 +36,24 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5)
       .map(([name, stats]) => ({ name, ...stats }));
+  }, [filteredSurveys]);
+
+  const topAgents = React.useMemo(() => {
+    const agg: Record<string, { total: number, name: string, s5: number, s4: number, s3: number, s2: number, s1: number }> = {};
+    filteredSurveys.forEach(h => {
+      const csId = h.csId || 'Unknown';
+      if (!agg[csId]) agg[csId] = { total: 0, name: h.agentName || csId, s5: 0, s4: 0, s3: 0, s2: 0, s1: 0 };
+      agg[csId].total++;
+      if (h.score === 5) agg[csId].s5++;
+      if (h.score === 4) agg[csId].s4++;
+      if (h.score === 3) agg[csId].s3++;
+      if (h.score === 2) agg[csId].s2++;
+      if (h.score === 1) agg[csId].s1++;
+    });
+    return Object.entries(agg)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 5)
+      .map(([csId, stats]) => ({ csId, ...stats }));
   }, [filteredSurveys]);
 
   return (
@@ -62,11 +81,34 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                 </span>
               </div>
 
-              {topCategories.length > 0 && (
+              {(modalType === 'category' ? topAgents.length > 0 : topCategories.length > 0) && (
                 <div className="flex flex-col px-4 py-2 bg-card rounded-lg border border-border shadow-sm flex-1 min-w-[300px]">
-                  <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-2">Top {topCategories.length} Categories</span>
+                  <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-2">
+                    Top {modalType === 'category' ? topAgents.length : topCategories.length} {modalType === 'category' ? 'Agents' : 'Categories'}
+                  </span>
                   <div className="flex flex-col gap-2">
-                    {topCategories.map((cat, idx) => (
+                    {modalType === 'category' ? topAgents.map((agent, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-4 text-xs">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="font-bold text-text-muted w-4">{idx + 1}.</span>
+                          <span className="font-semibold text-text-primary truncate max-w-[200px]" title={agent.name}>{agent.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-bold text-text-secondary w-6 text-right mr-2">{agent.total}</span>
+                          {[
+                            { score: 5, count: agent.s5, color: 'bg-success' },
+                            { score: 4, count: agent.s4, color: 'bg-success/80' },
+                            { score: 3, count: agent.s3, color: 'bg-warning' },
+                            { score: 2, count: agent.s2, color: 'bg-orange-500' },
+                            { score: 1, count: agent.s1, color: 'bg-danger' },
+                          ].map(s => s.count > 0 ? (
+                            <span key={s.score} className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                              <Star className="w-2.5 h-2.5 fill-current" /> {s.score} ({s.count})
+                            </span>
+                          ) : null)}
+                        </div>
+                      </div>
+                    )) : topCategories.map((cat, idx) => (
                       <div key={idx} className="flex items-center justify-between gap-4 text-xs">
                         <div className="flex items-center gap-2 flex-1">
                           <span className="font-bold text-text-muted w-4">{idx + 1}.</span>

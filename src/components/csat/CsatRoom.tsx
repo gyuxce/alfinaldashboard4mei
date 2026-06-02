@@ -715,7 +715,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                       const isDown = diff < 0;
                       
                       return (
-                        <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group">
+                        <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group cursor-pointer" onClick={() => handleCategoryClick(cat.name, viewMode === 'full' ? 'From Full Data' : 'After Take Out', data)}>
                           <td className="p-2 text-center text-text-muted font-medium">{cat.rank}</td>
                           <td className={`p-2 font-medium max-w-[200px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
                           <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{formatNum(cat.count, 0)}</td>
@@ -1067,6 +1067,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           title={wowModalData.title}
           subtitle={wowModalData.subtitle}
           surveys={wowModalData.surveys}
+          modalType={typeof wowModalData.title === 'string' && wowModalData.title.includes('Category Analysis') ? 'category' : 'agent'}
           onClose={() => setWowModalData(null)}
           expandedDates={expandedDates}
           toggleExpandDate={(date) => {
