@@ -526,16 +526,16 @@ export default function App() {
                 <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
                   <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
                 </div>
-                <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare {comparisonMode === 'mom' ? 'MoM' : 'WoW'}</span>
+                <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare</span>
               </div>
 
-              <div className="flex bg-card rounded-xl border border-border p-0.5 gap-0.5">
+              <div className="flex rounded-xl border border-primary/30 bg-primary-soft p-0.5 gap-0.5 shadow-sm">
                 <button
                   type="button"
                   onClick={() => setComparisonMode('wow')}
                   className={cn(
-                    "text-[10px] px-2 py-1 rounded font-bold transition-colors cursor-pointer",
-                    comparisonMode === 'wow' ? "bg-primary text-white" : "text-text-secondary hover:bg-surface-muted"
+                    "text-[10px] px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer",
+                    comparisonMode === 'wow' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
                   )}
                 >
                   WoW
@@ -544,8 +544,8 @@ export default function App() {
                   type="button"
                   onClick={() => setComparisonMode('mom')}
                   className={cn(
-                    "text-[10px] px-2 py-1 rounded font-bold transition-colors cursor-pointer",
-                    comparisonMode === 'mom' ? "bg-primary text-white" : "text-text-secondary hover:bg-surface-muted"
+                    "text-[10px] px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer",
+                    comparisonMode === 'mom' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
                   )}
                 >
                   MoM
