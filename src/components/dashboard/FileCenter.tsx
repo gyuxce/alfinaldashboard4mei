@@ -573,6 +573,61 @@ export const FileCenter = () => {
             </span>
           </div>
         </div>
+
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-text-primary">Monthly Sheet Setup</h3>
+                <p className="text-xs text-text-muted mt-1">
+                  {activeMonth.suffix
+                    ? 'Buat tab berikut sebelum sync bulan baru. Header kolom harus sama seperti bulan sebelumnya.'
+                    : 'Mei 2026 masih memakai nama tab dari env Vercel, jadi tidak perlu rename tab.'}
+                </p>
+              </div>
+              <span className={cn(
+                "text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border",
+                activeMonth.suffix
+                  ? "text-warning border-warning/30 bg-warning/10"
+                  : "text-success border-success/30 bg-success/10"
+              )}>
+                {activeMonth.suffix ? 'Setup needed' : 'Ready'}
+              </span>
+            </div>
+
+            {activeMonth.suffix ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {sheetNames.map(sheet => (
+                    <div
+                      key={sheet.tabName}
+                      className={cn(
+                        "flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs",
+                        failedSheetName === sheet.tabName
+                          ? "border-danger/40 bg-danger-soft text-danger"
+                          : "border-border bg-surface/40 text-text-secondary"
+                      )}
+                    >
+                      <span className="font-medium truncate">{sheet.label}</span>
+                      <span className="font-bold text-text-primary truncate max-w-[180px]" title={sheet.tabName}>
+                        {sheet.tabName}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-text-muted">
+                  <div className="rounded-lg bg-surface/50 border border-border px-3 py-2">1. Copy tab bulan sebelumnya.</div>
+                  <div className="rounded-lg bg-surface/50 border border-border px-3 py-2">2. Rename sesuai nama tab di atas.</div>
+                  <div className="rounded-lg bg-surface/50 border border-border px-3 py-2">3. Kosongkan data lama, header jangan diubah.</div>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg bg-surface/50 border border-border px-3 py-2 text-xs text-text-muted">
+                Dashboard akan membaca tab env default yang sudah tersimpan di Vercel.
+              </div>
+            )}
+          </div>
+        </div>
         
         {/* Loading state */}
         {isFetchingSheets && (
