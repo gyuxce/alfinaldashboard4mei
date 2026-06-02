@@ -1,7 +1,22 @@
 import React from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { parseDateForSort, cn } from '../../lib/utils';
-import { AlertCircle, X, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { AlertCircle, X, ChevronUp, ChevronDown, Star, Copy, Eye, EyeOff } from 'lucide-react';
+
+const CopyButton = ({ text }: { text: string }) => {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button onClick={handleCopy} className="ml-1 p-0.5 rounded text-text-muted hover:bg-surface-muted hover:text-primary transition-colors" title="Copy">
+      {copied ? <span className="text-[9px] text-success font-bold">Copied</span> : <Copy className="w-3 h-3" />}
+    </button>
+  );
+};
 
 interface CsatDetailModalProps {
   title: React.ReactNode;
@@ -19,7 +34,17 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
   title, subtitle, surveys, agentType, modalType = 'agent', onClose, expandedDates, toggleExpandDate, viewMode
 }) => {
   const filteredSurveys = surveys.filter(h => (viewMode === 'full' || !h.isTakeout) && h.score > 0);
-  
+  const [selectedDetailFilter, setSelectedDetailFilter] = React.useState<{type: 'category' | 'agent', value: string} | null>(null);
+
+  const tableSurveys = React.useMemo(() => {
+    if (!selectedDetailFilter) return filteredSurveys;
+    return filteredSurveys.filter(s => {
+      if (selectedDetailFilter.type === 'category') return s.category === selectedDetailFilter.value;
+      if (selectedDetailFilter.type === 'agent') return s.agentName === selectedDetailFilter.value || s.csId === selectedDetailFilter.value;
+      return true;
+    });
+  }, [filteredSurveys, selectedDetailFilter]);
+
   const topCategoriesAll = React.useMemo(() => {
     const agg: Record<string, { total: number, s5: number, s4: number, s3: number, s2: number, s1: number }> = {};
     filteredSurveys.forEach(h => {
@@ -170,49 +195,63 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     </span>
                     <div className="flex flex-col gap-2">
                       {modalType === 'category' ? topAgentsAll.map((agent, idx) => (
-                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                        <div 
+                          key={idx} 
+                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
+                            selectedDetailFilter?.value === agent.name ? 'bg-primary/10 border border-primary/20' : 'hover:bg-surface-muted'
+                          )}
+                          onClick={() => setSelectedDetailFilter(prev => prev?.value === agent.name ? null : {type: 'agent', value: agent.name})}
+                        >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
                             <span className="font-semibold text-text-primary truncate" title={agent.name}>{agent.name}</span>
+                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === agent.name ? 'opacity-100 text-primary' : 'text-text-muted')} />
                           </div>
-                          <div className="flex items-center shrink-0 w-8 justify-end">
-                            <span className="font-bold text-text-secondary">{agent.total}</span>
-                          </div>
-                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[140px]">
-                            {[
-                              { score: 5, count: agent.s5, color: 'bg-success' },
-                              { score: 4, count: agent.s4, color: 'bg-success/80' },
-                              { score: 3, count: agent.s3, color: 'bg-warning' },
-                              { score: 2, count: agent.s2, color: 'bg-orange-500' },
-                              { score: 1, count: agent.s1, color: 'bg-danger' },
-                            ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                              </span>
-                            ) : null)}
+                          <div className="flex items-center shrink-0 justify-end ml-auto">
+                            <span className="font-bold text-text-secondary mr-2">{agent.total}</span>
+                            <div className="flex flex-nowrap justify-end gap-1 shrink-0">
+                              {[
+                                { score: 5, count: agent.s5, color: 'bg-success' },
+                                { score: 4, count: agent.s4, color: 'bg-success/80' },
+                                { score: 3, count: agent.s3, color: 'bg-warning' },
+                                { score: 2, count: agent.s2, color: 'bg-orange-500' },
+                                { score: 1, count: agent.s1, color: 'bg-danger' },
+                              ].map(s => s.count > 0 ? (
+                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
+                                </span>
+                              ) : null)}
+                            </div>
                           </div>
                         </div>
                       )) : topCategoriesAll.map((cat, idx) => (
-                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                        <div 
+                          key={idx} 
+                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
+                            selectedDetailFilter?.value === cat.name ? 'bg-primary/10 border border-primary/20' : 'hover:bg-surface-muted'
+                          )}
+                          onClick={() => setSelectedDetailFilter(prev => prev?.value === cat.name ? null : {type: 'category', value: cat.name})}
+                        >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
                             <span className="font-semibold text-text-primary truncate" title={cat.name}>{cat.name}</span>
+                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === cat.name ? 'opacity-100 text-primary' : 'text-text-muted')} />
                           </div>
-                          <div className="flex items-center shrink-0 w-8 justify-end">
-                            <span className="font-bold text-text-secondary">{cat.total}</span>
-                          </div>
-                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[140px]">
-                            {[
-                              { score: 5, count: cat.s5, color: 'bg-success' },
-                              { score: 4, count: cat.s4, color: 'bg-success/80' },
-                              { score: 3, count: cat.s3, color: 'bg-warning' },
-                              { score: 2, count: cat.s2, color: 'bg-orange-500' },
-                              { score: 1, count: cat.s1, color: 'bg-danger' },
-                            ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                              </span>
-                            ) : null)}
+                          <div className="flex items-center shrink-0 justify-end ml-auto">
+                            <span className="font-bold text-text-secondary mr-2">{cat.total}</span>
+                            <div className="flex flex-nowrap justify-end gap-1 shrink-0">
+                              {[
+                                { score: 5, count: cat.s5, color: 'bg-success' },
+                                { score: 4, count: cat.s4, color: 'bg-success/80' },
+                                { score: 3, count: cat.s3, color: 'bg-warning' },
+                                { score: 2, count: cat.s2, color: 'bg-orange-500' },
+                                { score: 1, count: cat.s1, color: 'bg-danger' },
+                              ].map(s => s.count > 0 ? (
+                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
+                                </span>
+                              ) : null)}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -228,43 +267,57 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                     </span>
                     <div className="flex flex-col gap-2">
                       {modalType === 'category' ? topAgentsBad.map((agent, idx) => (
-                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                        <div 
+                          key={idx} 
+                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
+                            selectedDetailFilter?.value === agent.name ? 'bg-danger/10 border border-danger/20' : 'hover:bg-danger/5'
+                          )}
+                          onClick={() => setSelectedDetailFilter(prev => prev?.value === agent.name ? null : {type: 'agent', value: agent.name})}
+                        >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
                             <span className="font-semibold text-text-primary truncate" title={agent.name}>{agent.name}</span>
+                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === agent.name ? 'opacity-100 text-danger' : 'text-text-muted')} />
                           </div>
-                          <div className="flex items-center shrink-0 w-8 justify-end">
-                            <span className="font-bold text-text-secondary">{agent.s1 + agent.s2}</span>
-                          </div>
-                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[80px]">
-                            {[
-                              { score: 2, count: agent.s2, color: 'bg-orange-500' },
-                              { score: 1, count: agent.s1, color: 'bg-danger' },
-                            ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                              </span>
-                            ) : null)}
+                          <div className="flex items-center shrink-0 justify-end ml-auto">
+                            <span className="font-bold text-text-secondary mr-2">{agent.s1 + agent.s2}</span>
+                            <div className="flex flex-nowrap justify-end gap-1 shrink-0">
+                              {[
+                                { score: 2, count: agent.s2, color: 'bg-orange-500' },
+                                { score: 1, count: agent.s1, color: 'bg-danger' },
+                              ].map(s => s.count > 0 ? (
+                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
+                                </span>
+                              ) : null)}
+                            </div>
                           </div>
                         </div>
                       )) : topCategoriesBad.map((cat, idx) => (
-                        <div key={idx} className="flex items-start justify-between gap-4 text-xs py-0.5">
+                        <div 
+                          key={idx} 
+                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
+                            selectedDetailFilter?.value === cat.name ? 'bg-danger/10 border border-danger/20' : 'hover:bg-danger/5'
+                          )}
+                          onClick={() => setSelectedDetailFilter(prev => prev?.value === cat.name ? null : {type: 'category', value: cat.name})}
+                        >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
                             <span className="font-semibold text-text-primary truncate" title={cat.name}>{cat.name}</span>
+                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === cat.name ? 'opacity-100 text-danger' : 'text-text-muted')} />
                           </div>
-                          <div className="flex items-center shrink-0 w-8 justify-end">
-                            <span className="font-bold text-text-secondary">{cat.s1 + cat.s2}</span>
-                          </div>
-                          <div className="flex flex-wrap justify-end gap-1 shrink-0 w-[80px]">
-                            {[
-                              { score: 2, count: cat.s2, color: 'bg-orange-500' },
-                              { score: 1, count: cat.s1, color: 'bg-danger' },
-                            ].map(s => s.count > 0 ? (
-                              <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                              </span>
-                            ) : null)}
+                          <div className="flex items-center shrink-0 justify-end ml-auto">
+                            <span className="font-bold text-text-secondary mr-2">{cat.s1 + cat.s2}</span>
+                            <div className="flex flex-nowrap justify-end gap-1 shrink-0">
+                              {[
+                                { score: 2, count: cat.s2, color: 'bg-orange-500' },
+                                { score: 1, count: cat.s1, color: 'bg-danger' },
+                              ].map(s => s.count > 0 ? (
+                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
+                                </span>
+                              ) : null)}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -284,10 +337,24 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
         </div>
         
         <div className="flex-1 overflow-y-auto p-5 bg-card space-y-4">
+          {selectedDetailFilter && (
+            <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-lg text-sm mb-4">
+              <span className="font-medium text-text-primary">
+                Menampilkan hasil khusus untuk {selectedDetailFilter.type === 'agent' ? 'Agent' : 'Kategori'}: <span className="font-bold text-primary">{selectedDetailFilter.value}</span>
+              </span>
+              <button 
+                onClick={() => setSelectedDetailFilter(null)}
+                className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-md text-xs font-bold text-text-primary hover:bg-surface-muted transition-colors border border-border shadow-sm"
+              >
+                <X className="w-3.5 h-3.5" /> Clear Filter
+              </button>
+            </div>
+          )}
+          
           {Array.from(new Set<string>(
-             filteredSurveys.map(h => h.date)
+             tableSurveys.map(h => h.date)
           )).sort((a,b) => parseDateForSort(a) - parseDateForSort(b)).map(date => {
-            const dateSurveys = filteredSurveys.filter(h => h.date === date);
+            const dateSurveys = tableSurveys.filter(h => h.date === date);
             if (dateSurveys.length === 0) return null;
             const isExpanded = expandedDates.has(date);
             
@@ -345,12 +412,21 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                             </td>
                             <td className="p-3 align-top">
                               <div className="flex flex-col gap-1">
-                                <span className="text-text-primary font-medium tracking-tight">T: <span className="font-mono">{s.ticketId || '-'}</span></span>
-                                <span className="text-text-muted">C: <span className="font-mono">{s.chatId || '-'}</span></span>
+                                <span className="text-text-primary font-medium tracking-tight flex items-center">
+                                  T: <span className="font-mono ml-1">{s.ticketId || '-'}</span>
+                                  {s.ticketId && <CopyButton text={s.ticketId} />}
+                                </span>
+                                <span className="text-text-muted flex items-center">
+                                  C: <span className="font-mono ml-1">{s.chatId || '-'}</span>
+                                  {s.chatId && <CopyButton text={s.chatId} />}
+                                </span>
                               </div>
                             </td>
                             <td className="p-3 align-top font-mono text-text-muted">
-                              {s.uid || '-'}
+                              <div className="flex items-center">
+                                {s.uid || '-'}
+                                {s.uid && <CopyButton text={s.uid} />}
+                              </div>
                             </td>
                             <td className="p-3 align-top font-medium text-text-primary min-w-[180px] whitespace-normal">
                               {s.agentName || s.csId}
@@ -374,7 +450,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
               </div>
             );
           })}
-          {filteredSurveys.length === 0 && (
+          {tableSurveys.length === 0 && (
              <div className="text-center p-8 text-text-muted mt-4 bg-surface rounded-lg border border-dashed border-border text-sm">
                Tidak ada data detail.
              </div>
