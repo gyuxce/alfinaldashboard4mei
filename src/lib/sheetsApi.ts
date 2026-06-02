@@ -2,10 +2,13 @@
 const API_KEY = import.meta.env.VITE_SHEETS_API_KEY;
 const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
 const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
 // Type untuk raw data dari Sheets API
 export type SheetRow = string[];
 export type SheetData = SheetRow[];
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Fetch single sheet
 export async function fetchSheet(
@@ -13,17 +16,26 @@ export async function fetchSheet(
   range: string = 'A:AZ'
 ): Promise<SheetData> {
   const url = `${BASE_URL}/${SPREADSHEET_ID}/values/${encodeURIComponent(sheetName)}!${range}?key=${API_KEY}`;
-  
-  const response = await fetch(url);
-  
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch sheet "${sheetName}": ${response.status} ${response.statusText}`
-    );
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const response = await fetch(url);
+
+    if (response.ok) {
+      const json = await response.json();
+      return json.values || [];
+    }
+
+    const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
+    if (!shouldRetry) {
+      throw new Error(
+        `Failed to fetch sheet "${sheetName}": ${response.status} ${response.statusText}`
+      );
+    }
+
+    await sleep(1000 * Math.pow(2, attempt));
   }
-  
-  const json = await response.json();
-  return json.values || [];
+
+  return [];
 }
 
 // Fetch semua sheet sekaligus (parallel)
@@ -58,15 +70,18 @@ const DEFAULT_CONFIG: SheetConfig = {
 export async function fetchAllSheets(
   config: SheetConfig = DEFAULT_CONFIG
 ): Promise<AllSheetsData> {
-  // Fetch semua parallel untuk kecepatan
-  const [csid, productivity, csatSc, sla, schedule, qa] = await Promise.all([
-    fetchSheet(config.csidSheetName),
-    fetchSheet(config.productivitySheetName),
-    fetchSheet(config.csatScSheetName),
-    fetchSheet(config.slaSheetName),
-    fetchSheet(config.scheduleSheetName),
-    fetchSheet(config.qaSheetName),
-  ]);
+  // Fetch berurutan supaya Google Sheets API tidak terlalu mudah kena 503.
+  const csid = await fetchSheet(config.csidSheetName);
+  await sleep(250);
+  const productivity = await fetchSheet(config.productivitySheetName);
+  await sleep(250);
+  const csatSc = await fetchSheet(config.csatScSheetName);
+  await sleep(250);
+  const sla = await fetchSheet(config.slaSheetName);
+  await sleep(250);
+  const schedule = await fetchSheet(config.scheduleSheetName);
+  await sleep(250);
+  const qa = await fetchSheet(config.qaSheetName);
   
   return { csid, productivity, csatSc, sla, schedule, qa };
 }
