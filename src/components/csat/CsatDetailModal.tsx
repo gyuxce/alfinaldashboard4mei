@@ -18,6 +18,25 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
   title, subtitle, surveys, agentType, onClose, expandedDates, toggleExpandDate, viewMode
 }) => {
   const filteredSurveys = surveys.filter(h => (viewMode === 'full' || !h.isTakeout) && h.score > 0);
+  
+  const topCategories = React.useMemo(() => {
+    const agg: Record<string, { total: number, s5: number, s4: number, s3: number, s2: number, s1: number }> = {};
+    filteredSurveys.forEach(h => {
+      const cat = h.category || 'Uncategorized';
+      if (!agg[cat]) agg[cat] = { total: 0, s5: 0, s4: 0, s3: 0, s2: 0, s1: 0 };
+      agg[cat].total++;
+      if (h.score === 5) agg[cat].s5++;
+      if (h.score === 4) agg[cat].s4++;
+      if (h.score === 3) agg[cat].s3++;
+      if (h.score === 2) agg[cat].s2++;
+      if (h.score === 1) agg[cat].s1++;
+    });
+    return Object.entries(agg)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 5)
+      .map(([name, stats]) => ({ name, ...stats }));
+  }, [filteredSurveys]);
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-card w-full max-w-5xl rounded-xl shadow-2xl flex flex-col max-h-[90vh] border border-border">
@@ -35,13 +54,43 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
               )}
             </div>
             
-            <div className="flex items-center gap-4 ml-0 md:ml-7 mt-2">
+            <div className="flex items-start gap-4 ml-0 md:ml-7 mt-2 flex-wrap">
               <div className="flex flex-col px-4 py-2 bg-card rounded-lg border border-border shadow-sm">
                 <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-1">Total Surveys</span>
                 <span className="text-lg font-black text-text-primary">
                   {filteredSurveys.length}
                 </span>
               </div>
+
+              {topCategories.length > 0 && (
+                <div className="flex flex-col px-4 py-2 bg-card rounded-lg border border-border shadow-sm flex-1 min-w-[300px]">
+                  <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-2">Top {topCategories.length} Categories</span>
+                  <div className="flex flex-col gap-2">
+                    {topCategories.map((cat, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-4 text-xs">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="font-bold text-text-muted w-4">{idx + 1}.</span>
+                          <span className="font-semibold text-text-primary truncate max-w-[200px]" title={cat.name}>{cat.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-bold text-text-secondary w-6 text-right mr-2">{cat.total}</span>
+                          {[
+                            { score: 5, count: cat.s5, color: 'bg-success' },
+                            { score: 4, count: cat.s4, color: 'bg-success/80' },
+                            { score: 3, count: cat.s3, color: 'bg-warning' },
+                            { score: 2, count: cat.s2, color: 'bg-orange-500' },
+                            { score: 1, count: cat.s1, color: 'bg-danger' },
+                          ].map(s => s.count > 0 ? (
+                            <span key={s.score} className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
+                              <Star className="w-2.5 h-2.5 fill-current" /> {s.score} ({s.count})
+                            </span>
+                          ) : null)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
