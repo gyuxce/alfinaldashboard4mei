@@ -32,9 +32,9 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                 Team Leader
               </th>
               <th className="p-2 font-bold">Productivity</th>
-              <th className="p-2 font-bold">CSAT Asli</th>
+              <th className="p-2 font-bold">CSAT Official</th>
               <th className="p-2 font-bold">CSAT SC Full</th>
-              <th className="p-2 font-bold">CSAT SC Fair</th>
+              <th className="p-2 font-bold">CSAT SC Takeout</th>
               <th className="p-2 font-bold">SLA 1m</th>
               <th className="p-2 font-bold">SLA 3m</th>
               <th className="p-2 font-bold">Avg Attendance</th>
@@ -157,7 +157,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                 >
                   <EmptyState
                     title="Tidak ada agent yang cocok"
-                    description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah pencarian, filter BPO, Team Leader, Agent, atau range tanggal."
+                    description="Data sudah tersedia, tetapi tidak ada agent yang cocok dengan pencarian atau filter yang sedang dipakai."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
                   />

@@ -547,7 +547,7 @@ export default function App() {
                   options={tlList}
                   value={selectedTL}
                   onChange={setSelectedTL}
-                  allOptionLabel="All Team Leaders"
+                  allOptionLabel="All TL"
                   placeholder="Search TL..."
                 />
               </div>

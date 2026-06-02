@@ -257,7 +257,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
       {!data.length && (
         <EmptyState
           title="Belum ada data KPI untuk ditampilkan"
-          description="Buka File Center, pilih bulan data, lalu klik Sync Now. Jika sudah sync tapi tetap kosong, cek filter BPO, Team Leader, Agent, atau range tanggal."
+          description="Buka File Center, pilih bulan data, lalu klik Sync Now. Setelah sync berhasil, dashboard akan menampilkan data sesuai bulan yang dipilih."
           variant="data"
         />
       )}
@@ -548,9 +548,54 @@ const KpiRulesPanel = ({
   );
 };
 
-const StatCard = ({
-  title,
-  value,
+const parseDisplayValue = (value: string) => {
+  const match = value.match(/^(-?\d+(?:\.\d+)?)(.*)$/);
+  if (!match) return null;
+  const decimals = match[1].includes(".") ? match[1].split(".")[1].length : 0;
+  return {
+    target: Number(match[1]),
+    decimals,
+    suffix: match[2],
+  };
+};
+
+const CountUpValue = ({ value }: { value: string }) => {
+  const parsed = parseDisplayValue(value);
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    if (!parsed || Number.isNaN(parsed.target)) {
+      setDisplayValue(value);
+      return;
+    }
+
+    let animationFrame = 0;
+    const durationMs = 750;
+    const startedAt = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - startedAt) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const nextValue = parsed.target * eased;
+      setDisplayValue(`${nextValue.toFixed(parsed.decimals)}${parsed.suffix}`);
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(tick);
+      }
+    };
+
+    setDisplayValue(`${(0).toFixed(parsed.decimals)}${parsed.suffix}`);
+    animationFrame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(animationFrame);
+  }, [value, parsed?.target, parsed?.decimals, parsed?.suffix]);
+
+  return <>{displayValue}</>;
+};
+
+const StatCard = ({ 
+  title, 
+  value, 
   subValue,
   kpiTheme,
   delta,
@@ -596,7 +641,7 @@ const StatCard = ({
       {/* Current Period */}
       <div className="flex items-baseline justify-between mt-auto">
         <span className="text-[26px] font-bold tracking-tight leading-none" style={{ color }}>
-          {value}
+          <CountUpValue value={value} />
         </span>
         {delta !== undefined && delta !== 0 && (
           <div className={`flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full ${

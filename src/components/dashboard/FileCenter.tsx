@@ -567,20 +567,26 @@ export const FileCenter = () => {
           "rounded-xl p-4 text-sm border",
           hasSuccessfulSync
             ? "bg-success/10 border-success/30"
-            : "bg-primary-soft border-primary/20"
+            : "bg-warning/10 border-warning/30"
         )}>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
             <div>
-              <p className="font-bold text-text-primary">Sheet aktif: {activeMonth.label}</p>
-              <p className="text-xs text-text-muted mt-1">{activeMonth.description}</p>
+              <p className="font-bold text-text-primary">
+                {hasSuccessfulSync ? `Sheet aktif: ${activeMonth.label}` : `Sheet belum aktif: ${activeMonth.label}`}
+              </p>
+              <p className="text-xs text-text-muted mt-1">
+                {hasSuccessfulSync
+                  ? activeMonth.description
+                  : 'Pilih bulan data lalu klik Sync Now supaya sheet ini aktif di dashboard.'}
+              </p>
             </div>
             <span className={cn(
               "text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border",
               hasSuccessfulSync
                 ? "text-success border-success/30 bg-success/10"
-                : "text-primary border-primary/20 bg-card/50"
+                : "text-warning border-warning/30 bg-warning/10"
             )}>
-              {hasSuccessfulSync ? `Synced ${formatRelativeTime(lastSyncTime)}` : activeMonth.suffix ? 'Monthly tabs' : 'Env default tabs'}
+              {hasSuccessfulSync ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Belum sync'}
             </span>
           </div>
         </div>
