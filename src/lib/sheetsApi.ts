@@ -97,6 +97,21 @@ export interface SheetMonthOption {
   description: string;
 }
 
+const MONTHS = [
+  { number: 1, label: 'Januari', code: 'JAN' },
+  { number: 2, label: 'Februari', code: 'FEB' },
+  { number: 3, label: 'Maret', code: 'MAR' },
+  { number: 4, label: 'April', code: 'APR' },
+  { number: 5, label: 'Mei', code: 'MAY' },
+  { number: 6, label: 'Juni', code: 'JUN' },
+  { number: 7, label: 'Juli', code: 'JUL' },
+  { number: 8, label: 'Agustus', code: 'AUG' },
+  { number: 9, label: 'September', code: 'SEP' },
+  { number: 10, label: 'Oktober', code: 'OCT' },
+  { number: 11, label: 'November', code: 'NOV' },
+  { number: 12, label: 'Desember', code: 'DEC' },
+];
+
 // Default config, user bisa override di env atau settings
 const DEFAULT_CONFIG: SheetConfig = {
   csidSheetName: import.meta.env.VITE_SHEET_CSID || 'CSID',
@@ -107,59 +122,41 @@ const DEFAULT_CONFIG: SheetConfig = {
   qaSheetName: import.meta.env.VITE_SHEET_QA || 'QA',
 };
 
-export const SHEET_MONTH_OPTIONS: SheetMonthOption[] = [
-  {
+const LEGACY_MONTH_OPTION: SheetMonthOption = {
     key: 'legacy',
     label: 'Mei 2026',
     suffix: null,
     description: 'Menggunakan nama tab dari env Vercel saat ini',
-  },
-  {
-    key: 'JUN_2026',
-    label: 'Juni 2026',
-    suffix: 'JUN_2026',
-    description: 'Menggunakan tab bulanan format *_JUN_2026',
-  },
-  {
-    key: 'JUL_2026',
-    label: 'Juli 2026',
-    suffix: 'JUL_2026',
-    description: 'Menggunakan tab bulanan format *_JUL_2026',
-  },
-  {
-    key: 'AUG_2026',
-    label: 'Agustus 2026',
-    suffix: 'AUG_2026',
-    description: 'Menggunakan tab bulanan format *_AUG_2026',
-  },
-  {
-    key: 'SEP_2026',
-    label: 'September 2026',
-    suffix: 'SEP_2026',
-    description: 'Menggunakan tab bulanan format *_SEP_2026',
-  },
-  {
-    key: 'OCT_2026',
-    label: 'Oktober 2026',
-    suffix: 'OCT_2026',
-    description: 'Menggunakan tab bulanan format *_OCT_2026',
-  },
-  {
-    key: 'NOV_2026',
-    label: 'November 2026',
-    suffix: 'NOV_2026',
-    description: 'Menggunakan tab bulanan format *_NOV_2026',
-  },
-  {
-    key: 'DEC_2026',
-    label: 'Desember 2026',
-    suffix: 'DEC_2026',
-    description: 'Menggunakan tab bulanan format *_DEC_2026',
-  },
-];
+};
+
+function buildMonthlySheetOptions(): SheetMonthOption[] {
+  const currentYear = new Date().getFullYear();
+  const endYear = Math.max(2028, currentYear + 2);
+  const options: SheetMonthOption[] = [LEGACY_MONTH_OPTION];
+
+  for (let year = 2026; year <= endYear; year++) {
+    for (const month of MONTHS) {
+      if (year === 2026 && month.number < 6) continue;
+
+      const suffix = `${month.code}_${year}`;
+      options.push({
+        key: suffix,
+        label: `${month.label} ${year}`,
+        suffix,
+        description: `Menggunakan tab bulanan format *_${suffix}`,
+      });
+    }
+  }
+
+  return options;
+}
+
+export function getSheetMonthOptions(): SheetMonthOption[] {
+  return buildMonthlySheetOptions();
+}
 
 export function getSheetMonthOption(monthKey: string): SheetMonthOption {
-  return SHEET_MONTH_OPTIONS.find(option => option.key === monthKey) || SHEET_MONTH_OPTIONS[0];
+  return getSheetMonthOptions().find(option => option.key === monthKey) || LEGACY_MONTH_OPTION;
 }
 
 export function getSheetConfigForMonth(monthKey: string): SheetConfig {

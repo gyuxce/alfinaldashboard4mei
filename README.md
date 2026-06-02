@@ -56,7 +56,7 @@ Untuk data bulanan, biarkan tab Mei tetap memakai env di atas. Mulai Juni 2026, 
 - `SCHEDULE_JUN_2026`
 - `QA_JUN_2026`
 
-Ganti suffix bulan untuk bulan berikutnya, misalnya `JUL_2026`, `AUG_2026`, dan seterusnya.
+Ganti suffix bulan untuk bulan berikutnya, misalnya `JUL_2026`, `AUG_2026`, dan seterusnya. Pilihan bulan di File Center dibuat otomatis sampai beberapa tahun ke depan, jadi tidak perlu update code hanya untuk menambah tahun baru.
 
 ## Scripts
 

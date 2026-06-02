@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { useStore, AppState } from '../../store';
 import { UploadCloud, CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { getSheetConfigForMonth, getSheetMonthOption, SHEET_MONTH_OPTIONS } from '../../lib/sheetsApi';
+import { getSheetConfigForMonth, getSheetMonthOption, getSheetMonthOptions } from '../../lib/sheetsApi';
 import { 
   countDataRows,
   validateCsidFile, 
@@ -491,6 +491,7 @@ export const FileCenter = () => {
   const isSheetMode = !!import.meta.env.VITE_SHEETS_API_KEY;
   const activeMonth = getSheetMonthOption(selectedSheetMonth);
   const activeSheetConfig = getSheetConfigForMonth(selectedSheetMonth);
+  const sheetMonthOptions = getSheetMonthOptions();
   const failedSheetName = sheetsFetchError?.match(/"([^"]+)"/)?.[1] || null;
 
   const sheetNames = [
@@ -523,7 +524,7 @@ export const FileCenter = () => {
                 disabled={isFetchingSheets}
                 className="h-9 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-text-primary outline-none transition-colors hover:border-primary/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {SHEET_MONTH_OPTIONS.map(option => (
+                {sheetMonthOptions.map(option => (
                   <option key={option.key} value={option.key}>
                     {option.label}
                   </option>
