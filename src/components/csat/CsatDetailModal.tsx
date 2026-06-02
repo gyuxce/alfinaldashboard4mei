@@ -33,7 +33,8 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
       if (h.score === 1) agg[cat].s1++;
     });
     return Object.entries(agg)
-      .sort((a, b) => b[1].total - a[1].total)
+      .filter(([_, stats]) => (stats.s1 + stats.s2) > 0)
+      .sort((a, b) => (b[1].s1 + b[1].s2) - (a[1].s1 + a[1].s2))
       .slice(0, 5)
       .map(([name, stats]) => ({ name, ...stats }));
   }, [filteredSurveys]);
@@ -51,7 +52,8 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
       if (h.score === 1) agg[csId].s1++;
     });
     return Object.entries(agg)
-      .sort((a, b) => b[1].total - a[1].total)
+      .filter(([_, stats]) => (stats.s1 + stats.s2) > 0)
+      .sort((a, b) => (b[1].s1 + b[1].s2) - (a[1].s1 + a[1].s2))
       .slice(0, 5)
       .map(([csId, stats]) => ({ csId, ...stats }));
   }, [filteredSurveys]);
@@ -112,11 +114,8 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                           <span className="font-semibold text-text-primary truncate max-w-[200px]" title={agent.name}>{agent.name}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="font-bold text-text-secondary w-6 text-right mr-2">{agent.total}</span>
+                          <span className="font-bold text-text-secondary w-6 text-right mr-2">{agent.s1 + agent.s2}</span>
                           {[
-                            { score: 5, count: agent.s5, color: 'bg-success' },
-                            { score: 4, count: agent.s4, color: 'bg-success/80' },
-                            { score: 3, count: agent.s3, color: 'bg-warning' },
                             { score: 2, count: agent.s2, color: 'bg-orange-500' },
                             { score: 1, count: agent.s1, color: 'bg-danger' },
                           ].map(s => s.count > 0 ? (
@@ -133,11 +132,8 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                           <span className="font-semibold text-text-primary truncate max-w-[200px]" title={cat.name}>{cat.name}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="font-bold text-text-secondary w-6 text-right mr-2">{cat.total}</span>
+                          <span className="font-bold text-text-secondary w-6 text-right mr-2">{cat.s1 + cat.s2}</span>
                           {[
-                            { score: 5, count: cat.s5, color: 'bg-success' },
-                            { score: 4, count: cat.s4, color: 'bg-success/80' },
-                            { score: 3, count: cat.s3, color: 'bg-warning' },
                             { score: 2, count: cat.s2, color: 'bg-orange-500' },
                             { score: 1, count: cat.s1, color: 'bg-danger' },
                           ].map(s => s.count > 0 ? (
