@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from './store';
 import { processKPIs, getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
 
@@ -22,7 +22,8 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  FileText
+  FileText,
+  Check
 } from 'lucide-react';
 
 import { cn } from './lib/utils';
@@ -102,6 +103,11 @@ function formatLocalDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function getCurrentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function getMonthRange(monthValue: string) {
   if (!monthValue) return { start: '', end: '' };
   const [year, month] = monthValue.split('-').map(Number);
@@ -111,6 +117,84 @@ function getMonthRange(monthValue: string) {
     start: formatLocalDate(year, month, 1),
     end: formatLocalDate(year, month, lastDay),
   };
+}
+
+function getCurrentMonthRange() {
+  return getMonthRange(getCurrentMonthValue());
+}
+
+function getMonthOptions() {
+  const now = new Date();
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    return {
+      value,
+      label: new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(date),
+    };
+  });
+}
+
+interface MonthPickerProps {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}
+
+function MonthPicker({ value, options, onChange }: MonthPickerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const selectedOption = options.find(option => option.value === value);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full sm:w-[150px]" ref={wrapperRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex h-9 w-full items-center justify-between rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+      >
+        <span className="truncate">{selectedOption?.label || 'Pilih bulan'}</span>
+        <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-text-muted" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-[9999] mt-1 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+          <div className="max-h-64 overflow-y-auto p-1">
+            {options.map(option => {
+              const isSelected = option.value === value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    isSelected ? "bg-primary-soft font-bold text-primary" : "text-text-primary hover:bg-surface-muted"
+                  )}
+                >
+                  <span>{option.label}</span>
+                  {isSelected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function App() {
@@ -280,9 +364,16 @@ export default function App() {
   };
 
   const selectedMonthFilter = getMonthValue(startDate);
+  const monthOptions = getMonthOptions();
+  const defaultDateRange = getCurrentMonthRange();
+  const isDefaultDateRange = startDate === defaultDateRange.start && endDate === defaultDateRange.end;
+  const hasCustomDateFilter = !!(startDate || endDate) && !isDefaultDateRange;
   const applyMonthFilter = (monthValue: string) => {
     const range = getMonthRange(monthValue);
     setDateRange(range.start, range.end);
+  };
+  const resetPeriodToCurrentMonth = () => {
+    setDateRange(defaultDateRange.start, defaultDateRange.end);
   };
 
   const activeFilters = [
@@ -295,11 +386,11 @@ export default function App() {
     selectedGlobalAgent && selectedGlobalAgent !== 'All Agents'
       ? { label: 'Agent', value: selectedGlobalAgent, onClear: () => setSelectedGlobalAgent('All Agents') }
       : null,
-    startDate || endDate
+    hasCustomDateFilter
       ? {
           label: 'Date',
           value: `${startDate ? formatFilterDate(startDate) : 'awal'} to ${endDate ? formatFilterDate(endDate) : 'akhir'}`,
-          onClear: () => setDateRange('', ''),
+          onClear: resetPeriodToCurrentMonth,
         }
       : null,
   ].filter((filter): filter is ActiveFilterChipProps => filter !== null);
@@ -308,7 +399,7 @@ export default function App() {
     setSelectedBpo('All BPO');
     setSelectedTL('All TL');
     setSelectedGlobalAgent('All Agents');
-    setDateRange('', '');
+    resetPeriodToCurrentMonth();
   };
 
   return (
@@ -437,12 +528,12 @@ export default function App() {
 
           {/* Filter Content */}
           <div className={cn(
-            "flex-col xl:flex-row flex-wrap items-start xl:items-center gap-4",
+            "flex-col 2xl:flex-row flex-wrap items-start 2xl:items-center gap-3",
             isMobileFilterOpen ? "flex" : "hidden md:flex"
           )}>
-            <div className="flex flex-wrap items-center gap-3 xl:border-r xl:border-border xl:pr-5 w-full xl:w-auto">
-              <span className="hidden md:inline text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Scope</span>
-              <div className="w-full sm:w-auto min-w-[120px]">
+            <div className="flex flex-wrap items-center gap-2 2xl:border-r 2xl:border-border 2xl:pr-3 w-full 2xl:w-auto">
+              <span className="hidden md:inline text-[10px] font-bold text-text-muted uppercase tracking-widest pl-1">Scope</span>
+              <div className="w-full sm:w-[112px]">
                 <SearchableSelect 
                   options={['TIN', 'TCID', 'TCID x TIN']}
                   value={selectedBpo}
@@ -451,7 +542,7 @@ export default function App() {
                   placeholder="Search BPO..."
                 />
               </div>
-              <div className="w-full sm:w-auto min-w-[150px]">
+              <div className="w-full sm:w-[150px]">
                 <SearchableSelect 
                   options={tlList}
                   value={selectedTL}
@@ -461,7 +552,7 @@ export default function App() {
                 />
               </div>
               {activeTab !== 'leaderboard' && (
-                <div className="w-full sm:w-auto min-w-[150px]">
+                <div className="w-full sm:w-[150px]">
                   <SearchableSelect 
                     options={agentList}
                     value={selectedGlobalAgent}
@@ -473,25 +564,20 @@ export default function App() {
               )}
             </div>
             
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full xl:w-auto xl:border-r xl:border-border xl:pr-5">
-              <span className="hidden md:inline text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Period</span>
-              <label className="flex items-center gap-2 text-[11px] font-semibold text-text-secondary w-full sm:w-auto">
-                <span className="whitespace-nowrap">Quick Month</span>
-                <input
-                  type="month"
-                  className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto"
-                  value={selectedMonthFilter}
-                  onChange={e => applyMonthFilter(e.target.value)}
-                />
-              </label>
-              <span className="text-[11px] font-semibold text-text-secondary whitespace-nowrap">Custom Range</span>
-              <input type="date" className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full 2xl:w-auto 2xl:border-r 2xl:border-border 2xl:pr-3">
+              <span className="hidden md:inline text-[10px] font-bold text-text-muted uppercase tracking-widest pl-1">Period</span>
+              <MonthPicker
+                value={selectedMonthFilter || getCurrentMonthValue()}
+                options={monthOptions}
+                onChange={applyMonthFilter}
+              />
+              <input type="date" className="h-9 w-full rounded-xl border border-border bg-surface px-3 text-sm font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary sm:w-[132px]" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
               <span className="text-text-muted text-sm shrink-0">to</span>
-              <input type="date" className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
+              <input type="date" className="h-9 w-full rounded-xl border border-border bg-surface px-3 text-sm font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary sm:w-[132px]" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
             </div>
             
-            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto shrink-0">
-              <button onClick={() => setDateRange('', '')} className="text-[11px] font-semibold text-text-muted hover:text-primary hover:bg-primary-soft px-3 py-1.5 rounded-lg transition-colors cursor-pointer">Clear Dates</button>
+            <div className="flex flex-wrap items-center gap-2 w-full 2xl:w-auto shrink-0">
+              <button onClick={resetPeriodToCurrentMonth} className="h-8 rounded-lg px-2.5 text-[11px] font-semibold text-text-muted transition-colors hover:bg-primary-soft hover:text-primary">Bulan Ini</button>
               
               <div className="flex bg-card rounded-xl border border-border p-0.5 gap-0.5">
                 <button 
@@ -515,10 +601,10 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto shrink-0">
-              <span className="hidden md:inline text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Compare</span>
+            <div className="flex flex-wrap items-center gap-2 w-full 2xl:w-auto shrink-0">
+              <span className="hidden md:inline text-[10px] font-bold text-text-muted uppercase tracking-widest pl-1">Compare</span>
               <div 
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card/40 hover:bg-card transition-all group cursor-pointer" 
+                className="flex h-8 items-center gap-2 rounded-xl border border-border bg-card/40 px-2.5 transition-all hover:bg-card group cursor-pointer" 
                 onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
               >
                 <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
@@ -571,13 +657,13 @@ export default function App() {
             </div>
 
            {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
-              <div className="xl:ml-auto inline-flex items-center px-3 py-1 rounded-full bg-primary-soft text-primary-text text-xs font-semibold border border-primary-soft-hover shadow-[0_1px_3px_rgba(0,0,0,0.04)] mt-2 xl:mt-0">
+              <div className="2xl:ml-auto inline-flex items-center px-3 py-1 rounded-full bg-primary-soft text-primary-text text-xs font-semibold border border-primary-soft-hover shadow-[0_1px_3px_rgba(0,0,0,0.04)] mt-2 2xl:mt-0">
                 <span className="w-2 h-2 rounded-full bg-primary mr-2 animate-pulse"></span>
                 Viewing: Tim {selectedTL}
               </div>
             )}
 
-            <div className="w-full xl:w-auto xl:ml-auto flex flex-wrap items-center justify-between xl:justify-end gap-2 border-t border-border pt-2 xl:border-t-0 xl:pt-0 mt-2 xl:mt-0">
+            <div className="w-full 2xl:w-auto 2xl:ml-auto flex flex-wrap items-center justify-between 2xl:justify-end gap-2 border-t border-border pt-2 2xl:border-t-0 2xl:pt-0 mt-2 2xl:mt-0">
               {lastSyncTime && (
                 <span className="text-[10px] text-text-muted">
                   Synced {formatRelativeTime(lastSyncTime)}
