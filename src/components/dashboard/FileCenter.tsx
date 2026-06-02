@@ -642,49 +642,57 @@ export const FileCenter = () => {
 
         {!isFetchingSheets && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sheetNames.map((sheet, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "bg-card border rounded-xl p-5 flex flex-col relative overflow-hidden group transition-colors shadow-sm",
-                  failedSheetName === sheet.tabName
-                    ? "border-danger/50 hover:border-danger/70"
-                    : "border-border hover:border-primary/30"
-                )}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={cn(
-                      "w-8 h-8 rounded flex items-center justify-center shrink-0",
-                      failedSheetName === sheet.tabName ? "bg-danger-soft" : "bg-primary-soft"
-                    )}
-                  >
-                    {failedSheetName === sheet.tabName ? (
-                      <AlertCircle size={18} className="text-danger" />
-                    ) : (
-                      <CheckCircle2 size={18} className="text-primary"/>
-                    )}
+            {sheetNames.map((sheet, idx) => {
+              const isFailed = failedSheetName === sheet.tabName;
+              const isSynced = !!lastSyncTime && !isFailed && !sheetsFetchError;
+              return (
+                <div
+                  key={idx}
+                  className={cn(
+                    "bg-card border rounded-xl p-5 flex flex-col relative overflow-hidden group transition-colors shadow-sm",
+                    isFailed
+                      ? "border-danger/50 hover:border-danger/70"
+                      : isSynced
+                        ? "border-success/40 hover:border-success/60"
+                        : "border-border hover:border-primary/30"
+                  )}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div
+                      className={cn(
+                        "w-8 h-8 rounded flex items-center justify-center shrink-0",
+                        isFailed ? "bg-danger-soft" : isSynced ? "bg-success/10" : "bg-surface-muted"
+                      )}
+                    >
+                      {isFailed ? (
+                        <AlertCircle size={18} className="text-danger" />
+                      ) : isSynced ? (
+                        <CheckCircle2 size={18} className="text-success"/>
+                      ) : (
+                        <FileText size={18} className="text-text-muted"/>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-text-primary text-sm">{sheet.label}</h3>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-text-primary text-sm">{sheet.label}</h3>
+                  <div className="space-y-1.5 mt-auto border-t border-border/50 pt-3">
+                    <p className="text-[11px] text-text-muted flex justify-between">
+                      <span>Google Sheet Tab:</span>
+                      <span className="font-medium text-text-primary">"{sheet.tabName}"</span>
+                    </p>
+                    <p className="text-[11px] text-text-muted flex justify-between">
+                      <span>Status:</span>
+                      <span className={cn("font-medium", isFailed ? "text-danger" : isSynced ? "text-success" : "text-text-muted")}>
+                        {isFailed
+                          ? 'Tab belum ditemukan'
+                          : isSynced ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Belum di-sync'}
+                      </span>
+                    </p>
                   </div>
                 </div>
-                <div className="space-y-1.5 mt-auto border-t border-border/50 pt-3">
-                  <p className="text-[11px] text-text-muted flex justify-between">
-                    <span>Google Sheet Tab:</span>
-                    <span className="font-medium text-text-primary">"{sheet.tabName}"</span>
-                  </p>
-                  <p className="text-[11px] text-text-muted flex justify-between">
-                    <span>Status:</span>
-                    <span className={cn("font-medium", failedSheetName === sheet.tabName ? "text-danger" : "text-success")}>
-                      {failedSheetName === sheet.tabName
-                        ? 'Tab belum ditemukan'
-                        : lastSyncTime ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Belum di-sync'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

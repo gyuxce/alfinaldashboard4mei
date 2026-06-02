@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
+import { fetchAllSheets, getCurrentSheetMonthKey, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
 
 export interface AppState {
   // Data source mode
@@ -79,7 +79,7 @@ export const useStore = create<AppState>((set, get) => ({
   isFetchingSheets: false,
   sheetsFetchError: null,
   lastSyncTime: null,
-  selectedSheetMonth: 'legacy',
+  selectedSheetMonth: getCurrentSheetMonthKey(),
   sheetsConfig: null,
 
   productivityFile: null,

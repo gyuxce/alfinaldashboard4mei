@@ -159,6 +159,20 @@ export function getSheetMonthOption(monthKey: string): SheetMonthOption {
   return getSheetMonthOptions().find(option => option.key === monthKey) || LEGACY_MONTH_OPTION;
 }
 
+export function getCurrentSheetMonthKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  if (year < 2026 || (year === 2026 && month <= 5)) return 'legacy';
+
+  const monthCode = MONTHS[month - 1]?.code;
+  if (!monthCode) return 'legacy';
+
+  const key = `${monthCode}_${year}`;
+  return getSheetMonthOptions().some(option => option.key === key) ? key : 'legacy';
+}
+
 export function getPreviousSheetMonthKey(monthKey: string): string | null {
   const option = getSheetMonthOption(monthKey);
   if (!option.suffix) return null;
