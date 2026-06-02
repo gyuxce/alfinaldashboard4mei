@@ -441,7 +441,7 @@ export default function App() {
             isMobileFilterOpen ? "flex" : "hidden md:flex"
           )}>
             <div className="flex flex-wrap items-center gap-3 xl:border-r xl:border-border xl:pr-5 w-full xl:w-auto">
-              <span className="hidden md:inline text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Filters</span>
+              <span className="hidden md:inline text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Scope</span>
               <div className="w-full sm:w-auto min-w-[120px]">
                 <SearchableSelect 
                   options={['TIN', 'TCID', 'TCID x TIN']}
@@ -473,9 +473,10 @@ export default function App() {
               )}
             </div>
             
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full xl:w-auto">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full xl:w-auto xl:border-r xl:border-border xl:pr-5">
+              <span className="hidden md:inline text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Period</span>
               <label className="flex items-center gap-2 text-[11px] font-semibold text-text-secondary w-full sm:w-auto">
-                <span className="whitespace-nowrap">Bulan</span>
+                <span className="whitespace-nowrap">Quick Month</span>
                 <input
                   type="month"
                   className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto"
@@ -483,6 +484,7 @@ export default function App() {
                   onChange={e => applyMonthFilter(e.target.value)}
                 />
               </label>
+              <span className="text-[11px] font-semibold text-text-secondary whitespace-nowrap">Custom Range</span>
               <input type="date" className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
               <span className="text-text-muted text-sm shrink-0">to</span>
               <input type="date" className="bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer w-full sm:w-auto" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
@@ -511,7 +513,10 @@ export default function App() {
                   Next &raquo;
                 </button>
               </div>
+            </div>
 
+            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto shrink-0">
+              <span className="hidden md:inline text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Compare</span>
               <div 
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card/40 hover:bg-card transition-all group cursor-pointer" 
                 onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
@@ -522,28 +527,46 @@ export default function App() {
                 <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare</span>
               </div>
 
-              <div className="flex rounded-xl border border-primary/30 bg-primary-soft p-0.5 gap-0.5 shadow-sm">
+              <div className={cn(
+                "flex rounded-xl border p-0.5 gap-0.5 shadow-sm transition-opacity",
+                isComparisonEnabled ? "border-primary/30 bg-primary-soft opacity-100" : "border-border bg-surface/60 opacity-80"
+              )}>
                 <button
                   type="button"
-                  onClick={() => setComparisonMode('wow')}
+                  onClick={() => {
+                    setComparisonMode('wow');
+                    setIsComparisonEnabled(true);
+                  }}
                   className={cn(
                     "text-[10px] px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer",
-                    comparisonMode === 'wow' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
+                    comparisonMode === 'wow' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
                   )}
+                  title="WoW membandingkan dengan periode sebelumnya dengan durasi yang sama"
                 >
                   WoW
                 </button>
                 <button
                   type="button"
-                  onClick={() => setComparisonMode('mom')}
+                  onClick={() => {
+                    setComparisonMode('mom');
+                    setIsComparisonEnabled(true);
+                  }}
                   className={cn(
                     "text-[10px] px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer",
-                    comparisonMode === 'mom' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
+                    comparisonMode === 'mom' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
                   )}
+                  title="MoM membandingkan dengan bulan sebelumnya"
                 >
                   MoM
                 </button>
               </div>
+              <span className="text-[10px] text-text-muted">
+                {isComparisonEnabled
+                  ? comparisonMode === 'mom'
+                    ? 'vs bulan sebelumnya'
+                    : 'vs periode sebelumnya'
+                  : 'off'}
+              </span>
 
             </div>
 
