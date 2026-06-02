@@ -493,6 +493,7 @@ export const FileCenter = () => {
   const activeSheetConfig = getSheetConfigForMonth(selectedSheetMonth);
   const sheetMonthOptions = getSheetMonthOptions();
   const failedSheetName = sheetsFetchError?.match(/"([^"]+)"/)?.[1] || null;
+  const hasSuccessfulSync = !!lastSyncTime && !sheetsFetchError;
 
   const sheetNames = [
     { label: 'Master CSID', tabName: activeSheetConfig.csidSheetName },
@@ -562,14 +563,24 @@ export const FileCenter = () => {
           </div>
         )}
 
-        <div className="bg-primary-soft border border-primary/20 rounded-xl p-4 text-sm">
+        <div className={cn(
+          "rounded-xl p-4 text-sm border",
+          hasSuccessfulSync
+            ? "bg-success/10 border-success/30"
+            : "bg-primary-soft border-primary/20"
+        )}>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
             <div>
               <p className="font-bold text-text-primary">Sheet aktif: {activeMonth.label}</p>
               <p className="text-xs text-text-muted mt-1">{activeMonth.description}</p>
             </div>
-            <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
-              {activeMonth.suffix ? 'Monthly tabs' : 'Env default tabs'}
+            <span className={cn(
+              "text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border",
+              hasSuccessfulSync
+                ? "text-success border-success/30 bg-success/10"
+                : "text-primary border-primary/20 bg-card/50"
+            )}>
+              {hasSuccessfulSync ? `Synced ${formatRelativeTime(lastSyncTime)}` : activeMonth.suffix ? 'Monthly tabs' : 'Env default tabs'}
             </span>
           </div>
         </div>
@@ -587,11 +598,13 @@ export const FileCenter = () => {
               </div>
               <span className={cn(
                 "text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border",
-                activeMonth.suffix
-                  ? "text-warning border-warning/30 bg-warning/10"
-                  : "text-success border-success/30 bg-success/10"
+                hasSuccessfulSync
+                  ? "text-success border-success/30 bg-success/10"
+                  : activeMonth.suffix
+                    ? "text-warning border-warning/30 bg-warning/10"
+                    : "text-success border-success/30 bg-success/10"
               )}>
-                {activeMonth.suffix ? 'Setup needed' : 'Ready'}
+                {hasSuccessfulSync ? 'Synced' : activeMonth.suffix ? 'Setup needed' : 'Ready'}
               </span>
             </div>
 

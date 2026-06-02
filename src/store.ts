@@ -3,6 +3,23 @@ import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { ValidationResult } from './lib/csvValidator';
 import { fetchAllSheets, getCurrentSheetMonthKey, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
 
+function formatLocalDate(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function getCurrentMonthRange() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    start: formatLocalDate(year, month, 1),
+    end: formatLocalDate(year, month, lastDay),
+  };
+}
+
+const defaultDateRange = getCurrentMonthRange();
+
 export interface AppState {
   // Data source mode
   dataSource: 'sheets' | 'csv';
@@ -96,8 +113,8 @@ export const useStore = create<AppState>((set, get) => ({
   csidData: [],
   qaData: [],
   
-  startDate: '',
-  endDate: '',
+  startDate: defaultDateRange.start,
+  endDate: defaultDateRange.end,
   selectedBpo: 'All BPO',
   selectedTL: 'All TL',
   selectedGlobalAgent: 'All Agents',
