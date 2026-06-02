@@ -8,6 +8,11 @@ export interface CSATEntry {
   category: string;
   response: string;
   isTakeout: boolean;
+  rcaAgent?: string;
+  rcaCustomer?: string;
+  rcaAkulaku?: string;
+  agentName?: string;
+  csId?: string;
 }
 
 export interface QAEntry {
@@ -726,6 +731,8 @@ export const processKPIs = (
             rcaAgent,
             rcaCustomer,
             rcaAkulaku,
+            agentName: agent.name,
+            csId: agent.csId,
          });
       }
 

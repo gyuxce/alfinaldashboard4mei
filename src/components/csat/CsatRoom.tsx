@@ -19,7 +19,34 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   const [selectedScoreCase, setSelectedScoreCase] = useState<string>('All');
   const [scoreCasePage, setScoreCasePage] = useState<number>(1);
   const [selectedAgent, setSelectedAgent] = useState<{agent: AgentKPI, date?: string, type?: 'csat' | 'defects'} | null>(null);
+  const [wowModalData, setWowModalData] = useState<{ title: React.ReactNode, subtitle?: React.ReactNode, surveys: CSATEntry[] } | null>(null);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  
+  const handleCategoryClick = (categoryName: string, weekLabel: string, dataset: AgentKPI[]) => {
+    const surveys: CSATEntry[] = [];
+    dataset.forEach(a => {
+      const filtered = a.csatHistory.filter(h => h.category.toLowerCase() === categoryName.toLowerCase() && (viewMode === 'full' || !h.isTakeout) && h.score > 0);
+      surveys.push(...filtered);
+    });
+    if (surveys.length > 0) {
+      setWowModalData({
+        title: `Category Analysis: ${categoryName}`,
+        subtitle: `Data filter: ${weekLabel} (${viewMode === 'full' ? 'Full Data' : 'After Take Out'})`,
+        surveys
+      });
+    }
+  };
+
+  const handleAgentClick = (agentId: string, agentName: string, weekLabel: string, dataset: AgentKPI[]) => {
+    const agent = dataset.find(a => a.csId === agentId);
+    if (agent && agent.csatHistory.length > 0) {
+      setWowModalData({
+        title: `Historical Audit Trail: ${agentName || agent.csId}`,
+        subtitle: `CS ID: ${agent.csId} • Team Leader: ${agent.teamLeader || '-'} • Data filter: ${weekLabel} (${viewMode === 'full' ? 'Full Data' : 'After Take Out'})`,
+        surveys: agent.csatHistory.filter(h => (viewMode === 'full' || !h.isTakeout) && h.score > 0)
+      });
+    }
+  };
   
   const [agentSortConfig, setAgentSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [defectSortConfig, setDefectSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -659,6 +686,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   viewMode={viewMode}
                   search={search}
                   filterTL={filterTL}
+                  onCategoryClick={handleCategoryClick}
+                  onAgentClick={handleAgentClick}
                 />
               ) : (
                 <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -741,6 +770,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   viewMode={viewMode}
                   search={search}
                   filterTL={filterTL}
+                  onCategoryClick={handleCategoryClick}
+                  onAgentClick={handleAgentClick}
                 />
               ) : (
                 <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -1015,8 +1046,28 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       
       {selectedAgent && (
         <CsatDetailModal
-          selectedAgent={selectedAgent}
+          title={<>Historical Audit Trail: {selectedAgent.agent.name || selectedAgent.agent.csId}</>}
+          subtitle={<>CS ID: <span className="font-semibold text-text-primary">{selectedAgent.agent.csId}</span> &nbsp;&bull;&nbsp; Team Leader: <span className="font-semibold text-text-primary">{selectedAgent.agent.teamLeader || '-'}</span></>}
+          surveys={selectedAgent.date ? selectedAgent.agent.csatHistory.filter((h: any) => h.date === selectedAgent.date) : selectedAgent.agent.csatHistory}
+          agentType={selectedAgent.type}
           onClose={() => setSelectedAgent(null)}
+          expandedDates={expandedDates}
+          toggleExpandDate={(date) => {
+            const newExpanded = new Set(expandedDates);
+            if (newExpanded.has(date)) newExpanded.delete(date);
+            else newExpanded.add(date);
+            setExpandedDates(newExpanded);
+          }}
+          viewMode={viewMode}
+        />
+      )}
+      
+      {wowModalData && (
+        <CsatDetailModal
+          title={wowModalData.title}
+          subtitle={wowModalData.subtitle}
+          surveys={wowModalData.surveys}
+          onClose={() => setWowModalData(null)}
           expandedDates={expandedDates}
           toggleExpandDate={(date) => {
             const newExpanded = new Set(expandedDates);
@@ -1161,7 +1212,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
   );
 };
 
-const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, viewMode, search, filterTL, type = 'all' }: any) => {
+const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, viewMode, search, filterTL, type = 'all', onCategoryClick, onAgentClick }: any) => {
   const { startDate, endDate } = useStore();
 
   const getWeekLabel = (offset: number) => {
@@ -1266,7 +1317,11 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                 {week.cats.map((cat, i) => {
                   const isTakeoutCategory = TAKEOUT_CATEGORIES.includes(cat.name.toLowerCase());
                   return (
-                    <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors">
+                    <tr 
+                      key={cat.name} 
+                      className="border-b border-border hover:bg-surface-muted transition-colors cursor-pointer"
+                      onClick={() => onCategoryClick && onCategoryClick(cat.name, week.name, wIdx === 3 ? data : wIdx === 2 ? previousData : wIdx === 1 ? previousData2 : previousData3)}
+                    >
                       <td className="p-1.5 text-center text-text-muted font-medium">{i+1}</td>
                       <td className={`p-1.5 font-medium max-w-[120px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
                       <td className="p-1.5 text-center font-bold text-[10px] text-text-secondary">{formatNum(cat.count, 0)}</td>
@@ -1302,7 +1357,11 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                 {week.agents.map((agent, i) => {
                   const isRepeat = wIdx === weeks.length - 1 && weeks[wIdx - 1].agents.some(prevAgent => prevAgent.csId === agent.csId);
                   return (
-                    <tr key={agent.csId} className="border-b border-border hover:bg-surface-muted transition-colors">
+                    <tr 
+                      key={agent.csId} 
+                      className="border-b border-border hover:bg-surface-muted transition-colors cursor-pointer"
+                      onClick={() => onAgentClick && onAgentClick(agent.csId, agent.name, week.name, wIdx === 3 ? data : wIdx === 2 ? previousData : wIdx === 1 ? previousData2 : previousData3)}
+                    >
                       <td className="p-1.5 text-center text-text-muted font-medium">{i+1}</td>
                       <td className={`p-1.5 font-medium max-w-[120px] truncate ${isRepeat ? 'text-danger font-bold' : 'text-text-primary'}`} title={agent.name}>{agent.name}</td>
                       <td className="p-1.5 text-center font-bold text-[10px] text-text-secondary">{agent.badScoreCount}</td>
