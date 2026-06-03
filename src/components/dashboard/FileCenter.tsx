@@ -140,6 +140,13 @@ const getDateHealth = (source: DataSource, data: any[][]) => {
   return { checked, invalid, samples, ruleLabel: sourceConfig.label };
 };
 
+type CoverageStatus = 'ok' | 'partial' | 'empty';
+
+const getCoverageStatus = (covered: number, total: number): CoverageStatus => {
+  if (total <= 0 || covered <= 0) return 'empty';
+  return covered >= total ? 'ok' : 'partial';
+};
+
 const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
   const store = useStore() as any;
 
@@ -190,8 +197,53 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
     { ok: 0, warning: 0, error: 0, missing: 0, rows: 0 } as Record<HealthStatus, number> & { rows: number },
   );
 
-  const agentCount = Object.keys(store.agentDictionary || {}).length;
-  const masterIds = React.useMemo(() => new Set(Object.keys(store.agentDictionary || {})), [store.agentDictionary]);
+  const masterIdList = React.useMemo<string[]>(() => Object.keys(store.agentDictionary || {}), [store.agentDictionary]);
+  const agentCount = masterIdList.length;
+  const masterIds = React.useMemo(() => new Set<string>(masterIdList), [masterIdList]);
+  const masterProfileIssues = React.useMemo(() => {
+    return Object.entries(store.agentDictionary || {})
+      .filter(([, profile]: [string, any]) => !profile?.name || !profile?.bpo || !profile?.teamLeader)
+      .map(([csId, profile]: [string, any]) => ({
+        csId,
+        missing: [
+          !profile?.name ? 'name' : '',
+          !profile?.bpo ? 'BPO' : '',
+          !profile?.teamLeader ? 'TL' : '',
+        ].filter(Boolean),
+      }))
+      .sort((a, b) => a.csId.localeCompare(b.csId));
+  }, [store.agentDictionary]);
+
+  const coverageItems = React.useMemo(() => {
+    return dataSources
+      .filter((source) => source.dataKey !== 'csidData')
+      .map((source) => {
+        const data = (store[source.dataKey] || []) as any[][];
+        const ids = extractCsIds(data);
+        const matchedIds = Array.from(ids).filter((id) => masterIds.has(id)).sort();
+        const missingIds = masterIdList.filter((id) => !ids.has(id)).sort();
+        const coverage = agentCount > 0 ? Math.round((matchedIds.length / agentCount) * 100) : 0;
+
+        return {
+          label: source.label,
+          dataKey: source.dataKey,
+          totalIds: ids.size,
+          matchedIds,
+          missingIds,
+          coverage,
+          status: getCoverageStatus(matchedIds.length, agentCount),
+        };
+      });
+  }, [
+    agentCount,
+    masterIdList,
+    masterIds,
+    store.productivityData,
+    store.csatScData,
+    store.slaData,
+    store.scheduleData,
+    store.qaData,
+  ]);
 
   const orphanChecks = React.useMemo(() => {
     return dataSources
@@ -240,6 +292,43 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
   ]);
 
   const totalInvalidDates = dateChecks.reduce((sum, check) => sum + check.invalid, 0);
+  const criticalCoverageIssues = coverageItems.filter((item) => (
+    item.dataKey === 'productivityData' || item.dataKey === 'scheduleData'
+  ) && item.missingIds.length > 0);
+  const issueItems = [
+    {
+      title: 'Orphan CS ID',
+      count: totalOrphanIds,
+      tone: totalOrphanIds > 0 ? 'warning' : 'success',
+      detail: totalOrphanIds > 0
+        ? 'Ada CS ID di data KPI yang belum terdaftar di Master CSID.'
+        : 'Tidak ada CS ID asing di data KPI.',
+    },
+    {
+      title: 'Master profile incomplete',
+      count: masterProfileIssues.length,
+      tone: masterProfileIssues.length > 0 ? 'warning' : 'success',
+      detail: masterProfileIssues.length > 0
+        ? `${masterProfileIssues.slice(0, 3).map(issue => `${issue.csId} (${issue.missing.join(', ')})`).join(', ')}${masterProfileIssues.length > 3 ? ` +${masterProfileIssues.length - 3} more` : ''}`
+        : 'Semua agent di Master CSID punya nama, BPO, dan TL.',
+    },
+    {
+      title: 'Critical source coverage',
+      count: criticalCoverageIssues.reduce((sum, item) => sum + item.missingIds.length, 0),
+      tone: criticalCoverageIssues.length > 0 ? 'warning' : 'success',
+      detail: criticalCoverageIssues.length > 0
+        ? criticalCoverageIssues.map(item => `${item.label}: ${item.missingIds.length} agent belum muncul`).join(' | ')
+        : 'Productivity dan Schedule sudah mencakup semua agent master.',
+    },
+    {
+      title: 'Invalid date values',
+      count: totalInvalidDates,
+      tone: totalInvalidDates > 0 ? 'warning' : 'success',
+      detail: totalInvalidDates > 0
+        ? 'Ada tanggal yang tidak bisa dibaca, filter tanggal bisa tidak akurat.'
+        : 'Format tanggal terbaca normal.',
+    },
+  ];
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
@@ -270,6 +359,101 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
         <div>
           <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Mode</div>
           <div className="text-lg font-black text-text-primary mt-0.5">{isSheetMode ? 'Google Sheets' : 'CSV Upload'}</div>
+        </div>
+      </div>
+
+      <div className="p-4 border-b border-border">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+          <div>
+            <h3 className="text-xs font-bold text-text-primary">Data Completeness</h3>
+            <p className="text-[10px] text-text-muted mt-1">
+              Coverage agent per source dibandingkan Master CSID.
+            </p>
+          </div>
+          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+            Target utama: Productivity + Schedule 100%
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          {coverageItems.map((item) => (
+            <div key={item.dataKey} className="rounded-lg border border-border bg-surface/20 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-text-primary truncate">{item.label}</div>
+                  <div className="text-[10px] text-text-muted mt-1">
+                    {item.matchedIds.length}/{agentCount} master agents
+                  </div>
+                </div>
+                <span className={cn(
+                  'shrink-0 rounded-lg border px-2 py-1 text-[10px] font-black',
+                  item.status === 'ok'
+                    ? 'bg-success/5 border-success/20 text-success'
+                    : item.status === 'partial'
+                      ? 'bg-warning/5 border-warning/20 text-warning'
+                      : 'bg-surface border-border text-text-muted'
+                )}>
+                  {item.coverage}%
+                </span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-border/60">
+                <div
+                  className={cn(
+                    'h-full rounded-full',
+                    item.status === 'ok' ? 'bg-success' : item.status === 'partial' ? 'bg-warning' : 'bg-text-muted'
+                  )}
+                  style={{ width: `${Math.min(item.coverage, 100)}%` }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between text-[10px] text-text-muted">
+                <span>{item.totalIds} unique IDs</span>
+                <span>{item.missingIds.length} missing</span>
+              </div>
+              {item.missingIds.length > 0 && (
+                <div className="mt-2 truncate text-[10px] text-warning" title={item.missingIds.join(', ')}>
+                  Missing: {item.missingIds.slice(0, 3).join(', ')}{item.missingIds.length > 3 ? ` +${item.missingIds.length - 3} more` : ''}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4 border-b border-border bg-surface/20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+          <div>
+            <h3 className="text-xs font-bold text-text-primary">Agent Issue Detector</h3>
+            <p className="text-[10px] text-text-muted mt-1">
+              Deteksi cepat masalah data agent yang bisa memengaruhi KPI.
+            </p>
+          </div>
+          <span className={cn(
+            'rounded-lg border px-2 py-1 text-[10px] font-bold',
+            issueItems.some(item => item.count > 0)
+              ? 'bg-warning/5 border-warning/20 text-warning'
+              : 'bg-success/5 border-success/20 text-success'
+          )}>
+            {issueItems.reduce((sum, item) => sum + item.count, 0)} issues
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {issueItems.map((item) => (
+            <div key={item.title} className="rounded-lg border border-border bg-card p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] font-bold text-text-primary">{item.title}</div>
+                <span className={cn(
+                  'rounded-lg border px-2 py-1 text-[10px] font-black',
+                  item.tone === 'success'
+                    ? 'bg-success/5 border-success/20 text-success'
+                    : 'bg-warning/5 border-warning/20 text-warning'
+                )}>
+                  {item.count}
+                </span>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-text-muted">
+                {item.detail}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
