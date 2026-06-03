@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from './store';
 import { processKPIs, getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
+import { getPreviousSheetMonthKey, getSheetMonthOption } from './lib/sheetsApi';
 
 import { 
   LayoutDashboard, 
@@ -52,6 +53,14 @@ function formatRelativeTime(date: Date): string {
   const diffHour = Math.floor(diffMin / 60);
   if (diffHour < 24) return `${diffHour} jam lalu`;
   return date.toLocaleDateString('id-ID');
+}
+
+function isStaleSync(date: Date | null) {
+  if (!date) return false;
+  const now = new Date();
+  const isDifferentDay = date.toDateString() !== now.toDateString();
+  const isOlderThanSixHours = now.getTime() - date.getTime() > 6 * 60 * 60 * 1000;
+  return isDifferentDay || isOlderThanSixHours;
 }
 
 function TabLoading() {
@@ -219,7 +228,7 @@ export default function App() {
 
   const { 
     productivityData, csatScData, slaData, scheduleData, qaData, 
-    startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, selectedAgentFor360, agentDictionary, 
+    startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, selectedAgentFor360, agentDictionary, selectedSheetMonth,
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedAgentFor360,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime,
@@ -238,6 +247,21 @@ export default function App() {
     hasAutoFetchedSheetsRef.current = true;
     void fetchFromSheets();
   }, [fetchFromSheets, isFetchingSheets, isHydrating, productivityData.length]);
+
+  const activeSheetOption = getSheetMonthOption(selectedSheetMonth);
+  const previousSheetMonthKey = getPreviousSheetMonthKey(selectedSheetMonth);
+  const previousSheetOption = previousSheetMonthKey ? getSheetMonthOption(previousSheetMonthKey) : null;
+  const syncMonthLabel = previousSheetOption
+    ? `${activeSheetOption.label} + ${previousSheetOption.label}`
+    : activeSheetOption.label;
+  const syncStatusText = isFetchingSheets
+    ? `Mengambil ${syncMonthLabel}...`
+    : lastSyncTime
+      ? previousSheetOption
+        ? `Data aktif: ${activeSheetOption.label}, pembanding: ${previousSheetOption.label}`
+        : `Data aktif: ${activeSheetOption.label}`
+      : `Menunggu sync ${activeSheetOption.label}`;
+  const syncIsStale = isStaleSync(lastSyncTime);
 
   const { rawData, previousRawData, previousRawData2, previousRawData3, tlList: baseTlList } = useMemo(() => {
     let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary);
@@ -674,10 +698,20 @@ export default function App() {
             )}
 
             <div className="w-full 2xl:w-auto 2xl:ml-auto flex flex-wrap items-center justify-between 2xl:justify-end gap-2 border-t border-border pt-2 2xl:border-t-0 2xl:pt-0 mt-2 2xl:mt-0">
-              {lastSyncTime && (
-                <span className="text-[10px] text-text-muted">
-                  Synced {formatRelativeTime(lastSyncTime)}
-                </span>
+              {import.meta.env.VITE_SHEETS_API_KEY && (
+                <div className="flex min-w-0 flex-col text-[10px] leading-tight">
+                  <span className={cn(
+                    "font-bold",
+                    isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-secondary"
+                  )}>
+                    {syncStatusText}
+                  </span>
+                  {lastSyncTime && (
+                    <span className={cn("text-text-muted", syncIsStale && "text-warning")}>
+                      {syncIsStale ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Refresh untuk update.` : `Synced ${formatRelativeTime(lastSyncTime)}`}
+                    </span>
+                  )}
+                </div>
               )}
               {import.meta.env.VITE_SHEETS_API_KEY && (
                 <button
@@ -753,7 +787,7 @@ export default function App() {
             </div>
             <div>
               <p className="font-semibold text-text-primary text-lg">Mengambil data terbaru...</p>
-              <p className="text-sm text-text-muted mt-1">Sinkronisasi dengan Google Sheets</p>
+              <p className="text-sm text-text-muted mt-1">{syncStatusText}</p>
             </div>
           </div>
         </div>

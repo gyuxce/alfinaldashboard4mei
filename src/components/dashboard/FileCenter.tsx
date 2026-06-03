@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { useStore, AppState } from '../../store';
 import { UploadCloud, CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { getSheetConfigForMonth, getSheetMonthOption, getSheetMonthOptions } from '../../lib/sheetsApi';
+import { getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, getSheetMonthOptions } from '../../lib/sheetsApi';
 import { 
   countDataRows,
   validateCsidFile, 
@@ -24,6 +24,14 @@ function formatRelativeTime(date: Date): string {
   const diffHour = Math.floor(diffMin / 60);
   if (diffHour < 24) return `${diffHour} jam lalu`;
   return date.toLocaleDateString('id-ID');
+}
+
+function isStaleSync(date: Date | null) {
+  if (!date) return false;
+  const now = new Date();
+  const isDifferentDay = date.toDateString() !== now.toDateString();
+  const isOlderThanSixHours = now.getTime() - date.getTime() > 6 * 60 * 60 * 1000;
+  return isDifferentDay || isOlderThanSixHours;
 }
 
 const validators: Record<string, (data: any[][]) => ValidationResult> = {
@@ -494,6 +502,19 @@ export const FileCenter = () => {
   const sheetMonthOptions = getSheetMonthOptions();
   const failedSheetName = sheetsFetchError?.match(/"([^"]+)"/)?.[1] || null;
   const hasSuccessfulSync = !!lastSyncTime && !sheetsFetchError;
+  const previousSheetMonthKey = getPreviousSheetMonthKey(selectedSheetMonth);
+  const previousSheetOption = previousSheetMonthKey ? getSheetMonthOption(previousSheetMonthKey) : null;
+  const syncMonthLabel = previousSheetOption
+    ? `${activeMonth.label} + ${previousSheetOption.label}`
+    : activeMonth.label;
+  const syncStatusText = isFetchingSheets
+    ? `Mengambil ${syncMonthLabel}...`
+    : hasSuccessfulSync
+      ? previousSheetOption
+        ? `Data aktif: ${activeMonth.label}, pembanding: ${previousSheetOption.label}`
+        : `Data aktif: ${activeMonth.label}`
+      : `Sheet belum aktif: ${activeMonth.label}`;
+  const syncIsStale = isStaleSync(lastSyncTime);
 
   const sheetNames = [
     { label: 'Master CSID', tabName: activeSheetConfig.csidSheetName },
@@ -566,27 +587,38 @@ export const FileCenter = () => {
         <div className={cn(
           "rounded-xl p-4 text-sm border",
           hasSuccessfulSync
-            ? "bg-success/10 border-success/30"
+            ? syncIsStale
+              ? "bg-warning/10 border-warning/30"
+              : "bg-success/10 border-success/30"
             : "bg-warning/10 border-warning/30"
         )}>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
             <div>
-              <p className="font-bold text-text-primary">
-                {hasSuccessfulSync ? `Sheet aktif: ${activeMonth.label}` : `Sheet belum aktif: ${activeMonth.label}`}
+              <p className={cn(
+                "font-bold",
+                isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-primary"
+              )}>
+                {syncStatusText}
               </p>
               <p className="text-xs text-text-muted mt-1">
-                {hasSuccessfulSync
-                  ? activeMonth.description
-                  : 'Pilih bulan data lalu klik Sync Now supaya sheet ini aktif di dashboard.'}
+                {isFetchingSheets
+                  ? 'Mohon tunggu, dashboard sedang membaca tab Google Sheets.'
+                  : hasSuccessfulSync
+                    ? syncIsStale
+                      ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Sync Now untuk update.`
+                      : `Sinkron ${formatRelativeTime(lastSyncTime)}. ${activeMonth.description}`
+                    : 'Dashboard akan otomatis sync saat dibuka. Klik Sync Now jika ingin memaksa update manual.'}
               </p>
             </div>
             <span className={cn(
               "text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border",
               hasSuccessfulSync
-                ? "text-success border-success/30 bg-success/10"
+                ? syncIsStale
+                  ? "text-warning border-warning/30 bg-warning/10"
+                  : "text-success border-success/30 bg-success/10"
                 : "text-warning border-warning/30 bg-warning/10"
             )}>
-              {hasSuccessfulSync ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Belum sync'}
+              {isFetchingSheets ? 'Syncing' : hasSuccessfulSync ? syncIsStale ? 'Perlu refresh' : 'Synced' : 'Belum sync'}
             </span>
           </div>
         </div>
