@@ -1,12 +1,11 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { AgentKPI, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
-import { Activity, Star, Clock, CheckCircle, TrendingUp, Smile, Users, Info, ChevronDown } from "lucide-react";
+import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
 import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
 import { DashboardAgentTable } from "./DashboardAgentTable";
 import { EmptyState } from "../ui/EmptyState";
-import { calculateAgentCompositeScore } from "../../lib/kpiScoring";
 
 interface Props {
   data: AgentKPI[];
@@ -18,11 +17,7 @@ interface Props {
 export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const [search, setSearch] = useState("");
   const [isRulesOpen, setIsRulesOpen] = useState(false);
-  const dict = useStore((state) => state.agentDictionary);
-  const { startDate, endDate, setDateRange, comparisonMode } = useStore();
-
-  const tickerRef = useRef<HTMLDivElement>(null);
-  const [tickerDuration, setTickerDuration] = useState(30);
+  const { startDate, endDate, comparisonMode } = useStore();
 
   const tableData = useMemo(() => {
     return data.filter(
@@ -31,38 +26,6 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
         (a.name || "").toLowerCase().includes(search.toLowerCase()),
     );
   }, [data, search]);
-
-  const topAgentsList = useMemo(() => {
-    const aList: { name: string; score: number }[] = [];
-    tableData.forEach((agent) => {
-      const composite = calculateAgentCompositeScore(agent);
-      if (composite.score !== null) {
-        aList.push({
-          name: agent.name && agent.name !== "-" ? agent.name : agent.csId,
-          score: composite.score,
-        });
-      }
-    });
-
-    aList.sort((a, b) => b.score - a.score);
-    return aList.slice(0, 5);
-  }, [tableData]);
-
-  useEffect(() => {
-    let observer: ResizeObserver;
-    if (tickerRef.current) {
-      observer = new ResizeObserver((entries) => {
-        for (let entry of entries) {
-           const distance = entry.target.scrollWidth / 2;
-           setTickerDuration(Math.max(distance / 50, 1));
-        }
-      });
-      observer.observe(tickerRef.current);
-    }
-    return () => {
-      if (observer) observer.disconnect();
-    };
-  }, [topAgentsList]);
 
   const stats = useMemo(() => {
     const calculate = (dataset: AgentKPI[]) => {

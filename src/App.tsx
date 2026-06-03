@@ -202,6 +202,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const hasAutoFetchedSheetsRef = useRef(false);
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
@@ -228,6 +229,15 @@ export default function App() {
   useEffect(() => {
     hydrateFromStorage();
   }, [hydrateFromStorage]);
+
+  useEffect(() => {
+    if (!import.meta.env.VITE_SHEETS_API_KEY) return;
+    if (isHydrating || isFetchingSheets || hasAutoFetchedSheetsRef.current) return;
+    if (productivityData.length > 0) return;
+
+    hasAutoFetchedSheetsRef.current = true;
+    void fetchFromSheets();
+  }, [fetchFromSheets, isFetchingSheets, isHydrating, productivityData.length]);
 
   const { rawData, previousRawData, previousRawData2, previousRawData3, tlList: baseTlList } = useMemo(() => {
     let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary);
