@@ -677,6 +677,7 @@ export const processKPIs = (
     const rcaAgentIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca agent area');
     const rcaCustomerIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca customer area');
     const rcaAkulakuIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca akulaku process');
+    const seenCsatScEntries = new Set<string>();
 
     for (let i = 1; i < csatData.length; i++) {
       const row = csatData[i];
@@ -730,6 +731,24 @@ export const processKPIs = (
       const rcaAgent = rcaAgentIdx !== -1 ? String(row[rcaAgentIdx] || '').trim() : '';
       const rcaCustomer = rcaCustomerIdx !== -1 ? String(row[rcaCustomerIdx] || '').trim() : '';
       const rcaAkulaku = rcaAkulakuIdx !== -1 ? String(row[rcaAkulakuIdx] || '').trim() : '';
+
+      const csatScEntryKey = [
+        agentId,
+        normDate || dateStr.trim(),
+        ticketId,
+        chatId,
+        uid,
+        scoreStr,
+        category,
+        response,
+        rcaAgent,
+        rcaCustomer,
+        rcaAkulaku,
+        timestampStr,
+      ].join("|").toLowerCase();
+
+      if (seenCsatScEntries.has(csatScEntryKey)) continue;
+      seenCsatScEntries.add(csatScEntryKey);
       
       const isTakeoutRecord = [
         "tidak bisa transaksi namun memiliki limit",
