@@ -282,7 +282,7 @@ export default function App() {
     startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, selectedAgentFor360, agentDictionary, selectedSheetMonth,
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedAgentFor360,
     isHydrating, hydrateFromStorage,
-    isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError,
+    isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, activeMonthRowCounts,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode
   } = useStore();
 
@@ -315,12 +315,12 @@ export default function App() {
   const syncIsStale = isStaleSync(lastSyncTime);
   const dataQuality = useMemo(() => {
     const sourceRows = [
-      { label: 'Master', rows: countDataRows(csidData) },
-      { label: 'Productivity', rows: countDataRows(productivityData) },
-      { label: 'CSAT SC', rows: countDataRows(csatScData) },
-      { label: 'SLA', rows: countDataRows(slaData) },
-      { label: 'Schedule', rows: countDataRows(scheduleData) },
-      { label: 'QA', rows: countDataRows(qaData) },
+      { label: 'Master', rows: activeMonthRowCounts?.csidData ?? countDataRows(csidData) },
+      { label: 'Productivity', rows: activeMonthRowCounts?.productivityData ?? countDataRows(productivityData) },
+      { label: 'CSAT SC', rows: activeMonthRowCounts?.csatScData ?? countDataRows(csatScData) },
+      { label: 'SLA', rows: activeMonthRowCounts?.slaData ?? countDataRows(slaData) },
+      { label: 'Schedule', rows: activeMonthRowCounts?.scheduleData ?? countDataRows(scheduleData) },
+      { label: 'QA', rows: activeMonthRowCounts?.qaData ?? countDataRows(qaData) },
     ];
     const missingSources = sourceRows.filter((source) => source.rows === 0);
     const masterIds = new Set(Object.keys(agentDictionary || {}));
@@ -372,6 +372,7 @@ export default function App() {
     };
   }, [
     agentDictionary,
+    activeMonthRowCounts,
     csidData,
     productivityData,
     csatScData,

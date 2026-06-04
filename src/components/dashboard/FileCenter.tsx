@@ -202,7 +202,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
   const healthItems = React.useMemo(() => {
     return dataSources.map((source) => {
       const data = (store[source.dataKey] || []) as any[][];
-      const rows = countDataRows(data);
+      const rows = store.activeMonthRowCounts?.[source.dataKey] ?? countDataRows(data);
       const hasData = data.length > 0 && rows > 0;
       const persistedValidation = store.fileValidations?.[source.fileKey] as ValidationResult | null | undefined;
       const validation = hasData
@@ -397,7 +397,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
         <div>
           <h2 className="text-sm font-bold text-text-primary">Data Health</h2>
           <p className="text-[11px] text-text-muted mt-1">
-            Status input data sebelum KPI diproses.
+            Status input data bulan aktif sebelum KPI diproses.
           </p>
         </div>
         <div className="grid grid-cols-2 sm:flex gap-2 text-[11px] font-bold">
@@ -412,6 +412,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
         <div>
           <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Total Rows</div>
           <div className="text-lg font-black text-text-primary mt-0.5">{summary.rows}</div>
+          <div className="text-[10px] text-text-muted mt-0.5">Bulan aktif saja</div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Known Agents</div>
@@ -580,7 +581,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-text-primary truncate">{item.label}</div>
                   <div className="text-[10px] text-text-muted mt-1">
-                    {item.rows > 0 ? `${item.rows} rows detected` : 'No data detected'}
+                    {item.rows > 0 ? `${item.rows} rows detected bulan aktif` : 'No data detected'}
                   </div>
                   {item.fileName && (
                     <div className="text-[10px] text-text-muted mt-1 truncate" title={item.fileName}>

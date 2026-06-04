@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
-import { ValidationResult } from './lib/csvValidator';
+import { countDataRows, ValidationResult } from './lib/csvValidator';
 import { fetchAllSheets, getCurrentSheetMonthKey, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
 
 function formatLocalDate(year: number, month: number, day: number) {
@@ -29,6 +29,7 @@ export interface AppState {
   sheetsFetchError: string | null;
   lastSyncTime: Date | null;
   selectedSheetMonth: string;
+  activeMonthRowCounts: Record<string, number> | null;
   
   // Sheet configuration
   sheetsConfig: {
@@ -97,6 +98,7 @@ export const useStore = create<AppState>((set, get) => ({
   sheetsFetchError: null,
   lastSyncTime: null,
   selectedSheetMonth: getCurrentSheetMonthKey(),
+  activeMonthRowCounts: null,
   sheetsConfig: null,
 
   productivityFile: null,
@@ -225,6 +227,7 @@ export const useStore = create<AppState>((set, get) => ({
       agentDictionary: {},
       fileValidations: {},
       fileNames: {},
+      activeMonthRowCounts: null,
       selectedBpo: 'All BPO',
       selectedTL: 'All TL',
       persistedKeys: []
@@ -334,6 +337,14 @@ export const useStore = create<AppState>((set, get) => ({
       const sheetConfig = getSheetConfigForMonth(selectedMonth);
       const monthOption = getSheetMonthOption(selectedMonth);
       const currentMonthData = await fetchAllSheets(sheetConfig);
+      const currentMonthRows = {
+        csidData: countDataRows(sheetDataToParseResult(currentMonthData.csid).data),
+        productivityData: countDataRows(sheetDataToParseResult(currentMonthData.productivity).data),
+        csatScData: countDataRows(sheetDataToParseResult(currentMonthData.csatSc).data),
+        slaData: countDataRows(sheetDataToParseResult(currentMonthData.sla).data),
+        scheduleData: countDataRows(sheetDataToParseResult(currentMonthData.schedule).data),
+        qaData: countDataRows(sheetDataToParseResult(currentMonthData.qa).data),
+      };
       const previousMonthKey = getPreviousSheetMonthKey(selectedMonth);
       const allData = previousMonthKey
         ? mergeAllSheetsData(
@@ -411,6 +422,7 @@ export const useStore = create<AppState>((set, get) => ({
         qaData: csvQa.data,
 
         agentDictionary: newAgentDict,
+        activeMonthRowCounts: currentMonthRows,
         lastSyncTime: new Date(),
         isFetchingSheets: false,
         dataSource: 'sheets',
