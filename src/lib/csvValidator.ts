@@ -193,34 +193,48 @@ export function validateSlaFile(parsedData: any[][]): ValidationResult {
   const base = getBaseIssues(parsedData);
   if (base && base.errorType !== 'FEW_ROWS') return base;
 
-  const slaKeywords = [
-    'sla', '1m', '3m', '1 menit', '3 menit', '1min', '3min',
-    'time', 'response', 'tanggal', 'date', 'agent', 'cs id',
-    'menit', 'min', 'tiket', 'ticket', 'duration', 'durasi',
-    'first', 'reply', 'respond', 'wait', 'pickup', 'antri',
-    'queue', 'csid', 'company', 'csat'
-  ];
-
-  const rowsToScan = parsedData.slice(0, 10);
-  let keywordFound = false;
-
-  for (const row of rowsToScan) {
-    if (!row || !Array.isArray(row)) continue;
-    for (const cell of row) {
-      const cellText = String(cell || '').toLowerCase().trim();
-      if (slaKeywords.some(kw => cellText.includes(kw))) {
-        keywordFound = true;
-        break;
-      }
+  const parseSlaLikeProcessor = (value: unknown): number | null => {
+    const clean = String(value || '').replace(',', '.').trim();
+    if (!clean) return null;
+    if (clean.includes('%')) {
+      const pct = parseFloat(clean.replace('%', ''));
+      return Number.isNaN(pct) ? null : pct;
     }
-    if (keywordFound) break;
+    const n = parseFloat(clean);
+    return Number.isNaN(n) ? null : n * 100;
+  };
+
+  let rowsWithCsId = 0;
+  let rowsWithSlaValue = 0;
+
+  for (let i = 1; i < parsedData.length; i++) {
+    const row = parsedData[i];
+    if (!row || !Array.isArray(row)) continue;
+
+    const idIdx = row.findIndex(cell => String(cell || '').trim().startsWith('3-1-'));
+    if (idIdx === -1) continue;
+
+    rowsWithCsId++;
+
+    const sla1 = parseSlaLikeProcessor(row[idIdx + 11]);
+    const sla3 = parseSlaLikeProcessor(row[idIdx + 13]);
+    if (sla1 !== null || sla3 !== null) rowsWithSlaValue++;
   }
 
-  if (!keywordFound) {
+  if (rowsWithCsId === 0) {
     return {
       isValid: false,
-      errorType: 'MISSING_COLUMN',
-      message: 'Indikator file SLA tidak ditemukan.',
+      errorType: 'MISSING_CSID',
+      message: 'Tidak menemukan baris SLA dengan CS ID format 3-1-....',
+      severity: 'warning'
+    };
+  }
+
+  if (rowsWithSlaValue === 0) {
+    return {
+      isValid: false,
+      errorType: 'MISSING_SLA_VALUE',
+      message: 'CS ID ditemukan, tapi nilai SLA di kolom relatif +11/+13 tidak terbaca.',
       severity: 'warning'
     };
   }
