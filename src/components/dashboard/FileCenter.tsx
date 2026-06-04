@@ -147,6 +147,55 @@ const getCoverageStatus = (covered: number, total: number): CoverageStatus => {
   return covered >= total ? 'ok' : 'partial';
 };
 
+const getProductivityDuplicateHealth = (data: any[][]) => {
+  const seen = new Map<string, { count: number; label: string }>();
+
+  for (let r = 2; r < data.length; r++) {
+    const row = data[r];
+    if (!row || row.length < 2) continue;
+
+    const idIdx = row.findIndex((cell) =>
+      String(cell || "")
+        .trim()
+        .startsWith("3-1-"),
+    );
+    if (idIdx === -1) continue;
+
+    const rawDate = String(row[0] || "").trim();
+    const normDate = normalizeDateStr(rawDate) || rawDate;
+    const agentId = String(row[idIdx] || "").trim();
+    const productivity = String(row[idIdx + 8] || "").trim();
+    const csatOfficial = String(row[idIdx + 1] || "").trim();
+    const whu = String(row[idIdx + 15] || "").trim();
+    const scoreDistribution = [3, 4, 5, 6, 7].map((idx) => String(row[idx] || "").trim()).join("/");
+
+    const key = [
+      agentId,
+      normDate,
+      productivity,
+      csatOfficial,
+      whu,
+      scoreDistribution,
+    ].join("|").toLowerCase();
+
+    if (!agentId || !normDate) continue;
+
+    const label = `${agentId} | ${normDate} | prod ${productivity || "0"} | CSAT ${scoreDistribution}`;
+    const current = seen.get(key);
+    seen.set(key, current ? { ...current, count: current.count + 1 } : { count: 1, label });
+  }
+
+  const duplicates = Array.from(seen.values())
+    .filter((item) => item.count > 1)
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    duplicateGroups: duplicates.length,
+    duplicateRows: duplicates.reduce((sum, item) => sum + item.count - 1, 0),
+    samples: duplicates.slice(0, 5),
+  };
+};
+
 const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
   const store = useStore() as any;
 
@@ -292,6 +341,10 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
   ]);
 
   const totalInvalidDates = dateChecks.reduce((sum, check) => sum + check.invalid, 0);
+  const productivityDuplicateHealth = React.useMemo(
+    () => getProductivityDuplicateHealth((store.productivityData || []) as any[][]),
+    [store.productivityData],
+  );
   const criticalCoverageIssues = coverageItems.filter((item) => (
     item.dataKey === 'productivityData' || item.dataKey === 'scheduleData'
   ) && item.missingIds.length > 0);
@@ -327,6 +380,14 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
       detail: totalInvalidDates > 0
         ? 'Ada tanggal yang tidak bisa dibaca, filter tanggal bisa tidak akurat.'
         : 'Format tanggal terbaca normal.',
+    },
+    {
+      title: 'Productivity duplicate suspect',
+      count: productivityDuplicateHealth.duplicateRows,
+      tone: productivityDuplicateHealth.duplicateRows > 0 ? 'warning' : 'success',
+      detail: productivityDuplicateHealth.duplicateRows > 0
+        ? `${productivityDuplicateHealth.duplicateGroups} group suspect duplicate. Review data pusat sebelum dedupe otomatis.`
+        : 'Tidak ada exact duplicate suspect di Productivity.',
     },
   ];
 
@@ -454,6 +515,59 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
               </p>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="p-4 border-b border-border">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+          <div>
+            <h3 className="text-xs font-bold text-text-primary">Duplicate Watch</h3>
+            <p className="text-[10px] text-text-muted mt-1">
+              Audit suspect duplicate tanpa mengubah hasil KPI.
+            </p>
+          </div>
+          <span className={cn(
+            'rounded-lg border px-2 py-1 text-[10px] font-bold',
+            productivityDuplicateHealth.duplicateRows > 0
+              ? 'bg-warning/5 border-warning/20 text-warning'
+              : 'bg-success/5 border-success/20 text-success'
+          )}>
+            Productivity {productivityDuplicateHealth.duplicateRows} rows
+          </span>
+        </div>
+        <div className="rounded-lg border border-border bg-surface/20 p-3">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-bold text-text-primary">Productivity / CSAT Official / WHU</div>
+              <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
+                Detector memakai exact key dari CS ID, tanggal, productivity, CSAT distribution, CSAT official, dan WHU. Ini hanya warning karena row productivity bisa punya pola agregasi khusus.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
+              <div className="rounded-lg border border-border bg-card px-3 py-2">
+                <div className="font-black text-text-primary">{productivityDuplicateHealth.duplicateGroups}</div>
+                <div className="text-text-muted">groups</div>
+              </div>
+              <div className="rounded-lg border border-border bg-card px-3 py-2">
+                <div className="font-black text-text-primary">{productivityDuplicateHealth.duplicateRows}</div>
+                <div className="text-text-muted">extra rows</div>
+              </div>
+            </div>
+          </div>
+          {productivityDuplicateHealth.samples.length > 0 ? (
+            <div className="mt-3 space-y-1.5">
+              {productivityDuplicateHealth.samples.map((sample, index) => (
+                <div key={`${sample.label}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-warning/20 bg-warning/5 px-3 py-2 text-[10px]">
+                  <span className="min-w-0 truncate text-warning" title={sample.label}>{sample.label}</span>
+                  <span className="shrink-0 font-bold text-warning">x{sample.count}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-lg border border-success/20 bg-success/5 px-3 py-2 text-[10px] font-semibold text-success">
+              Tidak ada suspect duplicate productivity saat ini.
+            </div>
+          )}
         </div>
       </div>
 
