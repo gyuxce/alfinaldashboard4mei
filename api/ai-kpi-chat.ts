@@ -60,7 +60,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           ],
           generationConfig: {
             temperature: 0.35,
-            maxOutputTokens: 700,
+            maxOutputTokens: 1200,
           },
         }),
       },
@@ -85,9 +85,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         ?.map((part: { text?: string }) => part.text || '')
         .join('')
         .trim() || '';
+    const finishReason = payload?.candidates?.[0]?.finishReason;
 
     return res.status(200).json({
-      answer: answer || 'Gemini tidak mengembalikan jawaban.',
+      answer: answer
+        ? finishReason === 'MAX_TOKENS'
+          ? `${answer}\n\nCatatan: jawaban terpotong karena batas output Gemini. Coba minta versi lebih singkat.`
+          : answer
+        : 'Gemini tidak mengembalikan jawaban.',
     });
   } catch (error) {
     return res.status(500).json({
@@ -114,7 +119,9 @@ function buildPrompt({
     'Gunakan hanya data dashboard yang diberikan. Kalau data tidak cukup, bilang data belum tersedia.',
     'Jangan mengarang angka, nama agent, atau penyebab yang tidak ada di context.',
     'Saat memberi saran coaching, kaitkan dengan metrik seperti CSAT, QA, SLA, WHU, productivity, defect, dan RCA.',
-    'Batasi jawaban maksimal 6 bullet atau 3 paragraf pendek.',
+    'Jawaban harus selesai utuh, jangan berhenti di tengah kalimat.',
+    'Batasi jawaban maksimal 5 bullet pendek. Tiap bullet maksimal 1 kalimat.',
+    'Jika pertanyaan meminta ringkasan, gunakan format: Performa umum, risiko utama, penyebab, saran aksi.',
     '',
     'CONTEXT DASHBOARD:',
     JSON.stringify(context, null, 2).slice(0, 18000),

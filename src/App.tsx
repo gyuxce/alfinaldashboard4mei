@@ -962,6 +962,7 @@ export default function App() {
         data={kpiData}
         activeTab={activeTab}
         filters={aiBotFilters}
+        onOpenFilters={() => setIsMobileFilterOpen(true)}
       />
     </div>
   );

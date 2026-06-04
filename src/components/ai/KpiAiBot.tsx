@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Loader2, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { Bot, Loader2, RotateCcw, Send, Sparkles, UserCheck, X } from 'lucide-react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { cn } from '../../lib/utils';
 
@@ -11,6 +11,7 @@ type ChatMessage = {
 type KpiAiBotProps = {
   data: AgentKPI[];
   activeTab: string;
+  onOpenFilters?: () => void;
   filters: {
     bpo: string;
     teamLeader: string;
@@ -22,23 +23,24 @@ type KpiAiBotProps = {
 };
 
 const starterQuestions = [
-  'Ringkas performa filter saat ini',
-  'Agent mana yang perlu diprioritaskan coaching?',
-  'Apa penyebab risiko CSAT/QA terbesar?',
+  'Ringkas performa agent ini',
+  'Apa risiko utama performa agent ini?',
+  'Buatkan saran coaching singkat',
 ];
 
-export function KpiAiBot({ data, activeTab, filters }: KpiAiBotProps) {
+const initialMessage: ChatMessage = {
+  role: 'assistant',
+  content: 'Halo, saya KPI AI Bot. Pilih 1 agent dulu di filter dashboard, lalu saya bantu baca performa agent tersebut.',
+};
+
+export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [input, setInput] = React.useState('');
-  const [messages, setMessages] = React.useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      content: 'Halo, saya KPI AI Bot. Saya bisa bantu baca performa dari data yang sedang terfilter di dashboard.',
-    },
-  ]);
+  const [messages, setMessages] = React.useState<ChatMessage[]>([initialMessage]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const isAgentSelected = filters.agent !== 'All Agents' && filters.agent.trim() !== '';
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -47,9 +49,20 @@ export function KpiAiBot({ data, activeTab, filters }: KpiAiBotProps) {
 
   const context = React.useMemo(() => buildKpiContext(data, activeTab, filters), [activeTab, data, filters]);
 
+  const resetChat = () => {
+    setInput('');
+    setError('');
+    setIsLoading(false);
+    setMessages([initialMessage]);
+  };
+
   const sendMessage = async (override?: string) => {
     const message = (override || input).trim();
     if (!message || isLoading) return;
+    if (!isAgentSelected) {
+      setError('Pilih 1 agent dulu di filter dashboard sebelum memakai KPI AI.');
+      return;
+    }
 
     const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: message }];
     setMessages(nextMessages);
@@ -107,24 +120,58 @@ export function KpiAiBot({ data, activeTab, filters }: KpiAiBotProps) {
               <div className="min-w-0">
                 <h3 className="text-sm font-black text-text-primary">KPI AI Bot</h3>
                 <p className="truncate text-[11px] text-text-muted">
-                  {context.scope.agent || context.scope.teamLeader || context.scope.bpo || 'Data filter aktif'}
+                  {isAgentSelected ? context.scope.agent : 'Pilih agent dulu'}
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
-              aria-label="Close KPI AI Bot"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={resetChat}
+                className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
+                aria-label="Reset KPI AI Bot"
+                title="Kembali ke menu awal"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
+                aria-label="Close KPI AI Bot"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-card p-3">
-            <div className="rounded-xl border border-border bg-surface/40 p-3 text-[11px] leading-relaxed text-text-muted">
-              Bot membaca <span className="font-bold text-text-primary">{context.summary.agentCount}</span> agent dari filter saat ini. Jawaban dibatasi dari data dashboard, bukan raw sheet.
-            </div>
+            {isAgentSelected ? (
+              <div className="rounded-xl border border-border bg-surface/40 p-3 text-[11px] leading-relaxed text-text-muted">
+                Bot membaca <span className="font-bold text-text-primary">{context.summary.agentCount}</span> agent dari filter saat ini. Jawaban dibatasi dari data dashboard, bukan raw sheet.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-[11px] leading-relaxed text-warning">
+                <div className="flex items-start gap-2">
+                  <UserCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <div className="font-black text-warning">Pilih 1 agent dulu</div>
+                    <p className="mt-1 text-warning/90">
+                      KPI AI dikunci per agent supaya jawabannya tidak melebar ke semua agent.
+                    </p>
+                    {onOpenFilters && (
+                      <button
+                        type="button"
+                        onClick={onOpenFilters}
+                        className="mt-2 rounded-lg border border-warning/30 bg-card px-2.5 py-1 text-[10px] font-bold text-warning transition-colors hover:bg-warning/10"
+                      >
+                        Buka filter agent
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {messages.map((message, index) => (
               <div
@@ -148,7 +195,7 @@ export function KpiAiBot({ data, activeTab, filters }: KpiAiBotProps) {
             )}
           </div>
 
-          {messages.length <= 1 && (
+          {isAgentSelected && messages.length <= 1 && (
             <div className="grid shrink-0 grid-cols-1 gap-1.5 border-t border-border bg-surface/40 p-3">
               {starterQuestions.map((question) => (
                 <button
@@ -179,12 +226,13 @@ export function KpiAiBot({ data, activeTab, filters }: KpiAiBotProps) {
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Tanya performa agent/team..."
+              placeholder={isAgentSelected ? "Tanya performa agent ini..." : "Pilih agent dulu di filter..."}
+              disabled={!isAgentSelected}
               className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
             />
             <button
               type="submit"
-              disabled={!input.trim() || isLoading}
+              disabled={!isAgentSelected || !input.trim() || isLoading}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition-colors disabled:cursor-not-allowed disabled:bg-text-disabled"
               aria-label="Send message"
             >
