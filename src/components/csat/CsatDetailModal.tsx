@@ -160,9 +160,9 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
   }, [filteredSurveys]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-start justify-center overflow-y-auto p-2 sm:items-center sm:p-4">
       <div className="bg-card w-full max-w-[98vw] xl:max-w-7xl rounded-xl shadow-2xl flex flex-col max-h-[94vh] sm:max-h-[90vh] border border-border overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-start justify-between p-3 sm:p-4 border-b border-border bg-surface-muted rounded-t-xl relative gap-4 pr-11 sm:pr-12 md:pr-5 overflow-x-hidden">
+        <div className="flex shrink-0 flex-col md:flex-row md:items-start justify-between p-3 sm:p-4 border-b border-border bg-surface-muted rounded-t-xl relative gap-4 pr-11 sm:pr-12 md:pr-5 overflow-x-hidden">
           <div className="flex min-w-0 flex-col gap-3">
             <div>
               <h3 className="font-bold text-base sm:text-lg text-text-primary flex flex-wrap items-center gap-2">
@@ -185,7 +185,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-card space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5 bg-card space-y-4">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             <div className="flex min-w-0 flex-col rounded-lg border border-border bg-surface/40 px-2 py-1.5">
               <span className="truncate text-[8px] font-bold uppercase tracking-wider text-text-muted">Total</span>
