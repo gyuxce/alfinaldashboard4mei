@@ -84,14 +84,32 @@ const getHealthStyles = (status: HealthStatus) => {
   }
 };
 
-const extractCsIds = (data: any[][]) => {
+const extractCsIds = (data: any[][], dataKey: DataSource['dataKey']) => {
   const ids = new Set<string>();
-  data.forEach((row) => {
-    row?.forEach((cell) => {
-      const value = String(cell || '').trim();
-      if (value.startsWith('3-1-')) ids.add(value);
-    });
+
+  const addId = (value: unknown) => {
+    const id = String(value || '').trim();
+    if (id.startsWith('3-1-')) ids.add(id);
+  };
+
+  data.forEach((row, index) => {
+    if (!row || index === 0) return;
+
+    if (dataKey === 'scheduleData') {
+      addId(row[1]);
+      return;
+    }
+
+    if (dataKey === 'qaData') {
+      addId(row[0]);
+      return;
+    }
+
+    if (dataKey === 'productivityData' || dataKey === 'csatScData' || dataKey === 'slaData') {
+      addId(row[3]);
+    }
   });
+
   return ids;
 };
 
@@ -268,7 +286,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
       .filter((source) => source.dataKey !== 'csidData')
       .map((source) => {
         const data = (store[source.dataKey] || []) as any[][];
-        const ids = extractCsIds(data);
+        const ids = extractCsIds(data, source.dataKey);
         const matchedIds = Array.from(ids).filter((id) => masterIds.has(id)).sort();
         const missingIds = masterIdList.filter((id) => !ids.has(id)).sort();
         const coverage = agentCount > 0 ? Math.round((matchedIds.length / agentCount) * 100) : 0;
@@ -299,7 +317,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
       .filter((source) => source.dataKey !== 'csidData')
       .map((source) => {
         const data = (store[source.dataKey] || []) as any[][];
-        const ids = extractCsIds(data);
+        const ids = extractCsIds(data, source.dataKey);
         const orphanIds = Array.from(ids).filter((id) => !masterIds.has(id)).sort();
         return {
           label: source.label,
