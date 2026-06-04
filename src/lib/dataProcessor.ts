@@ -927,6 +927,8 @@ export const processKPIs = (
 
   // 4. QA Score (Index starts at 1)
   if (qaData.length > 1) {
+    const seenQaEntries = new Set<string>();
+
     for (let i = 1; i < qaData.length; i++) {
       const row = qaData[i];
       if (!row || row.length < 16) continue; // Changed from 18 to 16, to at least cover P (Mistake Level)
@@ -964,6 +966,24 @@ export const processKPIs = (
       } else if (scoreStr !== "") {
         score = parseFloat(scoreStr);
       }
+
+      const qaEntryKey = [
+        agentId,
+        normalizeDateStr(dateStr) || dateStr.trim(),
+        ticketId,
+        uid,
+        chatId,
+        caseDate,
+        qcName,
+        mistakeLevel,
+        category,
+        remarks,
+        crmKode,
+        scoreStr,
+      ].join("|").toLowerCase();
+
+      if (seenQaEntries.has(qaEntryKey)) continue;
+      seenQaEntries.add(qaEntryKey);
 
       if (!isNaN(score)) {
         agent.qaScoreSum += score;
