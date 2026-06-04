@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from './store';
-import { processKPIs, getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
+import { processKPIs, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from './lib/dataProcessor';
 import { getPreviousSheetMonthKey, getSheetMonthOption } from './lib/sheetsApi';
 
 import { 
@@ -24,7 +24,8 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
-  Check
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 
 import { cn } from './lib/utils';
@@ -144,6 +145,56 @@ function getMonthOptions() {
   });
 }
 
+function countDataRows(data: any[][]) {
+  if (!data || data.length === 0) return 0;
+  return Math.max(0, data.filter((row) => row?.some((cell) => String(cell || '').trim() !== '')).length - 1);
+}
+
+function extractCsIds(data: any[][]) {
+  const ids = new Set<string>();
+  data.forEach((row) => {
+    row?.forEach((cell) => {
+      const value = String(cell || '').trim();
+      if (value.startsWith('3-1-')) ids.add(value);
+    });
+  });
+  return ids;
+}
+
+function getProductivityDuplicateCount(data: any[][]) {
+  const seen = new Map<string, number>();
+
+  for (let r = 2; r < data.length; r++) {
+    const row = data[r];
+    if (!row || row.length < 2) continue;
+
+    const idIdx = row.findIndex((cell) =>
+      String(cell || "")
+        .trim()
+        .startsWith("3-1-"),
+    );
+    if (idIdx === -1) continue;
+
+    const rawDate = String(row[0] || "").trim();
+    const normDate = normalizeDateStr(rawDate) || rawDate;
+    const agentId = String(row[idIdx] || "").trim();
+    if (!agentId || !normDate) continue;
+
+    const key = [
+      agentId,
+      normDate,
+      String(row[idIdx + 8] || "").trim(),
+      String(row[idIdx + 1] || "").trim(),
+      String(row[idIdx + 15] || "").trim(),
+      [3, 4, 5, 6, 7].map((idx) => String(row[idx] || "").trim()).join("/"),
+    ].join("|").toLowerCase();
+
+    seen.set(key, (seen.get(key) || 0) + 1);
+  }
+
+  return Array.from(seen.values()).reduce((sum, count) => sum + Math.max(0, count - 1), 0);
+}
+
 interface MonthPickerProps {
   value: string;
   options: { value: string; label: string }[];
@@ -227,11 +278,11 @@ export default function App() {
   }, [theme]);
 
   const { 
-    productivityData, csatScData, slaData, scheduleData, qaData, 
+    csidData, productivityData, csatScData, slaData, scheduleData, qaData, 
     startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, selectedAgentFor360, agentDictionary, selectedSheetMonth,
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedAgentFor360,
     isHydrating, hydrateFromStorage,
-    isFetchingSheets, fetchFromSheets, lastSyncTime,
+    isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode
   } = useStore();
 
@@ -262,6 +313,75 @@ export default function App() {
         : `Data aktif: ${activeSheetOption.label}`
       : `Menunggu sync ${activeSheetOption.label}`;
   const syncIsStale = isStaleSync(lastSyncTime);
+  const dataQuality = useMemo(() => {
+    const sourceRows = [
+      { label: 'Master', rows: countDataRows(csidData) },
+      { label: 'Productivity', rows: countDataRows(productivityData) },
+      { label: 'CSAT SC', rows: countDataRows(csatScData) },
+      { label: 'SLA', rows: countDataRows(slaData) },
+      { label: 'Schedule', rows: countDataRows(scheduleData) },
+      { label: 'QA', rows: countDataRows(qaData) },
+    ];
+    const missingSources = sourceRows.filter((source) => source.rows === 0);
+    const masterIds = new Set(Object.keys(agentDictionary || {}));
+    const productivityIds = extractCsIds(productivityData);
+    const scheduleIds = extractCsIds(scheduleData);
+    const missingProductivity = Array.from(masterIds).filter((id) => !productivityIds.has(id)).length;
+    const missingSchedule = Array.from(masterIds).filter((id) => !scheduleIds.has(id)).length;
+    const duplicateProductivityRows = getProductivityDuplicateCount(productivityData);
+
+    let warningCount = 0;
+    if (syncIsStale) warningCount += 1;
+    if (missingProductivity > 0) warningCount += 1;
+    if (missingSchedule > 0) warningCount += 1;
+    if (duplicateProductivityRows > 0) warningCount += 1;
+
+    const errorCount = (sheetsFetchError ? 1 : 0) + missingSources.length;
+    const detailParts = [
+      sheetsFetchError ? 'sync error' : '',
+      missingSources.length ? `${missingSources.length} missing source` : '',
+      missingProductivity ? `${missingProductivity} missing productivity` : '',
+      missingSchedule ? `${missingSchedule} missing schedule` : '',
+      duplicateProductivityRows ? `${duplicateProductivityRows} duplicate suspect` : '',
+      syncIsStale ? 'stale sync' : '',
+    ].filter(Boolean);
+
+    if (errorCount > 0) {
+      return {
+        status: 'error' as const,
+        label: 'Need Review',
+        detail: detailParts.join(' | '),
+        count: errorCount + warningCount,
+      };
+    }
+
+    if (warningCount > 0) {
+      return {
+        status: 'warning' as const,
+        label: `${warningCount} Warning${warningCount > 1 ? 's' : ''}`,
+        detail: detailParts.join(' | '),
+        count: warningCount,
+      };
+    }
+
+    return {
+      status: 'ok' as const,
+      label: 'Data OK',
+      detail: lastSyncTime ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Waiting for sync',
+      count: 0,
+    };
+  }, [
+    agentDictionary,
+    csidData,
+    productivityData,
+    csatScData,
+    slaData,
+    scheduleData,
+    qaData,
+    lastSyncTime,
+    sheetsFetchError,
+    syncIsStale,
+  ]);
 
   const { rawData, previousRawData, previousRawData2, previousRawData3, tlList: baseTlList } = useMemo(() => {
     let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary);
@@ -713,6 +833,26 @@ export default function App() {
                   )}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => setActiveTab('files')}
+                title={dataQuality.detail}
+                className={cn(
+                  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors",
+                  dataQuality.status === 'ok'
+                    ? "border-success/30 bg-success/10 text-success hover:bg-success/15"
+                    : dataQuality.status === 'warning'
+                      ? "border-warning/30 bg-warning/10 text-warning hover:bg-warning/15"
+                      : "border-danger/30 bg-danger-soft text-danger hover:bg-danger-soft/80"
+                )}
+              >
+                {dataQuality.status === 'ok' ? (
+                  <CheckCircle size={13} />
+                ) : (
+                  <AlertTriangle size={13} />
+                )}
+                <span>{dataQuality.label}</span>
+              </button>
               {import.meta.env.VITE_SHEETS_API_KEY && (
                 <button
                   onClick={fetchFromSheets}
