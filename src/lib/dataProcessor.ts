@@ -899,6 +899,8 @@ export const processKPIs = (
   let sla3mSum: Record<string, { sum: number; count: number }> = {};
 
   if (slaData.length > 1) {
+    const seenSlaEntries = new Set<string>();
+
     for (let i = 1; i < slaData.length; i++) {
       const row = slaData[i];
       if (!row || row.length < 2) continue;
@@ -928,6 +930,16 @@ export const processKPIs = (
 
       const sla1 = parseSla(String(row[idIdx + 11] || ""));
       const sla3 = parseSla(String(row[idIdx + 13] || ""));
+
+      const slaEntryKey = [
+        agentId,
+        normDate || dateStr.trim(),
+        String(row[idIdx + 11] || "").trim(),
+        String(row[idIdx + 13] || "").trim(),
+      ].join("|").toLowerCase();
+
+      if (seenSlaEntries.has(slaEntryKey)) continue;
+      seenSlaEntries.add(slaEntryKey);
 
       if (sla1 !== null && !isNaN(sla1)) {
         if (!sla1mSum[agent.csId]) sla1mSum[agent.csId] = { sum: 0, count: 0 };
