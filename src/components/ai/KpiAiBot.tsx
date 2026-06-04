@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Loader2, RotateCcw, Send, Sparkles, UserCheck, X } from 'lucide-react';
+import { Bot, Loader2, Minus, RotateCcw, Send, Sparkles, UserCheck, X } from 'lucide-react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { cn } from '../../lib/utils';
 
@@ -25,6 +25,7 @@ type KpiAiBotProps = {
 const starterQuestions = [
   'Ringkas performa agent ini',
   'Apa risiko utama performa agent ini?',
+  'Cek detail CSAT/QA bermasalah',
   'Buatkan saran coaching singkat',
 ];
 
@@ -40,6 +41,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const lastRequestAtRef = React.useRef(0);
   const isAgentSelected = filters.agent !== 'All Agents' && filters.agent.trim() !== '';
 
   React.useEffect(() => {
@@ -63,6 +65,13 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
       setError('Pilih 1 agent dulu di filter dashboard sebelum memakai KPI AI.');
       return;
     }
+    const now = Date.now();
+    const waitMs = 5000 - (now - lastRequestAtRef.current);
+    if (waitMs > 0) {
+      setError(`Tunggu ${Math.ceil(waitMs / 1000)} detik sebelum kirim pertanyaan lagi agar tidak kena rate limit Gemini.`);
+      return;
+    }
+    lastRequestAtRef.current = now;
 
     const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: message }];
     setMessages(nextMessages);
@@ -138,7 +147,20 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                 type="button"
                 onClick={() => setIsOpen(false)}
                 className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
+                aria-label="Minimize KPI AI Bot"
+                title="Minimize"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetChat();
+                  setIsOpen(false);
+                }}
+                className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
                 aria-label="Close KPI AI Bot"
+                title="Tutup dan reset"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -147,9 +169,14 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
 
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-card p-3">
             {isAgentSelected ? (
-              <div className="rounded-xl border border-border bg-surface/40 p-3 text-[11px] leading-relaxed text-text-muted">
-                Bot membaca <span className="font-bold text-text-primary">{context.summary.agentCount}</span> agent dari filter saat ini. Jawaban dibatasi dari data dashboard, bukan raw sheet.
-              </div>
+              <>
+                <div className="rounded-xl border border-border bg-surface/40 p-3 text-[11px] leading-relaxed text-text-muted">
+                  Bot membaca <span className="font-bold text-text-primary">{context.summary.agentCount}</span> agent dari filter saat ini. Jawaban dibatasi dari data dashboard, bukan raw sheet.
+                </div>
+                <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-[11px] leading-relaxed text-warning">
+                  Agar respons AI tetap stabil, hindari mengirim pertanyaan terlalu cepat. Jika muncul kendala, tunggu 1-2 menit lalu coba lagi.
+                </div>
+              </>
             ) : (
               <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-[11px] leading-relaxed text-warning">
                 <div className="flex items-start gap-2">
@@ -289,6 +316,81 @@ function toAgentSnapshot(agent: AgentKPI) {
     .slice(0, 3)
     .map(([category, count]) => ({ category, count }));
   const topQaCategories = countBy(qaDefects.map(entry => entry.category || 'Uncategorized')).slice(0, 3);
+  const highQaDetails = highQaDefects.slice(0, 5).map(entry => ({
+    date: entry.date || '-',
+    level: entry.mistakeLevel || '-',
+    category: entry.category || '-',
+    crmCode: entry.crmKode || '-',
+    remarks: truncateText(entry.remarks || '-', 260),
+    feedback: truncateText(entry.feedback || '-', 260),
+    ticketId: entry.ticketId || '-',
+    chatId: entry.chatId || '-',
+    uid: entry.uid || '-',
+    qcName: entry.qcName || '-',
+  }));
+  const qaDefectDetails = qaDefects
+    .filter(entry => String(entry.mistakeLevel || '').toLowerCase() !== 'no mistake')
+    .slice(0, 8)
+    .map(entry => ({
+      date: entry.date || '-',
+      level: entry.mistakeLevel || '-',
+      category: entry.category || '-',
+      crmCode: entry.crmKode || '-',
+      deduction: nullableRound(entry.deduction),
+      score: nullableRound(entry.score),
+      remarks: truncateText(entry.remarks || '-', 220),
+      feedback: truncateText(entry.feedback || '-', 220),
+      ticketId: entry.ticketId || '-',
+      chatId: entry.chatId || '-',
+      uid: entry.uid || '-',
+      qcName: entry.qcName || '-',
+    }));
+  const badCsatDetails = (agent.csatHistory || [])
+    .filter(entry => entry.score === 1 || entry.score === 2)
+    .slice(0, 8)
+    .map(entry => ({
+      date: entry.date || '-',
+      score: entry.score,
+      category: entry.category || '-',
+      response: truncateText(entry.response || '-', 220),
+      isTakeout: Boolean(entry.isTakeout),
+      rcaAgent: entry.rcaAgent || '-',
+      rcaCustomer: entry.rcaCustomer || '-',
+      rcaProcess: entry.rcaAkulaku || '-',
+      ticketId: entry.ticketId || '-',
+      chatId: entry.chatId || '-',
+      uid: entry.uid || '-',
+    }));
+  const csatScoreCounts = {
+    score5: agent.csat5Count || 0,
+    score4: agent.csat4Count || 0,
+    score3: agent.csat3Count || 0,
+    score2: agent.csat2Count || 0,
+    score1: agent.csat1Count || 0,
+  };
+  const scheduleStatusCounts = countBy((agent.dailyHistory.schedule || []).map(entry => entry.status || 'Unknown'));
+  const recentSchedule = [...(agent.dailyHistory.schedule || [])]
+    .slice(-10)
+    .map(entry => ({
+      date: entry.date,
+      status: entry.status,
+      isManDay: entry.isManDay,
+    }));
+  const trendSamples = {
+    productivity: recentHistory(agent.dailyHistory.productivity),
+    csatOfficial: recentHistory(agent.dailyHistory.csat),
+    csatScFull: recentHistory(agent.dailyHistory.csatScFull.map(entry => ({ date: entry.date, value: entry.score }))),
+    csatScTakeout: recentHistory(agent.dailyHistory.csatScFair.map(entry => ({ date: entry.date, value: entry.score }))),
+    sla1m: recentHistory(agent.dailyHistory.sla1m),
+    sla3m: recentHistory(agent.dailyHistory.sla3m),
+    whu: recentHistory(agent.dailyHistory.whu),
+  };
+  const rcaBreakdown = {
+    agentArea: topEntries(agent.rcaAgentAreaCounts || {}, 5),
+    customerArea: topEntries(agent.rcaCustomerAreaCounts || {}, 5),
+    processArea: topEntries(agent.rcaAkulakuProcessCounts || {}, 5),
+    totalCases: agent.rcaTotalCases || 0,
+  };
 
   const riskScore =
     (agent.csatScBadScoreFullCount || 0) * 3 +
@@ -316,7 +418,15 @@ function toAgentSnapshot(agent: AgentKPI) {
     whu: nullableRound(agent.whu),
     attendanceScore: round(agent.attendanceScore || 0),
     topCsatCategories,
+    csatScoreCounts,
+    badCsatDetails,
     topQaCategories,
+    qaDefectDetails,
+    highQaDetails,
+    rcaBreakdown,
+    scheduleStatusCounts,
+    recentSchedule,
+    trendSamples,
     riskScore: round(riskScore),
   };
 }
@@ -327,6 +437,22 @@ function countBy(values: string[]) {
   return Array.from(counts.entries())
     .sort((a, b) => b[1] - a[1])
     .map(([label, count]) => ({ label, count }));
+}
+
+function topEntries(record: Record<string, number>, limit: number) {
+  return Object.entries(record)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([label, count]) => ({ label, count }));
+}
+
+function recentHistory(entries: Array<{ date: string; value: number }>, limit = 10) {
+  return entries
+    .slice(-limit)
+    .map(entry => ({
+      date: entry.date,
+      value: round(entry.value),
+    }));
 }
 
 function average(values: number[]) {
@@ -345,4 +471,10 @@ function nullableRound(value: number | null | undefined) {
 
 function round(value: number) {
   return Number(value.toFixed(2));
+}
+
+function truncateText(value: string, maxLength: number) {
+  const clean = String(value || '').trim();
+  if (clean.length <= maxLength) return clean;
+  return `${clean.slice(0, maxLength - 3)}...`;
 }

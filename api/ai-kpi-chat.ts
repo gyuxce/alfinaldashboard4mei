@@ -75,7 +75,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const isQuota = response.status === 429;
       return res.status(response.status).json({
         error: isQuota
-          ? `Gemini menolak request untuk model ${model}. Biasanya ini karena quota/rate limit, model tidak punya free quota di project ini, atau free tier sedang throttling. Detail: ${geminiMessage}`
+          ? `Gemini menolak request untuk model ${model}. Biasanya ini karena limit per menit/free tier sedang throttling, walau batas harian belum habis. Tunggu 1-2 menit lalu coba lagi. Detail: ${geminiMessage}`
           : geminiMessage,
       });
     }
@@ -119,6 +119,10 @@ function buildPrompt({
     'Gunakan hanya data dashboard yang diberikan. Kalau data tidak cukup, bilang data belum tersedia.',
     'Jangan mengarang angka, nama agent, atau penyebab yang tidak ada di context.',
     'Saat memberi saran coaching, kaitkan dengan metrik seperti CSAT, QA, SLA, WHU, productivity, defect, dan RCA.',
+    'Kamu bisa membaca semua area dashboard dari context: productivity, CSAT official, CSAT SC/takeout, badCsatDetails, QA, qaDefectDetails, highQaDetails, SLA, WHU, attendance/schedule, RCA, trendSamples, dan ranking risiko.',
+    'Jika user bertanya CSAT, pakai csatScoreCounts, topCsatCategories, badCsatDetails, dan rcaBreakdown.',
+    'Jika user bertanya QA, pakai topQaCategories, qaDefectDetails, highQaDetails, crmCode, remarks, feedback, ticket/chat, dan qcName.',
+    'Jika user bertanya SLA/WHU/Productivity/Schedule, pakai nilai metrik utama dan trendSamples/recentSchedule.',
     'Jawaban harus selesai utuh, jangan berhenti di tengah kalimat.',
     'Batasi jawaban maksimal 5 bullet pendek. Tiap bullet maksimal 1 kalimat.',
     'Jika pertanyaan meminta ringkasan, gunakan format: Performa umum, risiko utama, penyebab, saran aksi.',
