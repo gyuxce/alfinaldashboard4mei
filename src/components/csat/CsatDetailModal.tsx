@@ -1,7 +1,7 @@
 import React from 'react';
 import { AgentKPI, CSATEntry } from '../../lib/dataProcessor';
 import { parseDateForSort, cn } from '../../lib/utils';
-import { AlertCircle, X, ChevronUp, ChevronDown, Star, Copy, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, X, ChevronUp, ChevronDown, Star, Copy } from 'lucide-react';
 import { EmptyState } from '../ui/EmptyState';
 
 const CopyButton = ({ text }: { text: string }) => {
@@ -31,15 +31,32 @@ interface CsatDetailModalProps {
   viewMode: 'full' | 'fair';
 }
 
+type DetailFilter = {
+  type: 'category' | 'agent';
+  value: string;
+  scoreScope: 'all' | 'bad';
+};
+
 export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
   title, subtitle, surveys, agentType, modalType = 'agent', onClose, expandedDates, toggleExpandDate, viewMode
 }) => {
   const filteredSurveys = surveys.filter(h => (viewMode === 'full' || !h.isTakeout) && h.score > 0);
-  const [selectedDetailFilter, setSelectedDetailFilter] = React.useState<{type: 'category' | 'agent', value: string} | null>(null);
+  const [selectedDetailFilter, setSelectedDetailFilter] = React.useState<DetailFilter | null>(null);
+
+  const toggleDetailFilter = (nextFilter: DetailFilter) => {
+    setSelectedDetailFilter(prev =>
+      prev?.type === nextFilter.type &&
+      prev.value === nextFilter.value &&
+      prev.scoreScope === nextFilter.scoreScope
+        ? null
+        : nextFilter
+    );
+  };
 
   const tableSurveys = React.useMemo(() => {
     if (!selectedDetailFilter) return filteredSurveys;
     return filteredSurveys.filter(s => {
+      if (selectedDetailFilter.scoreScope === 'bad' && s.score !== 1 && s.score !== 2) return false;
       if (selectedDetailFilter.type === 'category') return s.category === selectedDetailFilter.value;
       if (selectedDetailFilter.type === 'agent') return s.agentName === selectedDetailFilter.value || s.csId === selectedDetailFilter.value;
       return true;
@@ -144,8 +161,8 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-card w-full max-w-[98vw] xl:max-w-7xl rounded-xl shadow-2xl flex flex-col max-h-[94vh] sm:max-h-[90vh] border border-border">
-        <div className="flex flex-col md:flex-row md:items-start justify-between p-3 sm:p-5 border-b border-border bg-surface-muted rounded-t-xl relative gap-4 pr-11 sm:pr-12 md:pr-5 overflow-x-hidden">
+      <div className="bg-card w-full max-w-[98vw] xl:max-w-7xl rounded-xl shadow-2xl flex flex-col max-h-[94vh] sm:max-h-[90vh] border border-border overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-start justify-between p-3 sm:p-4 border-b border-border bg-surface-muted rounded-t-xl relative gap-4 pr-11 sm:pr-12 md:pr-5 overflow-x-hidden">
           <div className="flex min-w-0 flex-col gap-3">
             <div>
               <h3 className="font-bold text-base sm:text-lg text-text-primary flex flex-wrap items-center gap-2">
@@ -158,57 +175,6 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                 </p>
               )}
             </div>
-            
-            <div className="flex w-full min-w-0 flex-col items-stretch gap-3 md:ml-7 md:mt-2">
-              <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-                <div className="flex min-w-0 flex-col px-2 sm:px-3 py-2 bg-card rounded-lg border border-border shadow-sm sm:min-w-[80px]">
-                  <span className="text-[9px] text-text-muted uppercase tracking-wider font-bold mb-1">Total Surveys</span>
-                  <span className="text-base font-black text-text-primary">
-                    {filteredSurveys.length}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col px-2 sm:px-3 py-2 bg-success/5 rounded-lg border border-success/20 shadow-sm sm:min-w-[80px]">
-                  <span className="text-[9px] text-success uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 fill-current" /> 5 Total
-                  </span>
-                  <span className="text-base font-black text-success">
-                    {scoreCounts[5] || 0}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col px-2 sm:px-3 py-2 bg-success/5 rounded-lg border border-success/20 shadow-sm sm:min-w-[80px]">
-                  <span className="text-[9px] text-success/80 uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 fill-current" /> 4 Total
-                  </span>
-                  <span className="text-base font-black text-success/80">
-                    {scoreCounts[4] || 0}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col px-2 sm:px-3 py-2 bg-warning/5 rounded-lg border border-warning/20 shadow-sm sm:min-w-[80px]">
-                  <span className="text-[9px] text-warning uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 fill-current" /> 3 Total
-                  </span>
-                  <span className="text-base font-black text-warning">
-                    {scoreCounts[3] || 0}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col px-2 sm:px-3 py-2 bg-orange-500/5 rounded-lg border border-orange-500/20 shadow-sm sm:min-w-[80px]">
-                  <span className="text-[9px] text-orange-500 uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 fill-current" /> 2 Total
-                  </span>
-                  <span className="text-base font-black text-orange-500">
-                    {scoreCounts[2] || 0}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col px-2 sm:px-3 py-2 bg-danger/5 rounded-lg border border-danger/20 shadow-sm sm:min-w-[80px]">
-                  <span className="text-[9px] text-danger uppercase tracking-wider font-bold mb-1 flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 fill-current" /> 1 Total
-                  </span>
-                  <span className="text-base font-black text-danger">
-                    {scoreCounts[1] || 0}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
           
           <button 
@@ -220,6 +186,33 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
         </div>
         
         <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-card space-y-4">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <div className="flex min-w-0 flex-col rounded-lg border border-border bg-surface/40 px-2 py-1.5">
+              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-text-muted">Total</span>
+              <span className="text-sm font-black text-text-primary">{filteredSurveys.length}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-lg border border-success/20 bg-success/5 px-2 py-1.5">
+              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-success">Score 5</span>
+              <span className="text-sm font-black text-success">{scoreCounts[5] || 0}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-lg border border-success/20 bg-success/5 px-2 py-1.5">
+              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-success/80">Score 4</span>
+              <span className="text-sm font-black text-success/80">{scoreCounts[4] || 0}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-lg border border-warning/20 bg-warning/5 px-2 py-1.5">
+              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-warning">Score 3</span>
+              <span className="text-sm font-black text-warning">{scoreCounts[3] || 0}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-lg border border-orange-500/20 bg-orange-500/5 px-2 py-1.5">
+              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-orange-500">Score 2</span>
+              <span className="text-sm font-black text-orange-500">{scoreCounts[2] || 0}</span>
+            </div>
+            <div className="flex min-w-0 flex-col rounded-lg border border-danger/20 bg-danger/5 px-2 py-1.5">
+              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-danger">Score 1</span>
+              <span className="text-sm font-black text-danger">{scoreCounts[1] || 0}</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
             {/* Menu 1: All Scores */}
             {(modalType === 'category' ? topAgentsAll.length > 0 : topCategoriesAll.length > 0) && (
@@ -230,13 +223,18 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-1.5">
                   {(modalType === 'category' ? topAgentsAll : topCategoriesAll).map((item: any, idx) => {
                     const filterValue = item.name;
+                    const filterType = modalType === 'category' ? 'agent' : 'category';
+                    const isSelected =
+                      selectedDetailFilter?.type === filterType &&
+                      selectedDetailFilter.value === filterValue &&
+                      selectedDetailFilter.scoreScope === 'all';
                     return (
                       <button
                         key={`${filterValue}-${idx}`}
-                        onClick={() => setSelectedDetailFilter(prev => prev?.value === filterValue ? null : { type: modalType === 'category' ? 'agent' : 'category', value: filterValue })}
+                        onClick={() => toggleDetailFilter({ type: filterType, value: filterValue, scoreScope: 'all' })}
                         className={cn(
                           "flex min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors",
-                          selectedDetailFilter?.value === filterValue ? 'bg-primary/10 border border-primary/20' : 'border border-transparent hover:bg-surface-muted'
+                          isSelected ? 'bg-primary/10 border border-primary/20' : 'border border-transparent hover:bg-surface-muted'
                         )}
                       >
                         <span className="flex min-w-0 items-center gap-2">
@@ -277,13 +275,18 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-1.5">
                   {(modalType === 'category' ? topAgentsBad : topCategoriesBad).map((item: any, idx) => {
                     const filterValue = item.name;
+                    const filterType = modalType === 'category' ? 'agent' : 'category';
+                    const isSelected =
+                      selectedDetailFilter?.type === filterType &&
+                      selectedDetailFilter.value === filterValue &&
+                      selectedDetailFilter.scoreScope === 'bad';
                     return (
                       <button
                         key={`${filterValue}-${idx}`}
-                        onClick={() => setSelectedDetailFilter(prev => prev?.value === filterValue ? null : { type: modalType === 'category' ? 'agent' : 'category', value: filterValue })}
+                        onClick={() => toggleDetailFilter({ type: filterType, value: filterValue, scoreScope: 'bad' })}
                         className={cn(
                           "flex min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors",
-                          selectedDetailFilter?.value === filterValue ? 'bg-danger/10 border border-danger/20' : 'border border-transparent hover:bg-danger/10'
+                          isSelected ? 'bg-danger/10 border border-danger/20' : 'border border-transparent hover:bg-danger/10'
                         )}
                       >
                         <span className="flex min-w-0 items-center gap-2">
@@ -307,6 +310,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-primary/10 border border-primary/20 rounded-lg text-sm mb-4">
               <span className="font-medium text-text-primary">
                 Menampilkan hasil khusus untuk {selectedDetailFilter.type === 'agent' ? 'Agent' : 'Kategori'}: <span className="font-bold text-primary">{selectedDetailFilter.value}</span>
+                {selectedDetailFilter.scoreScope === 'bad' && <span className="ml-2 rounded bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger">Score 1 & 2 saja</span>}
               </span>
               <button 
                 onClick={() => setSelectedDetailFilter(null)}
