@@ -31,6 +31,7 @@ import {
 import { cn } from './lib/utils';
 
 import { SearchableSelect } from './components/ui/SearchableSelect';
+import { KpiAiBot } from './components/ai/KpiAiBot';
 
 const FileCenter = React.lazy(() => import('./components/dashboard/FileCenter').then(module => ({ default: module.FileCenter })));
 const DashboardSummary = React.lazy(() => import('./components/dashboard/DashboardSummary').then(module => ({ default: module.DashboardSummary })));
@@ -451,6 +452,19 @@ export default function App() {
       agentList: Array.from(agents).sort((a,b) => a.localeCompare(b)) 
     };
   }, [rawData, previousRawData, previousRawData2, previousRawData3, baseTlList, selectedBpo, selectedTL, selectedGlobalAgent]);
+
+  const aiBotFilters = useMemo(() => ({
+    bpo: selectedBpo || 'All BPO',
+    teamLeader: selectedTL || 'All TL',
+    agent: selectedGlobalAgent || 'All Agents',
+    startDate: startDate || '',
+    endDate: endDate || '',
+    comparison: isComparisonEnabled
+      ? comparisonMode === 'mom'
+        ? 'Month over Month'
+        : 'Week over Week / previous period'
+      : 'Off',
+  }), [comparisonMode, endDate, isComparisonEnabled, selectedBpo, selectedGlobalAgent, selectedTL, startDate]);
 
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },
@@ -943,6 +957,12 @@ export default function App() {
           />
         </React.Suspense>
       )}
+
+      <KpiAiBot
+        data={kpiData}
+        activeTab={activeTab}
+        filters={aiBotFilters}
+      />
     </div>
   );
 }
