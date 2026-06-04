@@ -159,7 +159,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
               )}
             </div>
             
-            <div className="flex w-full min-w-0 flex-col items-stretch gap-3 md:ml-7 md:mt-2 xl:flex-row xl:items-start">
+            <div className="flex w-full min-w-0 flex-col items-stretch gap-3 md:ml-7 md:mt-2">
               <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                 <div className="flex min-w-0 flex-col px-2 sm:px-3 py-2 bg-card rounded-lg border border-border shadow-sm sm:min-w-[80px]">
                   <span className="text-[9px] text-text-muted uppercase tracking-wider font-bold mb-1">Total Surveys</span>
@@ -208,146 +208,6 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
                   </span>
                 </div>
               </div>
-
-              <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:gap-4">
-                {/* Menu 1: All Scores */}
-                {(modalType === 'category' ? topAgentsAll.length > 0 : topCategoriesAll.length > 0) && (
-                  <div className="flex min-w-0 flex-col px-3 sm:px-4 py-2 bg-card rounded-lg border border-border shadow-sm flex-1 lg:min-w-[300px]">
-                    <span className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-2">
-                      Top {modalType === 'category' ? topAgentsAll.length : topCategoriesAll.length} {modalType === 'category' ? 'Agents' : 'Categories'} (All Scores 1-5)
-                    </span>
-                    <div className="flex flex-col gap-2">
-                      {modalType === 'category' ? topAgentsAll.map((agent, idx) => (
-                        <div 
-                          key={idx} 
-                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
-                            selectedDetailFilter?.value === agent.name ? 'bg-primary/10 border border-primary/20' : 'hover:bg-surface-muted'
-                          )}
-                          onClick={() => setSelectedDetailFilter(prev => prev?.value === agent.name ? null : {type: 'agent', value: agent.name})}
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate" title={agent.name}>{agent.name}</span>
-                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === agent.name ? 'opacity-100 text-primary' : 'text-text-muted')} />
-                          </div>
-                          <div className="flex min-w-0 items-center shrink-0 justify-end ml-auto">
-                            <span className="font-bold text-text-secondary mr-2">{agent.total}</span>
-                            <div className="flex flex-wrap justify-end gap-1 shrink-0">
-                              {[
-                                { score: 5, count: agent.s5, color: 'bg-success' },
-                                { score: 4, count: agent.s4, color: 'bg-success/80' },
-                                { score: 3, count: agent.s3, color: 'bg-warning' },
-                                { score: 2, count: agent.s2, color: 'bg-orange-500' },
-                                { score: 1, count: agent.s1, color: 'bg-danger' },
-                              ].map(s => s.count > 0 ? (
-                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                                </span>
-                              ) : null)}
-                            </div>
-                          </div>
-                        </div>
-                      )) : topCategoriesAll.map((cat, idx) => (
-                        <div 
-                          key={idx} 
-                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
-                            selectedDetailFilter?.value === cat.name ? 'bg-primary/10 border border-primary/20' : 'hover:bg-surface-muted'
-                          )}
-                          onClick={() => setSelectedDetailFilter(prev => prev?.value === cat.name ? null : {type: 'category', value: cat.name})}
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate" title={cat.name}>{cat.name}</span>
-                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === cat.name ? 'opacity-100 text-primary' : 'text-text-muted')} />
-                          </div>
-                          <div className="flex min-w-0 items-center shrink-0 justify-end ml-auto">
-                            <span className="font-bold text-text-secondary mr-2">{cat.total}</span>
-                            <div className="flex flex-wrap justify-end gap-1 shrink-0">
-                              {[
-                                { score: 5, count: cat.s5, color: 'bg-success' },
-                                { score: 4, count: cat.s4, color: 'bg-success/80' },
-                                { score: 3, count: cat.s3, color: 'bg-warning' },
-                                { score: 2, count: cat.s2, color: 'bg-orange-500' },
-                                { score: 1, count: cat.s1, color: 'bg-danger' },
-                              ].map(s => s.count > 0 ? (
-                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                                </span>
-                              ) : null)}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Menu 2: Bad Scores */}
-                {(modalType === 'category' ? topAgentsBad.length > 0 : topCategoriesBad.length > 0) && (
-                  <div className="flex min-w-0 flex-col px-3 sm:px-4 py-2 bg-card rounded-lg border border-danger/30 shadow-sm flex-1 lg:min-w-[300px]">
-                    <span className="text-[10px] text-danger uppercase tracking-wider font-bold mb-2">
-                      Top {modalType === 'category' ? topAgentsBad.length : topCategoriesBad.length} {modalType === 'category' ? 'Agents' : 'Categories'} (Score 1 & 2 Only)
-                    </span>
-                    <div className="flex flex-col gap-2">
-                      {modalType === 'category' ? topAgentsBad.map((agent, idx) => (
-                        <div 
-                          key={idx} 
-                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
-                            selectedDetailFilter?.value === agent.name ? 'bg-danger/10 border border-danger/20' : 'hover:bg-danger/5'
-                          )}
-                          onClick={() => setSelectedDetailFilter(prev => prev?.value === agent.name ? null : {type: 'agent', value: agent.name})}
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate" title={agent.name}>{agent.name}</span>
-                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === agent.name ? 'opacity-100 text-danger' : 'text-text-muted')} />
-                          </div>
-                          <div className="flex min-w-0 items-center shrink-0 justify-end ml-auto">
-                            <span className="font-bold text-text-secondary mr-2">{agent.s1 + agent.s2}</span>
-                            <div className="flex flex-wrap justify-end gap-1 shrink-0">
-                              {[
-                                { score: 2, count: agent.s2, color: 'bg-orange-500' },
-                                { score: 1, count: agent.s1, color: 'bg-danger' },
-                              ].map(s => s.count > 0 ? (
-                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                                </span>
-                              ) : null)}
-                            </div>
-                          </div>
-                        </div>
-                      )) : topCategoriesBad.map((cat, idx) => (
-                        <div 
-                          key={idx} 
-                          className={cn("flex items-center justify-between gap-2 text-xs py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer group",
-                            selectedDetailFilter?.value === cat.name ? 'bg-danger/10 border border-danger/20' : 'hover:bg-danger/5'
-                          )}
-                          onClick={() => setSelectedDetailFilter(prev => prev?.value === cat.name ? null : {type: 'category', value: cat.name})}
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold text-text-muted w-4 shrink-0">{idx + 1}.</span>
-                            <span className="font-semibold text-text-primary truncate" title={cat.name}>{cat.name}</span>
-                            <Eye className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", selectedDetailFilter?.value === cat.name ? 'opacity-100 text-danger' : 'text-text-muted')} />
-                          </div>
-                          <div className="flex min-w-0 items-center shrink-0 justify-end ml-auto">
-                            <span className="font-bold text-text-secondary mr-2">{cat.s1 + cat.s2}</span>
-                            <div className="flex flex-wrap justify-end gap-1 shrink-0">
-                              {[
-                                { score: 2, count: cat.s2, color: 'bg-orange-500' },
-                                { score: 1, count: cat.s1, color: 'bg-danger' },
-                              ].map(s => s.count > 0 ? (
-                                <span key={s.score} className={`px-1 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-0.5 ${s.color}`}>
-                                  <Star className="w-2 h-2 fill-current" /> {s.score} ({s.count})
-                                </span>
-                              ) : null)}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
           
@@ -359,9 +219,92 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-5 bg-card space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-card space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {/* Menu 1: All Scores */}
+            {(modalType === 'category' ? topAgentsAll.length > 0 : topCategoriesAll.length > 0) && (
+              <div className="min-w-0 rounded-lg border border-border bg-surface/30 p-3">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                  Top {modalType === 'category' ? topAgentsAll.length : topCategoriesAll.length} {modalType === 'category' ? 'Agents' : 'Categories'} (All Scores 1-5)
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-1.5">
+                  {(modalType === 'category' ? topAgentsAll : topCategoriesAll).map((item: any, idx) => {
+                    const filterValue = item.name;
+                    return (
+                      <button
+                        key={`${filterValue}-${idx}`}
+                        onClick={() => setSelectedDetailFilter(prev => prev?.value === filterValue ? null : { type: modalType === 'category' ? 'agent' : 'category', value: filterValue })}
+                        className={cn(
+                          "flex min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors",
+                          selectedDetailFilter?.value === filterValue ? 'bg-primary/10 border border-primary/20' : 'border border-transparent hover:bg-surface-muted'
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="w-4 shrink-0 font-bold text-text-muted">{idx + 1}.</span>
+                          <span className="truncate font-semibold text-text-primary" title={filterValue}>{filterValue}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1">
+                          <span className="font-bold text-text-secondary">{item.total}</span>
+                          {[5, 4, 3, 2, 1].map((score) => {
+                            const count = item[`s${score}`] || 0;
+                            if (count === 0) return null;
+                            return (
+                              <span
+                                key={score}
+                                className={cn(
+                                  "rounded px-1 py-0.5 text-[8px] font-bold text-white",
+                                  score === 5 ? 'bg-success' : score === 4 ? 'bg-success/80' : score === 3 ? 'bg-warning' : score === 2 ? 'bg-orange-500' : 'bg-danger'
+                                )}
+                              >
+                                {score}:{count}
+                              </span>
+                            );
+                          })}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Menu 2: Bad Scores */}
+            {(modalType === 'category' ? topAgentsBad.length > 0 : topCategoriesBad.length > 0) && (
+              <div className="min-w-0 rounded-lg border border-danger/30 bg-danger/5 p-3">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-danger">
+                  Top {modalType === 'category' ? topAgentsBad.length : topCategoriesBad.length} {modalType === 'category' ? 'Agents' : 'Categories'} (Score 1 & 2 Only)
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-1.5">
+                  {(modalType === 'category' ? topAgentsBad : topCategoriesBad).map((item: any, idx) => {
+                    const filterValue = item.name;
+                    return (
+                      <button
+                        key={`${filterValue}-${idx}`}
+                        onClick={() => setSelectedDetailFilter(prev => prev?.value === filterValue ? null : { type: modalType === 'category' ? 'agent' : 'category', value: filterValue })}
+                        className={cn(
+                          "flex min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors",
+                          selectedDetailFilter?.value === filterValue ? 'bg-danger/10 border border-danger/20' : 'border border-transparent hover:bg-danger/10'
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="w-4 shrink-0 font-bold text-text-muted">{idx + 1}.</span>
+                          <span className="truncate font-semibold text-text-primary" title={filterValue}>{filterValue}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1">
+                          <span className="font-bold text-text-secondary">{(item.s1 || 0) + (item.s2 || 0)}</span>
+                          {item.s2 > 0 && <span className="rounded bg-orange-500 px-1 py-0.5 text-[8px] font-bold text-white">2:{item.s2}</span>}
+                          {item.s1 > 0 && <span className="rounded bg-danger px-1 py-0.5 text-[8px] font-bold text-white">1:{item.s1}</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           {selectedDetailFilter && (
-            <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-lg text-sm mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-primary/10 border border-primary/20 rounded-lg text-sm mb-4">
               <span className="font-medium text-text-primary">
                 Menampilkan hasil khusus untuk {selectedDetailFilter.type === 'agent' ? 'Agent' : 'Kategori'}: <span className="font-bold text-primary">{selectedDetailFilter.value}</span>
               </span>
