@@ -38,7 +38,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     ? req.body.history.slice(-MAX_HISTORY_ITEMS)
     : [];
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const prompt = buildPrompt({
     message,
     context: req.body?.context,
@@ -69,14 +69,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const payload = await response.json();
 
     if (!response.ok) {
-      const message =
+      const geminiMessage =
         payload?.error?.message ||
         'Gemini API gagal merespons. Coba lagi beberapa saat.';
       const isQuota = response.status === 429;
       return res.status(response.status).json({
         error: isQuota
-          ? 'Limit Gemini free tier sedang habis atau terlalu cepat. Coba lagi nanti.'
-          : message,
+          ? `Gemini menolak request untuk model ${model}. Biasanya ini karena quota/rate limit, model tidak punya free quota di project ini, atau free tier sedang throttling. Detail: ${geminiMessage}`
+          : geminiMessage,
       });
     }
 
