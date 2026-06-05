@@ -71,6 +71,10 @@ export async function fetchSheet(
   return [];
 }
 
+function buildRange(sheetName: string, range: string = 'A:AZ'): string {
+  return `'${sheetName.replace(/'/g, "''")}'!${range}`;
+}
+
 // Fetch semua sheet dari Google Sheets
 export interface AllSheetsData {
   csid: SheetData;
@@ -207,20 +211,44 @@ export function getSheetConfigForMonth(monthKey: string): SheetConfig {
 export async function fetchAllSheets(
   config: SheetConfig = DEFAULT_CONFIG
 ): Promise<AllSheetsData> {
-  // Fetch berurutan supaya Google Sheets API tidak terlalu mudah kena 503.
-  const csid = await fetchSheet(config.csidSheetName);
-  await sleep(250);
-  const productivity = await fetchSheet(config.productivitySheetName);
-  await sleep(250);
-  const csatSc = await fetchSheet(config.csatScSheetName);
-  await sleep(250);
-  const sla = await fetchSheet(config.slaSheetName);
-  await sleep(250);
-  const schedule = await fetchSheet(config.scheduleSheetName);
-  await sleep(250);
-  const qa = await fetchSheet(config.qaSheetName);
-  
-  return { csid, productivity, csatSc, sla, schedule, qa };
+  const sheetEntries = [
+    ['csid', config.csidSheetName],
+    ['productivity', config.productivitySheetName],
+    ['csatSc', config.csatScSheetName],
+    ['sla', config.slaSheetName],
+    ['schedule', config.scheduleSheetName],
+    ['qa', config.qaSheetName],
+  ] as const;
+  const params = new URLSearchParams({ key: API_KEY });
+
+  sheetEntries.forEach(([, sheetName]) => {
+    params.append('ranges', buildRange(sheetName));
+  });
+
+  const url = `${BASE_URL}/${SPREADSHEET_ID}/values:batchGet?${params.toString()}`;
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const response = await fetch(url);
+
+    if (response.ok) {
+      const json = await response.json();
+      const valueRanges: Array<{ values?: SheetData }> = json.valueRanges || [];
+      return sheetEntries.reduce((result, [key], index) => {
+        result[key] = valueRanges[index]?.values || [];
+        return result;
+      }, {} as AllSheetsData);
+    }
+
+    const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
+    if (!shouldRetry) {
+      const apiMessage = await readGoogleSheetsError(response);
+      throw buildSheetFetchError('beberapa tab Google Sheets', response.status, response.statusText, apiMessage);
+    }
+
+    await sleep(1000 * Math.pow(2, attempt));
+  }
+
+  return { csid: [], productivity: [], csatSc: [], sla: [], schedule: [], qa: [] };
 }
 
 function mergeSheetData(previous: SheetData, current: SheetData): SheetData {

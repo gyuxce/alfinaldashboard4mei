@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Loader2, Minus, RotateCcw, Send, Sparkles, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, Bot, Loader2, Minus, Send, Sparkles, UserCheck, X } from 'lucide-react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { cn } from '../../lib/utils';
 
@@ -158,10 +158,10 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                 type="button"
                 onClick={resetChat}
                 className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
-                aria-label="Reset Lumi"
-                title="Kembali ke menu awal"
+                aria-label="Kembali ke menu awal Lumi"
+                title="Kembali"
               >
-                <RotateCcw className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" />
               </button>
               <button
                 type="button"
