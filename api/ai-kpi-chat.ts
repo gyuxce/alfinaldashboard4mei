@@ -128,6 +128,8 @@ function buildPrompt({
     'Jika user bertanya CSAT, pakai csatScoreCounts, topCsatCategories, badCsatDetails, dan rcaBreakdown.',
     'Jika user bertanya QA, pakai topQaCategories, qaDefectDetails, highQaDetails, crmCode, remarks, feedback, ticket/chat, dan qcName.',
     'Jika user bertanya SLA/WHU/Productivity/Schedule, pakai nilai metrik utama dan trendSamples/recentSchedule.',
+    'Jika user meminta Private Coaching atau DMAIC, susun jawaban dengan bagian Define, Measure, Analyze, Improve, Control secara singkat.',
+    'Untuk coaching, gunakan bahasa yang suportif dan berbasis tindakan, bukan menghakimi agent.',
     'Jawaban harus selesai utuh, jangan berhenti di tengah kalimat.',
     'Jangan pakai emoji.',
     'Jangan pakai markdown asterisk (*), bold (**), atau numbering panjang.',

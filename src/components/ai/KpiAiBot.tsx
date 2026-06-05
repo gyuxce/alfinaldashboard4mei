@@ -23,10 +23,21 @@ type KpiAiBotProps = {
 };
 
 const starterQuestions = [
-  'Ringkas performa agent ini',
-  'Apa risiko utama performa agent ini?',
-  'Cek detail CSAT/QA bermasalah',
-  'Buatkan saran coaching singkat',
+  {
+    title: 'Performa Agent',
+    description: 'Ringkasan KPI, risiko, dan area fokus.',
+    prompt: 'Ringkas performa agent ini dari KPI utama, risiko terbesar, dan area fokus perbaikan.',
+  },
+  {
+    title: 'Detail CSAT & QA',
+    description: 'Bedah CSAT rendah dan defect QA.',
+    prompt: 'Cek detail CSAT dan QA agent ini. Fokus pada score CSAT rendah, defect QA, kategori, level, dan penyebab yang terlihat dari data.',
+  },
+  {
+    title: 'Private Coaching',
+    description: 'Draft coaching DMAIC dan action plan.',
+    prompt: 'Buat private coaching berbasis DMAIC untuk agent ini. Gunakan format Define, Measure, Analyze, Improve, Control dengan action plan singkat dan kalimat yang coaching-friendly.',
+  },
 ];
 
 const initialMessage: ChatMessage = {
@@ -226,12 +237,13 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
             <div className="grid shrink-0 grid-cols-1 gap-1.5 border-t border-border bg-surface/40 p-3">
               {starterQuestions.map((question) => (
                 <button
-                  key={question}
+                  key={question.title}
                   type="button"
-                  onClick={() => sendMessage(question)}
+                  onClick={() => sendMessage(question.prompt)}
                   className="rounded-xl border border-border bg-card px-3 py-2 text-left text-[11px] font-semibold text-text-secondary transition-colors hover:bg-primary-soft hover:text-primary"
                 >
-                  {question}
+                  <span className="block text-xs font-black text-text-primary">{question.title}</span>
+                  <span className="mt-0.5 block font-medium leading-snug text-text-muted">{question.description}</span>
                 </button>
               ))}
             </div>
