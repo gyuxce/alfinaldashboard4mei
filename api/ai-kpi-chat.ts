@@ -22,10 +22,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
-      error: 'GEMINI_API_KEY belum diset di environment Vercel.',
+      error: 'OPENROUTER_API_KEY belum diset di environment Vercel.',
     });
   }
 
@@ -38,7 +38,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     ? req.body.history.slice(-MAX_HISTORY_ITEMS)
     : [];
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const baseUrl = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+  const model = process.env.OPENROUTER_MODEL || 'openrouter/auto';
   const prompt = buildPrompt({
     message,
     context: req.body?.context,
@@ -46,60 +47,64 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   });
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.35,
-            maxOutputTokens: 1200,
-          },
-        }),
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'https://vercel.app',
+        'X-Title': process.env.OPENROUTER_APP_NAME || 'KPI Dashboard',
       },
-    );
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Kamu adalah KPI AI Bot untuk dashboard internal contact center.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.35,
+        max_tokens: 1200,
+      }),
+    });
 
     const payload = await response.json();
 
     if (!response.ok) {
-      const geminiMessage =
+      const providerMessage =
         payload?.error?.message ||
-        'Gemini API gagal merespons. Coba lagi beberapa saat.';
+        payload?.message ||
+        'OpenRouter gagal merespons. Coba lagi beberapa saat.';
       const isQuota = response.status === 429;
       return res.status(response.status).json({
         error: isQuota
-          ? `Gemini menolak request untuk model ${model}. Biasanya ini karena limit per menit/free tier sedang throttling, walau batas harian belum habis. Tunggu 1-2 menit lalu coba lagi. Detail: ${geminiMessage}`
-          : geminiMessage,
+          ? `OpenRouter menolak request untuk model ${model}. Biasanya ini karena rate limit, provider sedang penuh, atau limit akun/model. Tunggu 1-2 menit lalu coba lagi. Detail: ${providerMessage}`
+          : providerMessage,
       });
     }
 
     const answer =
-      payload?.candidates?.[0]?.content?.parts
-        ?.map((part: { text?: string }) => part.text || '')
-        .join('')
+      String(payload?.choices?.[0]?.message?.content || '')
         .trim() || '';
-    const finishReason = payload?.candidates?.[0]?.finishReason;
+    const finishReason = payload?.choices?.[0]?.finish_reason;
 
     return res.status(200).json({
       answer: answer
-        ? finishReason === 'MAX_TOKENS'
-          ? `${answer}\n\nCatatan: jawaban terpotong karena batas output Gemini. Coba minta versi lebih singkat.`
+        ? finishReason === 'length'
+          ? `${answer}\n\nCatatan: jawaban terpotong karena batas output AI. Coba minta versi lebih singkat.`
           : answer
-        : 'Gemini tidak mengembalikan jawaban.',
+        : 'OpenRouter tidak mengembalikan jawaban.',
     });
   } catch (error) {
     return res.status(500).json({
       error:
         error instanceof Error
           ? error.message
-          : 'Terjadi error saat menghubungi Gemini API.',
+          : 'Terjadi error saat menghubungi OpenRouter API.',
     });
   }
 }

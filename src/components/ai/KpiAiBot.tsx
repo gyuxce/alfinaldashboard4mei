@@ -68,7 +68,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
     const now = Date.now();
     const waitMs = 5000 - (now - lastRequestAtRef.current);
     if (waitMs > 0) {
-      setError(`Tunggu ${Math.ceil(waitMs / 1000)} detik sebelum kirim pertanyaan lagi agar tidak kena rate limit Gemini.`);
+      setError(`Tunggu ${Math.ceil(waitMs / 1000)} detik sebelum kirim pertanyaan lagi agar respons AI tetap stabil.`);
       return;
     }
     lastRequestAtRef.current = now;
