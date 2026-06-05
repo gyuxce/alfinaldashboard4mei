@@ -6,6 +6,18 @@ import { cn } from '../../lib/utils';
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
+  intent?: 'summary' | 'detail' | 'coaching';
+};
+
+type CoachingStatus = 'read' | 'understood' | 'needs_tl';
+
+type CoachingRecord = {
+  id: string;
+  agent: string;
+  period: string;
+  content: string;
+  status: CoachingStatus | null;
+  createdAt: string;
 };
 
 type KpiAiBotProps = {
@@ -27,16 +39,19 @@ const starterQuestions = [
     title: 'Performa Agent',
     description: 'Ringkasan KPI, risiko, dan area fokus.',
     prompt: 'Ringkas performa agent ini dari KPI utama, risiko terbesar, dan area fokus perbaikan.',
+    intent: 'summary' as const,
   },
   {
     title: 'Detail CSAT & QA',
     description: 'Bedah CSAT rendah dan defect QA.',
     prompt: 'Cek detail CSAT dan QA agent ini. Fokus pada score CSAT rendah, defect QA, kategori, level, dan penyebab yang terlihat dari data.',
+    intent: 'detail' as const,
   },
   {
     title: 'Private Coaching',
     description: 'Draft coaching DMAIC dan action plan.',
     prompt: 'Buat private coaching berbasis DMAIC untuk agent ini. Gunakan format Define, Measure, Analyze, Improve, Control dengan action plan singkat dan kalimat yang coaching-friendly.',
+    intent: 'coaching' as const,
   },
 ];
 
@@ -51,6 +66,8 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
   const [messages, setMessages] = React.useState<ChatMessage[]>([initialMessage]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [coachingRecords, setCoachingRecords] = React.useState<CoachingRecord[]>([]);
+  const [coachingStatuses, setCoachingStatuses] = React.useState<Record<string, CoachingStatus>>({});
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const lastRequestAtRef = React.useRef(0);
   const isAgentSelected = filters.agent !== 'All Agents' && filters.agent.trim() !== '';
@@ -61,6 +78,18 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
   }, [isOpen, messages, isLoading]);
 
   const context = React.useMemo(() => buildKpiContext(data, activeTab, filters), [activeTab, data, filters]);
+  const coachingPeriod = `${filters.startDate || 'awal'} - ${filters.endDate || 'akhir'}`;
+  const coachingKey = `${filters.agent}|${coachingPeriod}`;
+
+  React.useEffect(() => {
+    try {
+      setCoachingRecords(JSON.parse(localStorage.getItem('lumi-coaching-records') || '[]'));
+      setCoachingStatuses(JSON.parse(localStorage.getItem('lumi-coaching-statuses') || '{}'));
+    } catch {
+      setCoachingRecords([]);
+      setCoachingStatuses({});
+    }
+  }, []);
 
   const resetChat = () => {
     setInput('');
@@ -69,7 +98,41 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
     setMessages([initialMessage]);
   };
 
-  const sendMessage = async (override?: string) => {
+  const saveCoachingRecord = (content: string) => {
+    const record: CoachingRecord = {
+      id: `${coachingKey}|${Date.now()}`,
+      agent: filters.agent,
+      period: coachingPeriod,
+      content,
+      status: coachingStatuses[coachingKey] || null,
+      createdAt: new Date().toISOString(),
+    };
+    const nextRecords = [record, ...coachingRecords].slice(0, 50);
+    setCoachingRecords(nextRecords);
+    localStorage.setItem('lumi-coaching-records', JSON.stringify(nextRecords));
+  };
+
+  const updateCoachingStatus = (status: CoachingStatus) => {
+    const nextStatuses = { ...coachingStatuses, [coachingKey]: status };
+    const nextRecords = coachingRecords.map(record =>
+      record.agent === filters.agent && record.period === coachingPeriod
+        ? { ...record, status }
+        : record,
+    );
+    setCoachingStatuses(nextStatuses);
+    setCoachingRecords(nextRecords);
+    localStorage.setItem('lumi-coaching-statuses', JSON.stringify(nextStatuses));
+    localStorage.setItem('lumi-coaching-records', JSON.stringify(nextRecords));
+  };
+
+  const isCoachingSaved = (content: string) =>
+    coachingRecords.some(record =>
+      record.agent === filters.agent &&
+      record.period === coachingPeriod &&
+      record.content === content,
+    );
+
+  const sendMessage = async (override?: string, intent?: ChatMessage['intent']) => {
     const message = (override || input).trim();
     if (!message || isLoading) return;
     if (!isAgentSelected) {
@@ -84,7 +147,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
     }
     lastRequestAtRef.current = now;
 
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: message }];
+    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: message, intent }];
     setMessages(nextMessages);
     setInput('');
     setError('');
@@ -106,7 +169,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
         throw new Error(payload?.error || 'AI bot gagal merespons.');
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: payload.answer || 'Tidak ada jawaban.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: payload.answer || 'Tidak ada jawaban.', intent }]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Terjadi error pada AI bot.';
       setError(message);
@@ -211,19 +274,60 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
               </div>
             )}
 
-            {messages.map((message, index) => (
-              <div
-                key={`${message.role}-${index}`}
-                className={cn(
-                  'max-w-[88%] whitespace-pre-line rounded-2xl px-3 py-2 text-sm leading-relaxed',
-                  message.role === 'user'
-                    ? 'ml-auto bg-primary text-white'
-                    : 'mr-auto border border-border bg-surface text-text-primary',
-                )}
-              >
-                {message.content}
-              </div>
-            ))}
+            {messages.map((message, index) => {
+              const canSaveCoaching = message.role === 'assistant' && message.intent === 'coaching';
+              const saved = canSaveCoaching && isCoachingSaved(message.content);
+              const currentStatus = coachingStatuses[coachingKey];
+
+              return (
+                <div key={`${message.role}-${index}`} className={cn(message.role === 'user' ? 'ml-auto' : 'mr-auto', 'max-w-[88%]')}>
+                  <div
+                    className={cn(
+                      'whitespace-pre-line rounded-2xl px-3 py-2 text-sm leading-relaxed',
+                      message.role === 'user'
+                        ? 'bg-primary text-white'
+                        : 'border border-border bg-surface text-text-primary',
+                    )}
+                  >
+                    {message.content}
+                  </div>
+
+                  {canSaveCoaching && (
+                    <div className="mt-2 rounded-xl border border-border bg-surface/60 p-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => saveCoachingRecord(message.content)}
+                          disabled={saved}
+                          className="rounded-lg border border-primary/20 bg-primary-soft px-2.5 py-1 text-[10px] font-black text-primary transition-colors hover:bg-primary/10 disabled:cursor-default disabled:border-success/30 disabled:bg-success/10 disabled:text-success"
+                        >
+                          {saved ? 'Coaching tersimpan' : 'Simpan coaching'}
+                        </button>
+                        {[
+                          ['read', 'Sudah baca'],
+                          ['understood', 'Paham action plan'],
+                          ['needs_tl', 'Butuh review TL'],
+                        ].map(([status, label]) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => updateCoachingStatus(status as CoachingStatus)}
+                            className={cn(
+                              'rounded-lg border px-2.5 py-1 text-[10px] font-bold transition-colors',
+                              currentStatus === status
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-border bg-card text-text-muted hover:bg-primary-soft hover:text-primary',
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             {isLoading && (
               <div className="mr-auto flex max-w-[88%] items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2 text-sm text-text-muted">
@@ -239,7 +343,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                 <button
                   key={question.title}
                   type="button"
-                  onClick={() => sendMessage(question.prompt)}
+                  onClick={() => sendMessage(question.prompt, question.intent)}
                   className="rounded-xl border border-border bg-card px-3 py-2 text-left text-[11px] font-semibold text-text-secondary transition-colors hover:bg-primary-soft hover:text-primary"
                 >
                   <span className="block text-xs font-black text-text-primary">{question.title}</span>
