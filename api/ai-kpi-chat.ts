@@ -130,6 +130,8 @@ function buildPrompt({
     'Jika user bertanya SLA/WHU/Productivity/Schedule, pakai nilai metrik utama dan trendSamples/recentSchedule.',
     'Jika user meminta Private Coaching atau DMAIC, susun jawaban dengan bagian Define, Measure, Analyze, Improve, Control secara singkat.',
     'Untuk coaching, gunakan bahasa yang suportif dan berbasis tindakan, bukan menghakimi agent.',
+    'Wajib awali jawaban dengan 1 baris "Dasar data:" yang menyebut scope/periode/metric utama yang benar-benar ada di context.',
+    'Contoh singkat: "Dasar data: Agent A, periode 1-30 Juni 2026, QA 32 evaluasi, CSAT Official 4.2."',
     'Jawaban harus selesai utuh, jangan berhenti di tengah kalimat.',
     'Jangan pakai emoji.',
     'Jangan pakai markdown asterisk (*), bold (**), atau numbering panjang.',
