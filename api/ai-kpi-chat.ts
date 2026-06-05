@@ -3,6 +3,7 @@ type ApiRequest = {
   body?: {
     message?: string;
     context?: unknown;
+    intent?: 'summary' | 'detail' | 'coaching';
     history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   };
 };
@@ -14,7 +15,7 @@ type ApiResponse = {
 };
 
 const MAX_MESSAGE_LENGTH = 1200;
-const MAX_HISTORY_ITEMS = 8;
+const MAX_HISTORY_ITEMS = 4;
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') {
@@ -43,6 +44,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const prompt = buildPrompt({
     message,
     context: req.body?.context,
+    intent: req.body?.intent || 'summary',
     history,
   });
 
@@ -68,7 +70,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
         ],
         temperature: 0.35,
-        max_tokens: 1200,
+        max_tokens: 900,
       }),
     });
 
@@ -112,10 +114,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 function buildPrompt({
   message,
   context,
+  intent,
   history,
 }: {
   message: string;
   context: unknown;
+  intent: 'summary' | 'detail' | 'coaching';
   history: Array<{ role: 'user' | 'assistant'; content: string }>;
 }) {
   return [
@@ -141,10 +145,11 @@ function buildPrompt({
     'Jika pertanyaan meminta ringkasan, gunakan format: Performa umum, risiko utama, penyebab, saran aksi.',
     '',
     'CONTEXT DASHBOARD:',
-    JSON.stringify(context, null, 2).slice(0, 18000),
+    `Mode context: ${intent}`,
+    JSON.stringify(context, null, 2).slice(0, 12000),
     '',
     'RIWAYAT CHAT TERAKHIR:',
-    JSON.stringify(history, null, 2).slice(0, 6000),
+    JSON.stringify(history, null, 2).slice(0, 3000),
     '',
     `PERTANYAAN USER: ${message}`,
   ].join('\n');

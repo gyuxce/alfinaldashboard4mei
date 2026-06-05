@@ -6,8 +6,10 @@ import { cn } from '../../lib/utils';
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
-  intent?: 'summary' | 'detail' | 'coaching';
+  intent?: ChatIntent;
 };
+
+type ChatIntent = 'summary' | 'detail' | 'coaching';
 
 type KpiAiBotProps = {
   data: AgentKPI[];
@@ -64,7 +66,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [isOpen, messages, isLoading]);
 
-  const context = React.useMemo(() => buildKpiContext(data, activeTab, filters), [activeTab, data, filters]);
+  const context = React.useMemo(() => buildKpiContext(data, activeTab, filters, 'summary'), [activeTab, data, filters]);
 
   const resetChat = () => {
     setInput('');
@@ -73,7 +75,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
     setMessages([initialMessage]);
   };
 
-  const sendMessage = async (override?: string, intent?: ChatMessage['intent']) => {
+  const sendMessage = async (override?: string, intent?: ChatIntent) => {
     const message = (override || input).trim();
     if (!message || isLoading) return;
     if (!isAgentSelected) {
@@ -88,7 +90,9 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
     }
     lastRequestAtRef.current = now;
 
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: message, intent }];
+    const resolvedIntent = intent || inferChatIntent(message);
+    const requestContext = buildKpiContext(data, activeTab, filters, resolvedIntent);
+    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: message, intent: resolvedIntent }];
     setMessages(nextMessages);
     setInput('');
     setError('');
@@ -100,8 +104,9 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
-          context,
-          history: nextMessages.slice(-8),
+          intent: resolvedIntent,
+          context: requestContext,
+          history: nextMessages.slice(-4),
         }),
       });
 
@@ -110,7 +115,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
         throw new Error(payload?.error || 'AI bot gagal merespons.');
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: payload.answer || 'Tidak ada jawaban.', intent }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: payload.answer || 'Tidak ada jawaban.', intent: resolvedIntent }]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Terjadi error pada AI bot.';
       setError(message);
@@ -288,8 +293,13 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
   );
 }
 
-function buildKpiContext(data: AgentKPI[], activeTab: string, filters: KpiAiBotProps['filters']) {
-  const agents = data.map(toAgentSnapshot);
+function buildKpiContext(
+  data: AgentKPI[],
+  activeTab: string,
+  filters: KpiAiBotProps['filters'],
+  intent: ChatIntent,
+) {
+  const agents = data.map(agent => toAgentSnapshot(agent, intent));
   const riskAgents = [...agents]
     .sort((a, b) => b.riskScore - a.riskScore)
     .slice(0, 8);
@@ -321,7 +331,11 @@ function buildKpiContext(data: AgentKPI[], activeTab: string, filters: KpiAiBotP
   };
 }
 
-function toAgentSnapshot(agent: AgentKPI) {
+function toAgentSnapshot(agent: AgentKPI, intent: ChatIntent) {
+  const includeIssueDetails = intent === 'detail' || intent === 'coaching';
+  const detailLimit = intent === 'detail' ? 8 : intent === 'coaching' ? 3 : 0;
+  const detailTextLimit = intent === 'detail' ? 220 : 150;
+  const trendLimit = intent === 'summary' ? 5 : 4;
   const qaScore = agent.qaScoreCount > 0 ? agent.qaScoreSum / agent.qaScoreCount : null;
   const qaDefects = agent.qaHistory || [];
   const highQaDefects = qaDefects.filter(entry =>
@@ -332,21 +346,21 @@ function toAgentSnapshot(agent: AgentKPI) {
     .slice(0, 3)
     .map(([category, count]) => ({ category, count }));
   const topQaCategories = countBy(qaDefects.map(entry => entry.category || 'Uncategorized')).slice(0, 3);
-  const highQaDetails = highQaDefects.slice(0, 5).map(entry => ({
+  const highQaDetails = includeIssueDetails ? highQaDefects.slice(0, detailLimit).map(entry => ({
     date: entry.date || '-',
     level: entry.mistakeLevel || '-',
     category: entry.category || '-',
     crmCode: entry.crmKode || '-',
-    remarks: truncateText(entry.remarks || '-', 260),
-    feedback: truncateText(entry.feedback || '-', 260),
+    remarks: truncateText(entry.remarks || '-', detailTextLimit),
+    feedback: truncateText(entry.feedback || '-', detailTextLimit),
     ticketId: entry.ticketId || '-',
     chatId: entry.chatId || '-',
     uid: entry.uid || '-',
     qcName: entry.qcName || '-',
-  }));
-  const qaDefectDetails = qaDefects
+  })) : [];
+  const qaDefectDetails = includeIssueDetails ? qaDefects
     .filter(entry => String(entry.mistakeLevel || '').toLowerCase() !== 'no mistake')
-    .slice(0, 8)
+    .slice(0, detailLimit)
     .map(entry => ({
       date: entry.date || '-',
       level: entry.mistakeLevel || '-',
@@ -354,21 +368,21 @@ function toAgentSnapshot(agent: AgentKPI) {
       crmCode: entry.crmKode || '-',
       deduction: nullableRound(entry.deduction),
       score: nullableRound(entry.score),
-      remarks: truncateText(entry.remarks || '-', 220),
-      feedback: truncateText(entry.feedback || '-', 220),
+      remarks: truncateText(entry.remarks || '-', detailTextLimit),
+      feedback: truncateText(entry.feedback || '-', detailTextLimit),
       ticketId: entry.ticketId || '-',
       chatId: entry.chatId || '-',
       uid: entry.uid || '-',
       qcName: entry.qcName || '-',
-    }));
-  const badCsatDetails = (agent.csatHistory || [])
+    })) : [];
+  const badCsatDetails = includeIssueDetails ? (agent.csatHistory || [])
     .filter(entry => entry.score === 1 || entry.score === 2)
-    .slice(0, 8)
+    .slice(0, detailLimit)
     .map(entry => ({
       date: entry.date || '-',
       score: entry.score,
       category: entry.category || '-',
-      response: truncateText(entry.response || '-', 220),
+      response: truncateText(entry.response || '-', detailTextLimit),
       isTakeout: Boolean(entry.isTakeout),
       rcaAgent: entry.rcaAgent || '-',
       rcaCustomer: entry.rcaCustomer || '-',
@@ -376,7 +390,7 @@ function toAgentSnapshot(agent: AgentKPI) {
       ticketId: entry.ticketId || '-',
       chatId: entry.chatId || '-',
       uid: entry.uid || '-',
-    }));
+    })) : [];
   const csatScoreCounts = {
     score5: agent.csat5Count || 0,
     score4: agent.csat4Count || 0,
@@ -385,18 +399,18 @@ function toAgentSnapshot(agent: AgentKPI) {
     score1: agent.csat1Count || 0,
   };
   const trendSamples = {
-    productivity: recentHistory(agent.dailyHistory.productivity),
-    csatOfficial: recentHistory(agent.dailyHistory.csat),
-    csatScFull: recentHistory(agent.dailyHistory.csatScFull.map(entry => ({ date: entry.date, value: entry.score }))),
-    csatScTakeout: recentHistory(agent.dailyHistory.csatScFair.map(entry => ({ date: entry.date, value: entry.score }))),
-    sla1m: recentHistory(agent.dailyHistory.sla1m),
-    sla3m: recentHistory(agent.dailyHistory.sla3m),
-    whu: recentHistory(agent.dailyHistory.whu),
+    productivity: recentHistory(agent.dailyHistory.productivity, trendLimit),
+    csatOfficial: recentHistory(agent.dailyHistory.csat, trendLimit),
+    csatScFull: recentHistory(agent.dailyHistory.csatScFull.map(entry => ({ date: entry.date, value: entry.score })), trendLimit),
+    csatScTakeout: recentHistory(agent.dailyHistory.csatScFair.map(entry => ({ date: entry.date, value: entry.score })), trendLimit),
+    sla1m: recentHistory(agent.dailyHistory.sla1m, trendLimit),
+    sla3m: recentHistory(agent.dailyHistory.sla3m, trendLimit),
+    whu: recentHistory(agent.dailyHistory.whu, trendLimit),
   };
   const rcaBreakdown = {
-    agentArea: topEntries(agent.rcaAgentAreaCounts || {}, 5),
-    customerArea: topEntries(agent.rcaCustomerAreaCounts || {}, 5),
-    processArea: topEntries(agent.rcaAkulakuProcessCounts || {}, 5),
+    agentArea: topEntries(agent.rcaAgentAreaCounts || {}, includeIssueDetails ? 5 : 3),
+    customerArea: topEntries(agent.rcaCustomerAreaCounts || {}, includeIssueDetails ? 5 : 3),
+    processArea: topEntries(agent.rcaAkulakuProcessCounts || {}, includeIssueDetails ? 5 : 3),
     totalCases: agent.rcaTotalCases || 0,
   };
 
@@ -483,4 +497,24 @@ function truncateText(value: string, maxLength: number) {
   const clean = String(value || '').trim();
   if (clean.length <= maxLength) return clean;
   return `${clean.slice(0, maxLength - 3)}...`;
+}
+
+function inferChatIntent(message: string): ChatIntent {
+  const lower = message.toLowerCase();
+  if (lower.includes('coaching') || lower.includes('dmaic') || lower.includes('action plan')) {
+    return 'coaching';
+  }
+  if (
+    lower.includes('csat') ||
+    lower.includes('qa') ||
+    lower.includes('defect') ||
+    lower.includes('high') ||
+    lower.includes('mistake') ||
+    lower.includes('remarks') ||
+    lower.includes('feedback') ||
+    lower.includes('case')
+  ) {
+    return 'detail';
+  }
+  return 'summary';
 }
