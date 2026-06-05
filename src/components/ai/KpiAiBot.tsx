@@ -27,7 +27,7 @@ const starterQuestions = [
   {
     title: 'Performa Agent',
     description: 'Ringkasan semua KPI dan area fokus.',
-    prompt: 'Ringkas performa agent ini dari semua KPI dashboard: productivity, CSAT official, CSAT takeout, QA, SLA 1 menit, SLA 3 menit, WHU, attendance/schedule, RCA, dan trend. Jangan hanya fokus pada CSAT dan QA.',
+    prompt: 'Ringkas performa agent ini dari KPI dashboard: productivity, CSAT official, CSAT takeout, QA, SLA 1 menit, SLA 3 menit, WHU, attendance, RCA, dan trend. Berikan ringkasan yang mudah dipahami agent serta area fokus perbaikan.',
     intent: 'summary' as const,
   },
   {
@@ -39,7 +39,7 @@ const starterQuestions = [
   {
     title: 'Private Coaching',
     description: 'DMAIC dari semua KPI agent.',
-    prompt: 'Buat private coaching berbasis DMAIC untuk agent ini. Wajib membaca semua KPI dashboard: productivity, CSAT official, CSAT takeout, QA, SLA 1 menit, SLA 3 menit, WHU, attendance/schedule, RCA, dan trend. Gunakan bahasa coaching-friendly dan jangan hanya fokus pada CSAT/QA.',
+    prompt: 'Buat private coaching berbasis DMAIC untuk agent ini dari KPI dashboard: productivity, CSAT official, CSAT takeout, QA, SLA 1 menit, SLA 3 menit, WHU, attendance, RCA, dan trend. Gunakan bahasa yang mudah diterima agent, suportif, dan berisi action plan yang jelas.',
     intent: 'coaching' as const,
   },
 ];
@@ -384,14 +384,6 @@ function toAgentSnapshot(agent: AgentKPI) {
     score2: agent.csat2Count || 0,
     score1: agent.csat1Count || 0,
   };
-  const scheduleStatusCounts = countBy((agent.dailyHistory.schedule || []).map(entry => entry.status || 'Unknown'));
-  const recentSchedule = [...(agent.dailyHistory.schedule || [])]
-    .slice(-10)
-    .map(entry => ({
-      date: entry.date,
-      status: entry.status,
-      isManDay: entry.isManDay,
-    }));
   const trendSamples = {
     productivity: recentHistory(agent.dailyHistory.productivity),
     csatOfficial: recentHistory(agent.dailyHistory.csat),
@@ -440,8 +432,6 @@ function toAgentSnapshot(agent: AgentKPI) {
     qaDefectDetails,
     highQaDetails,
     rcaBreakdown,
-    scheduleStatusCounts,
-    recentSchedule,
     trendSamples,
     riskScore: round(riskScore),
   };
