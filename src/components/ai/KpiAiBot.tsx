@@ -31,7 +31,7 @@ const starterQuestions = [
 
 const initialMessage: ChatMessage = {
   role: 'assistant',
-  content: 'Halo, saya KPI AI Bot. Pilih 1 agent dulu di filter dashboard, lalu saya bantu baca performa agent tersebut.',
+  content: 'Halo, saya Lumi. Pilih 1 agent dulu di filter dashboard, lalu saya bantu baca performa agent tersebut.',
 };
 
 export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotProps) {
@@ -62,7 +62,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
     const message = (override || input).trim();
     if (!message || isLoading) return;
     if (!isAgentSelected) {
-      setError('Pilih 1 agent dulu di filter dashboard sebelum memakai KPI AI.');
+      setError('Pilih 1 agent dulu di filter dashboard sebelum memakai Lumi.');
       return;
     }
     const now = Date.now();
@@ -116,7 +116,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
         )}
       >
         <Bot className="h-5 w-5" />
-        KPI AI
+        Lumi
       </button>
 
       {isOpen && (
@@ -127,7 +127,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                 <Sparkles className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-sm font-black text-text-primary">KPI AI Bot</h3>
+                <h3 className="text-sm font-black text-text-primary">Lumi</h3>
                 <p className="truncate text-[11px] text-text-muted">
                   {isAgentSelected ? context.scope.agent : 'Pilih agent dulu'}
                 </p>
@@ -138,7 +138,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                 type="button"
                 onClick={resetChat}
                 className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
-                aria-label="Reset KPI AI Bot"
+                aria-label="Reset Lumi"
                 title="Kembali ke menu awal"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -147,7 +147,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                 type="button"
                 onClick={() => setIsOpen(false)}
                 className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
-                aria-label="Minimize KPI AI Bot"
+                aria-label="Minimize Lumi"
                 title="Minimize"
               >
                 <Minus className="h-4 w-4" />
@@ -159,7 +159,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                   setIsOpen(false);
                 }}
                 className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
-                aria-label="Close KPI AI Bot"
+                aria-label="Close Lumi"
                 title="Tutup dan reset"
               >
                 <X className="h-4 w-4" />
@@ -184,7 +184,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
                   <div>
                     <div className="font-black text-warning">Pilih 1 agent dulu</div>
                     <p className="mt-1 text-warning/90">
-                      KPI AI dikunci per agent supaya jawabannya tidak melebar ke semua agent.
+                      Lumi dikunci per agent supaya jawabannya tidak melebar ke semua agent.
                     </p>
                     {onOpenFilters && (
                       <button
@@ -204,7 +204,7 @@ export function KpiAiBot({ data, activeTab, filters, onOpenFilters }: KpiAiBotPr
               <div
                 key={`${message.role}-${index}`}
                 className={cn(
-                  'max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-relaxed',
+                  'max-w-[88%] whitespace-pre-line rounded-2xl px-3 py-2 text-sm leading-relaxed',
                   message.role === 'user'
                     ? 'ml-auto bg-primary text-white'
                     : 'mr-auto border border-border bg-surface text-text-primary',
