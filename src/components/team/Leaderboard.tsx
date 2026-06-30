@@ -2,10 +2,60 @@ import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
 import { processKPIs } from "../../lib/dataProcessor";
 import { Trophy, Users, User, ArrowRight } from "lucide-react";
-import { formatNum, getKpiColor } from "../../lib/utils";
+import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
+
+const DAILY_PRODUCTIVITY_TARGET = 100;
+const QUIZ_TARGET = 92;
+
+interface LeaderboardRow {
+  csId?: string;
+  name: string;
+  tl?: string;
+  score: number;
+  qa: number | null;
+  qa_pct: number | null;
+  qa_points: number | null;
+  prod: number | null;
+  prod_pct: number | null;
+  prod_daily_target: number;
+  prod_total_duty: number;
+  prod_target_chat: number;
+  prod_total_chat: number;
+  prod_points: number | null;
+  prod_final_points: number | null;
+  prod_difference: number | null;
+  csat: number | null;
+  csat_pct: number | null;
+  training_total: number | null;
+  training_completion: number | null;
+  training_pct: number;
+  training_points: number;
+  quiz_target: number;
+  quiz_score: number;
+  quiz_pct: number;
+  quiz_points: number;
+}
+
+const getProductivityColumns = (totalChat: number, totalDuty: number) => {
+  const targetChat = totalDuty * DAILY_PRODUCTIVITY_TARGET;
+  const achievement = targetChat > 0 ? (totalChat / targetChat) * 100 : null;
+  const points = achievement !== null ? (achievement / 100) * 20 : null;
+  const finalPoints = points !== null ? Math.min(points, 20) : null;
+
+  return {
+    achievement,
+    targetChat,
+    points,
+    finalPoints,
+    difference:
+      points !== null && finalPoints !== null
+        ? Math.round(points - finalPoints)
+        : null,
+  };
+};
 
 interface AgentKpiRowProps {
   label: string;
@@ -66,7 +116,7 @@ const getScoreColor = (score: number | null): string => {
 
 export const Leaderboard: React.FC = () => {
   const [toggleMode, setToggleMode] = useState<"tl" | "agent">("agent");
-  const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<LeaderboardRow | null>(null);
 
   React.useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -118,7 +168,7 @@ export const Leaderboard: React.FC = () => {
     );
 
     // Prepare Agent List
-    const aList: any[] = [];
+    const aList: LeaderboardRow[] = [];
 
     // Prepare TL aggregations
     const tlMap: Record<
@@ -137,11 +187,17 @@ export const Leaderboard: React.FC = () => {
         prodOrigCount: number;
         csatOrigSum: number;
         csatOrigCount: number;
+        totalDuty: number;
+        totalChat: number;
       }
     > = {};
 
     rawData.forEach((agent) => {
       const composite = calculateAgentCompositeScore(agent);
+      const productivity = getProductivityColumns(
+        agent.productivityTotal,
+        agent.manDays,
+      );
 
       if (composite.score !== null) {
         aList.push({
@@ -151,12 +207,27 @@ export const Leaderboard: React.FC = () => {
           score: composite.score,
           qa: composite.qaOriginal,
           qa_pct: composite.qaPct,
+          qa_points:
+            composite.qaPct !== null ? (composite.qaPct / 100) * 50 : null,
           prod: composite.productivityOriginal,
           prod_pct: composite.productivityPct,
+          prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
+          prod_total_duty: agent.manDays,
+          prod_target_chat: productivity.targetChat,
+          prod_total_chat: agent.productivityTotal,
+          prod_points: productivity.points,
+          prod_final_points: productivity.finalPoints,
+          prod_difference: productivity.difference,
           csat: composite.csatOriginal,
           csat_pct: composite.csatPct,
-          train: 5,
-          quiz: 5,
+          training_total: null,
+          training_completion: null,
+          training_pct: 100,
+          training_points: 5,
+          quiz_target: QUIZ_TARGET,
+          quiz_score: 100,
+          quiz_pct: 100,
+          quiz_points: 5,
         });
       }
 
@@ -178,9 +249,13 @@ export const Leaderboard: React.FC = () => {
             prodOrigCount: 0,
             csatOrigSum: 0,
             csatOrigCount: 0,
+            totalDuty: 0,
+            totalChat: 0,
           };
         }
         tlMap[tl].agents.add(agent.csId);
+        tlMap[tl].totalDuty += agent.manDays;
+        tlMap[tl].totalChat += agent.productivityTotal;
 
         if (composite.qaPct !== null) {
           tlMap[tl].qaPctSum += composite.qaPct;
@@ -204,7 +279,7 @@ export const Leaderboard: React.FC = () => {
     });
 
     // Compute TL composite scores
-    const tList: any[] = [];
+    const tList: LeaderboardRow[] = [];
     Object.entries(tlMap).forEach(([tlName, stats]) => {
       if (stats.agents.size < 3) return; // Fair filter: min 3 agents
 
@@ -225,6 +300,10 @@ export const Leaderboard: React.FC = () => {
         stats.csatOrigCount > 0
           ? stats.csatOrigSum / stats.csatOrigCount
           : null;
+      const productivity = getProductivityColumns(
+        stats.totalChat,
+        stats.totalDuty,
+      );
 
       const composite = calculateCompositeScore({
         qaPct: tl_qa_pct,
@@ -238,12 +317,26 @@ export const Leaderboard: React.FC = () => {
           score: composite.score,
           qa: tl_qa_orig,
           qa_pct: tl_qa_pct,
+          qa_points: tl_qa_pct !== null ? (tl_qa_pct / 100) * 50 : null,
           prod: tl_prod_orig,
           prod_pct: tl_prod_pct,
+          prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
+          prod_total_duty: stats.totalDuty,
+          prod_target_chat: productivity.targetChat,
+          prod_total_chat: stats.totalChat,
+          prod_points: productivity.points,
+          prod_final_points: productivity.finalPoints,
+          prod_difference: productivity.difference,
           csat: tl_csat_orig,
           csat_pct: tl_csat_pct,
-          train: 5,
-          quiz: 5,
+          training_total: null,
+          training_completion: null,
+          training_pct: 100,
+          training_points: 5,
+          quiz_target: QUIZ_TARGET,
+          quiz_score: 100,
+          quiz_pct: 100,
+          quiz_points: 5,
         });
       }
     });
@@ -282,36 +375,7 @@ export const Leaderboard: React.FC = () => {
     );
   }
 
-  const getRankEmoji = (rank: number) => {
-    return rank.toString();
-  };
-
-  const getRowClass = (rank: number) => {
-    if (rank === 1) return "bg-success-soft/30 hover:bg-success-soft/50";
-    return "hover:bg-surface-muted";
-  };
-
   const activeData = toggleMode === "tl" ? tlRows : agentRows;
-
-  const renderVal = (val: number | null, kpiType: "whu" | "qa") => {
-    if (val === null) return <span className="text-text-disabled">-</span>;
-    return (
-      <span className={`font-bold text-[11px] ${getKpiColor(val, kpiType)}`}>
-        {formatNum(val, 1)}%
-      </span>
-    );
-  };
-
-  const renderNeutral = (val: number | null) => {
-    if (val === null) return <span className="text-text-disabled">-</span>;
-    return (
-      <span
-        className={`font-bold text-[11px] ${getKpiColor(val, "productivity")}`}
-      >
-        {formatNum(val, 1)}%
-      </span>
-    );
-  };
 
   const bottomThreeIds = activeData.slice(-3).map(a => a.csId || a.name);
   const isBottomThree = (id: string) => toggleMode === "agent" && bottomThreeIds.includes(id);
@@ -378,137 +442,93 @@ export const Leaderboard: React.FC = () => {
         </button>
       </div>
 
-      <div className="relative w-full overflow-auto bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
-        <table className="w-full text-left text-[10px] whitespace-nowrap min-w-[800px] border-collapse">
-          <thead className="bg-surface text-text-secondary sticky top-0 z-30">
-            <tr>
-              <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">
-                #
-              </th>
-              <th className="p-2 font-bold  md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]">
-                Name
-              </th>
-              {toggleMode === "agent" && (
-                <th className="p-2 font-bold  md:sticky md:left-[310px] z-40 bg-surface min-w-[120px] max-w-[120px]">
-                  Team Leader
+      <div className="relative w-full overflow-auto bg-card border border-border rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
+        <table className="w-full min-w-[2100px] border-collapse whitespace-nowrap text-left text-[10px]">
+          <thead className="sticky top-0 z-30 text-primary-text">
+            <tr className="bg-primary">
+              <th rowSpan={2} className="w-12 border-r border-primary-text/20 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
+              <th rowSpan={2} className="w-[190px] border-r border-primary-text/20 p-2 font-bold md:sticky md:left-12 z-50 bg-primary">Name</th>
+              <th rowSpan={2} className="w-[110px] border-r border-primary-text/20 p-2 font-bold md:sticky md:left-[238px] z-50 bg-primary">Email / CS ID</th>
+              <th rowSpan={2} className="w-[160px] border-r border-primary-text/20 p-2 font-bold md:sticky md:left-[348px] z-50 bg-primary shadow-[8px_0_12px_-10px_rgba(0,0,0,0.8)]">Leader Name</th>
+              <th colSpan={2} className="border-r border-primary-text/20 p-2 text-center font-bold">QC Score (50 Points)</th>
+              <th colSpan={7} className="border-r border-primary-text/20 p-2 text-center font-bold">Productivity (20 Points)</th>
+              <th rowSpan={2} className="w-[90px] border-r border-primary-text/20 p-2 text-center font-bold">CSAT (20 Points)</th>
+              <th colSpan={4} className="border-r border-primary-text/20 p-2 text-center font-bold">Training Completion (5 Points)</th>
+              <th colSpan={4} className="border-r border-primary-text/20 p-2 text-center font-bold">Quiz Score (5 Points)</th>
+              <th rowSpan={2} className="w-[90px] p-2 text-center font-bold">Final Score</th>
+            </tr>
+            <tr className="bg-primary border-t border-primary-text/20">
+              {[
+                "% Ach", "Total Points",
+                "Daily Target", "Total Duty", "Target Chat", "Total Chat", "Total Points", "Final Points", "Difference",
+                "Total Training", "Agent Completion", "% Ach", "Total Points",
+                "Target", "Agent Score", "% Ach", "Total Points",
+              ].map((label, index) => (
+                <th key={`${label}-${index}`} className="min-w-[84px] border-r border-primary-text/20 px-2 py-1.5 text-center font-bold">
+                  {label}
                 </th>
-              )}
-              <th className="p-2 font-bold text-center border-b border-border bg-surface z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                Score
-              </th>
-              <th className="p-2 font-bold text-center z-30 relative bg-surface">
-                QA
-              </th>
-              <th className="p-2 font-bold text-center z-30 relative bg-surface">
-                Prod
-              </th>
-              <th className="p-2 font-bold text-center z-30 relative bg-surface">
-                CSAT
-              </th>
-              <th className="p-2 font-bold text-center z-30 relative bg-surface">
-                Training
-              </th>
-              <th className="p-2 font-bold text-center z-30 relative bg-surface">
-                Quiz
-              </th>
+              ))}
             </tr>
           </thead>
-          <tbody className="">
+          <tbody>
             {activeData.map((item, idx) => {
               const rank = idx + 1;
               const isBottom = isBottomThree(item.csId || item.name);
-              const stickyClass = isBottom ? "bg-danger-soft/30 group-hover:bg-danger-soft/50" : "bg-card group-hover:bg-surface-muted";
+              const stickyClass = isBottom
+                ? "bg-danger-soft group-hover:bg-danger-soft"
+                : "bg-card group-hover:bg-surface-muted";
+              const metricCell = "border-r border-border px-2 py-2 text-center font-semibold text-text-secondary";
+
               return (
                 <tr
                   key={item.csId || item.name}
                   className={cn(
-                    "border-b border-border transition-colors group",
-                    isBottom ? "bg-danger-soft/30 hover:bg-danger-soft/50" : "hover:bg-surface-muted"
+                    "group border-b border-border transition-colors",
+                    isBottom ? "bg-danger-soft/30 hover:bg-danger-soft/50" : "hover:bg-surface-muted",
                   )}
                 >
-                  <td
-                    className={`p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20  min-w-[60px] max-w-[60px] ${stickyClass}`}
-                  >
-                    {isBottom ? (
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[10px] font-bold text-danger-text">
-                          #{rank}
-                        </span>
-                        <span className="text-[8px] bg-danger-soft text-danger-text px-1 rounded font-semibold whitespace-nowrap">
-                          Perlu perhatian
-                        </span>
-                      </div>
-                    ) : (
-                      getRankEmoji(rank)
-                    )}
-                  </td>
-                  <td
-                    className={`p-2 font-medium md:sticky md:left-[60px] z-20  min-w-[250px] max-w-[250px] truncate ${stickyClass}`}
-                  >
-                    <button
-                      onClick={() => setSelectedAgent(item)}
-                      className="text-left hover:underline block"
-                    >
-                      <span className="font-bold text-kpi-neutral-text">
-                        {item.name}
-                      </span>
-                      {isBottom && (
-                        <span className="ml-1 text-[9px] text-danger-text">
-                          Tap untuk analisis
-                        </span>
-                      )}
+                  <td className={`w-12 px-2 py-2 text-center font-bold text-text-muted md:sticky md:left-0 z-20 ${stickyClass}`}>#{rank}</td>
+                  <td className={`w-[190px] max-w-[190px] px-2 py-2 md:sticky md:left-12 z-20 ${stickyClass}`}>
+                    <button onClick={() => setSelectedAgent(item)} className="block max-w-full truncate text-left font-bold text-kpi-neutral-text hover:underline" title={item.name}>
+                      {item.name}
                     </button>
-                    {toggleMode === "agent" && (
-                      <div className="text-[9px] text-text-muted font-normal mt-0.5">
-                        {item.csId}
-                      </div>
-                    )}
                   </td>
-                  {toggleMode === "agent" && (
-                    <td
-                      className={`p-2 font-medium md:sticky md:left-[310px] z-20  min-w-[120px] max-w-[120px] truncate ${stickyClass}`}
-                    >
-                      {item.tl}
-                    </td>
-                  )}
-                  <td className="p-2 text-center z-10 relative">
-                    <span
-                      className={`text-[11px] ${getScoreColor(item.score)}`}
-                    >
-                      {formatNum(item.score, 1)}
-                    </span>
+                  <td className={`w-[110px] max-w-[110px] truncate px-2 py-2 font-medium text-text-secondary md:sticky md:left-[238px] z-20 ${stickyClass}`} title={item.csId || "-"}>
+                    {item.csId || "-"}
                   </td>
-                  <td className="p-2 text-center z-10 relative">
-                    {renderVal(item.qa, "qa")}
+                  <td className={`w-[160px] max-w-[160px] truncate px-2 py-2 font-medium text-text-secondary md:sticky md:left-[348px] z-20 shadow-[8px_0_12px_-10px_rgba(0,0,0,0.5)] ${stickyClass}`} title={item.tl || "-"}>
+                    {item.tl || "-"}
                   </td>
-                  <td className="p-2 text-center z-10 relative">
-                    {renderNeutral(item.prod)}
+
+                  <td className={metricCell}>{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
+                  <td className={metricCell}>{item.qa_points !== null ? formatNum(item.qa_points, 2) : "-"}</td>
+
+                  <td className={metricCell}>{item.prod_daily_target}</td>
+                  <td className={metricCell}>{formatNum(item.prod_total_duty, 0)}</td>
+                  <td className={metricCell}>{formatNum(item.prod_target_chat, 0)}</td>
+                  <td className={metricCell}>{formatNum(item.prod_total_chat, 0)}</td>
+                  <td className={metricCell}>{item.prod_points !== null ? formatNum(item.prod_points, 2) : "-"}</td>
+                  <td className={metricCell}>{item.prod_final_points !== null ? formatNum(item.prod_final_points, 2) : "-"}</td>
+                  <td className={`${metricCell} font-bold ${item.prod_difference !== null && item.prod_difference > 0 ? "text-success-text" : ""}`}>
+                    {item.prod_difference !== null ? item.prod_difference : "-"}
                   </td>
-                  <td className="p-2 text-center z-10 relative">
-                    {item.csat === null ? (
-                      <span className="text-text-disabled">-</span>
-                    ) : item.csat > 5 ? (
-                      renderVal(item.csat, "whu")
-                    ) : (
-                      <span
-                        className={`font-bold text-[11px] ${getKpiColor(
-                          item.csat_pct,
-                          "productivity"
-                        )}`}
-                      >
-                        {formatNum(item.csat, 2)}
-                      </span>
-                    )}
+
+                  <td className={metricCell}>
+                    {item.csat === null ? "-" : item.csat > 5 ? `${formatNum(item.csat, 2)}%` : formatNum(item.csat, 2)}
                   </td>
-                  <td className="p-2 text-center z-10 relative">
-                    <span className="inline-flex items-center gap-1 font-bold text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded-sm">
-                      5/5
-                    </span>
-                  </td>
-                  <td className="p-2 text-center z-10 relative">
-                    <span className="inline-flex items-center gap-1 font-bold text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded-sm">
-                      5/5
-                    </span>
+
+                  <td className={metricCell}>{item.training_total ?? "-"}</td>
+                  <td className={metricCell}>{item.training_completion ?? "-"}</td>
+                  <td className={metricCell}>{formatNum(item.training_pct, 2)}%</td>
+                  <td className={metricCell}>{formatNum(item.training_points, 2)}</td>
+
+                  <td className={metricCell}>{item.quiz_target}%</td>
+                  <td className={metricCell}>{formatNum(item.quiz_score, 2)}%</td>
+                  <td className={metricCell}>{formatNum(item.quiz_pct, 2)}%</td>
+                  <td className={metricCell}>{formatNum(item.quiz_points, 2)}</td>
+
+                  <td className="px-2 py-2 text-center">
+                    <span className={`text-[11px] ${getScoreColor(item.score)}`}>{formatNum(item.score, 2)}</span>
                   </td>
                 </tr>
               );
@@ -516,13 +536,10 @@ export const Leaderboard: React.FC = () => {
 
             {activeData.length === 0 && (
               <tr>
-                <td
-                  colSpan={toggleMode === "agent" ? 9 : 8}
-                  className="p-4 z-10 relative"
-                >
+                <td colSpan={23} className="p-4">
                   <EmptyState
                     title="Tidak ada data leaderboard"
-                    description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah filter global. Untuk mode TL, pastikan TL memiliki minimal 3 agent."
+                    description="Jika belum sync, buka File Center lalu klik Sync Now. Untuk mode TL, pastikan TL memiliki minimal 3 agent."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
                   />
