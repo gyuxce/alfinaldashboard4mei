@@ -877,16 +877,16 @@ export const Leaderboard: React.FC = () => {
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-primary" />
             <div>
-              <h3 className="text-xs font-bold text-text-primary">Development Plan</h3>
-              <p className="text-[9px] text-text-muted">Monthly Bottom 3 tracking</p>
+              <h3 className="text-sm font-bold text-text-primary">Development Plan</h3>
+              <p className="text-[10px] text-text-muted">Monthly Bottom 3 tracking</p>
             </div>
           </div>
-          <span className="text-xs font-black text-text-primary">{developmentRows.length}</span>
+          <span className="text-sm font-black text-text-primary">{developmentRows.length}</span>
         </div>
 
         <div>
           {developmentRows.length > 0 ? (
-            <table className="w-full table-fixed text-left text-[10px]">
+            <table className="w-full table-fixed text-left text-[11px]">
               <thead className="sticky top-0 z-10 bg-surface text-text-muted">
                 <tr className="border-b border-border-strong">
                   <th className="w-[46%] px-3 py-2 font-bold uppercase">Agent</th>
@@ -902,21 +902,21 @@ export const Leaderboard: React.FC = () => {
                     <tr className="align-top">
                       <td className="px-3 py-2.5">
                         <div className="truncate font-bold text-text-primary" title={row.name}>{row.name}</div>
-                        <div className="mt-0.5 truncate text-[9px] text-text-muted" title={`${row.csId} | ${row.tl}`}>
+                        <div className="mt-0.5 truncate text-[10px] text-text-muted" title={`${row.csId} | ${row.tl}`}>
                           {row.csId} | {row.tl}
                         </div>
-                        <div className="mt-1 text-[9px] font-semibold text-text-secondary">
+                        <div className="mt-1 text-[10px] font-semibold text-text-secondary">
                           Bottom terdeteksi {row.bottomCount}x | {row.bottomMonths.join(", ")}
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <span className={cn(
-                          "inline-flex px-1.5 py-0.5 text-[9px] font-black",
+                          "inline-flex px-1.5 py-0.5 text-[10px] font-black",
                           stageMeta ? stageMeta.className : "bg-surface-muted text-text-secondary",
                         )}>
                           {stageMeta ? `Status resmi: ${stageMeta.label}` : "Status resmi: Belum ada"}
                         </span>
-                        <div className="mt-1.5 text-[9px] text-text-secondary">
+                        <div className="mt-1.5 text-[10px] text-text-secondary">
                           {row.currentRank !== null
                             ? `${pendingMeta ? "Peringkat bulan berjalan" : "Peringkat saat Bottom"} #${row.currentRank}`
                             : "Tidak Bottom 3 bulan ini"}
@@ -926,11 +926,11 @@ export const Leaderboard: React.FC = () => {
                     <tr className="border-b border-border last:border-b-0">
                       <td colSpan={2} className="px-3 pb-2.5 pt-0">
                         {pendingMeta && (
-                          <div className="mb-1.5 bg-warning-soft px-2 py-1.5 text-[9px] font-bold leading-relaxed text-warning">
+                          <div className="mb-1.5 bg-warning-soft px-2 py-1.5 text-[10px] font-bold leading-relaxed text-warning">
                             Jika bulan ini ditutup tetap Bottom 3, status menjadi {pendingMeta.label}.
                           </div>
                         )}
-                        <div className="whitespace-normal bg-surface-muted px-2 py-1.5 text-[9px] leading-relaxed text-text-secondary">
+                        <div className="whitespace-normal bg-surface-muted px-2 py-1.5 text-[10px] leading-relaxed text-text-secondary">
                           {row.history.join(" | ")}
                         </div>
                       </td>
