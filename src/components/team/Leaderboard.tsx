@@ -133,6 +133,8 @@ export const Leaderboard: React.FC = () => {
     scheduleData,
     qaData,
     agentDictionary,
+    startDate,
+    endDate,
   } = useStore();
 
   const handleOpenFiles = () => {
@@ -153,7 +155,6 @@ export const Leaderboard: React.FC = () => {
     qaData.length > 0;
 
   const { agentRows, tlRows } = useMemo(() => {
-    // We always compute the unfiltered data for the leaderboard
     if (!hasData) return { agentRows: [], tlRows: [] };
 
     const rawData = processKPIs(
@@ -162,8 +163,8 @@ export const Leaderboard: React.FC = () => {
       slaData,
       scheduleData,
       qaData,
-      "",
-      "",
+      startDate,
+      endDate,
       agentDictionary,
     );
 
@@ -353,6 +354,8 @@ export const Leaderboard: React.FC = () => {
     scheduleData,
     qaData,
     agentDictionary,
+    startDate,
+    endDate,
   ]);
 
   if (!hasData) {
@@ -413,7 +416,7 @@ export const Leaderboard: React.FC = () => {
           Weighted Score: QA 50% &middot; Prod 20% &middot; CSAT 20% &middot; Training 5% &middot; Quiz 5%
         </p>
         <p className="text-[11px] text-text-muted italic mt-0.5">
-          Menampilkan data lengkap, tidak mengikuti filter sidebar
+          Mengikuti periode aktif, ranking mencakup seluruh agent
         </p>
       </div>
 
