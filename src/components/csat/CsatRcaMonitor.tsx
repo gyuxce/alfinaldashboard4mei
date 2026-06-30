@@ -220,16 +220,15 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               <table className="w-full table-fixed text-left text-[10px]">
                 <thead className="bg-surface-muted text-text-muted">
                   <tr>
-                    <th className="w-[34%] px-2.5 py-2 font-bold uppercase tracking-wide">Issue</th>
+                    <th className="w-[38%] px-2.5 py-2 font-bold uppercase tracking-wide">Issue</th>
                     <th className="px-2.5 py-2 font-bold uppercase tracking-wide">Top Categories</th>
-                    <th className="w-12 px-2.5 py-2 text-right font-bold uppercase tracking-wide">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {issueCategories.map(row => (
                     <tr key={row.issue} className="border-t border-border align-top">
                       <td className="px-2.5 py-2">
-                        <div className="truncate font-bold text-text-primary" title={row.issue}>
+                        <div className="break-words font-bold leading-relaxed text-text-primary" title={row.issue}>
                           {row.issue}
                         </div>
                       </td>
@@ -238,7 +237,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                           {row.categories.length > 0 ? row.categories.map(category => (
                             <span
                               key={`${row.issue}-${category.name}`}
-                              className="max-w-[150px] truncate rounded border border-border bg-surface px-1.5 py-0.5 font-semibold text-text-secondary"
+                              className="min-w-0 break-words rounded border border-border bg-surface px-1.5 py-0.5 font-semibold leading-relaxed text-text-secondary"
                               title={`${category.name}: ${category.count} cases`}
                             >
                               {category.name} - {category.count}
@@ -247,9 +246,6 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                             <span className="font-semibold text-text-muted">Category belum terisi</span>
                           )}
                         </div>
-                      </td>
-                      <td className="px-2.5 py-2 text-right text-xs font-black" style={{ color }}>
-                        {row.count}
                       </td>
                     </tr>
                   ))}
