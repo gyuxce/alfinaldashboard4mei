@@ -48,7 +48,8 @@ interface DevelopmentRow {
   csId: string;
   name: string;
   tl: string;
-  stage: DevelopmentStage;
+  stage: DevelopmentStage | null;
+  pendingStage: DevelopmentStage | null;
   cleanStreak: number;
   bottomCount: number;
   bottomMonths: string[];
@@ -513,6 +514,7 @@ export const Leaderboard: React.FC = () => {
         name: info.name || csId,
         tl: info.teamLeader || "-",
         stage: seed.stage,
+        pendingStage: null,
         cleanStreak: 0,
         bottomCount: seed.bottomCount,
         bottomMonths: [...seed.bottomMonths],
@@ -523,6 +525,10 @@ export const Leaderboard: React.FC = () => {
     });
 
     monthRanges.forEach((monthRange) => {
+      const today = new Date();
+      const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+      const isOpenMonth = monthRange.start.slice(0, 7) === currentMonthKey;
+
       Array.from(developmentMap.entries()).forEach(([csId, row]) => {
         if (isAgentInactive({ name: row.name }, monthRange.end)) {
           developmentMap.delete(csId);
@@ -570,7 +576,7 @@ export const Leaderboard: React.FC = () => {
         const bottomRank = bottomRanks.get(csId);
 
         if (bottomRank !== undefined) {
-          const nextStage: DevelopmentStage = !current
+          const nextStage: DevelopmentStage = !current || current.stage === null
             ? "development"
             : current.stage === "development"
               ? "sp1"
@@ -582,25 +588,29 @@ export const Leaderboard: React.FC = () => {
             csId,
             name: monthlyEntry.agent.name || csId,
             tl: monthlyEntry.agent.teamLeader || "-",
-            stage: nextStage,
-            cleanStreak: 0,
+            stage: isOpenMonth ? (current?.stage || null) : nextStage,
+            pendingStage: isOpenMonth ? nextStage : null,
+            cleanStreak: isOpenMonth ? (current?.cleanStreak || 0) : 0,
             bottomCount: (current?.bottomCount || 0) + 1,
             bottomMonths: [...(current?.bottomMonths || []), monthRange.label],
             lastBottomMonth: monthRange.label,
             currentRank: bottomRank,
             history: [
               ...(current?.history || []),
-              `${monthRange.label}: Bottom -> ${DEVELOPMENT_STAGE_META[nextStage].label}`,
+              isOpenMonth
+                ? `${monthRange.label}: Bottom sementara -> potensi ${DEVELOPMENT_STAGE_META[nextStage].label}`
+                : `${monthRange.label}: Bottom -> ${DEVELOPMENT_STAGE_META[nextStage].label}`,
             ],
           });
           return;
         }
 
-        if (!current || current.stage === "termination") return;
+        if (!current || current.stage === null || current.stage === "termination") return;
         if (current.stage === "development") {
           developmentMap.delete(csId);
           return;
         }
+        if (isOpenMonth) return;
         const cleanStreak = current.cleanStreak + 1;
         if (cleanStreak >= 3) {
           developmentMap.delete(csId);
@@ -609,6 +619,7 @@ export const Leaderboard: React.FC = () => {
             ...current,
             name: monthlyEntry.agent.name || current.name,
             tl: monthlyEntry.agent.teamLeader || current.tl,
+            pendingStage: null,
             cleanStreak,
             currentRank: null,
             history: [
@@ -627,9 +638,11 @@ export const Leaderboard: React.FC = () => {
       development: 1,
     };
     const developmentList = Array.from(developmentMap.values()).sort(
-      (a, b) =>
-        stagePriority[b.stage] - stagePriority[a.stage] ||
-        a.name.localeCompare(b.name),
+      (a, b) => {
+        const aStage = a.pendingStage || a.stage || "development";
+        const bStage = b.pendingStage || b.stage || "development";
+        return stagePriority[bStage] - stagePriority[aStage] || a.name.localeCompare(b.name);
+      },
     );
 
     return { agentRows: aList, tlRows: tList, developmentRows: developmentList };
@@ -872,7 +885,7 @@ export const Leaderboard: React.FC = () => {
         </div>
 
         <div className="border-b border-border bg-primary-soft/20 px-3 py-2 text-[9px] leading-relaxed text-text-secondary">
-          SP tetap aktif selama masa pemantauan. Status baru bersih setelah 3 bulan berturut-turut tidak Bottom 3. Jika Bottom lagi sebelum 3 bulan, tahap langsung naik.
+          Bottom 2x berarti masuk Bottom 3 pada dua bulan berbeda. Aman 1/3 berarti baru satu bulan aman berturut-turut dari tiga bulan yang diwajibkan setelah SP. Status bulan berjalan belum final sampai bulan ditutup.
         </div>
 
         <div className="max-h-[calc(100vh-344px)] overflow-y-auto">
@@ -886,7 +899,8 @@ export const Leaderboard: React.FC = () => {
               </thead>
               <tbody>
                 {developmentRows.map((row) => {
-                  const stageMeta = DEVELOPMENT_STAGE_META[row.stage];
+                  const stageMeta = row.stage ? DEVELOPMENT_STAGE_META[row.stage] : null;
+                  const pendingMeta = row.pendingStage ? DEVELOPMENT_STAGE_META[row.pendingStage] : null;
                   return (
                     <React.Fragment key={row.csId}>
                     <tr className="align-top">
@@ -896,25 +910,35 @@ export const Leaderboard: React.FC = () => {
                           {row.csId} | {row.tl}
                         </div>
                         <div className="mt-1 text-[9px] font-semibold text-text-secondary">
-                          Bottom {row.bottomCount}x | {row.bottomMonths.join(", ")}
+                          Bottom terdeteksi {row.bottomCount}x | {row.bottomMonths.join(", ")}
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={cn("inline-flex px-1.5 py-0.5 text-[9px] font-black", stageMeta.className)}>
-                          {stageMeta.label}
+                        <span className={cn(
+                          "inline-flex px-1.5 py-0.5 text-[9px] font-black",
+                          stageMeta ? stageMeta.className : "bg-surface-muted text-text-secondary",
+                        )}>
+                          {stageMeta ? `Status resmi: ${stageMeta.label}` : "Status resmi: Belum ada"}
                         </span>
                         <div className="mt-1.5 text-[9px] text-text-secondary">
                           {row.currentRank !== null
-                            ? `Current rank #${row.currentRank}`
-                            : `Clean streak ${row.cleanStreak}/3`}
+                            ? `${pendingMeta ? "Peringkat bulan berjalan" : "Peringkat saat Bottom"} #${row.currentRank}`
+                            : `Bulan aman selesai: ${row.cleanStreak} dari 3`}
                         </div>
-                        <div className="mt-0.5 text-[9px] text-text-muted">
-                          Next: {stageMeta.next}
-                        </div>
+                        {row.stage === "sp1" || row.stage === "sp2" ? (
+                          <div className="mt-0.5 text-[9px] text-text-muted">
+                            Bulan aman berturut-turut: {row.cleanStreak}/3
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                     <tr className="border-b border-border last:border-b-0">
                       <td colSpan={2} className="px-3 pb-2.5 pt-0">
+                        {pendingMeta && (
+                          <div className="mb-1.5 bg-warning-soft px-2 py-1.5 text-[9px] font-bold leading-relaxed text-warning">
+                            Jika bulan ini ditutup tetap Bottom 3, status menjadi {pendingMeta.label}.
+                          </div>
+                        )}
                         <div className="whitespace-normal bg-surface-muted px-2 py-1.5 text-[9px] leading-relaxed text-text-secondary">
                           {row.history.join(" | ")}
                         </div>
