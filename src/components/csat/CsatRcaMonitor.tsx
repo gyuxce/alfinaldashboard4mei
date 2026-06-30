@@ -124,7 +124,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     ): IssueCategoryRow[] =>
       Object.entries(issueTotals)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
+        .slice(0, 5)
         .map(([issue, count]) => ({
           issue,
           count,
@@ -216,32 +216,45 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
             <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">
               Category per issue
             </div>
-            <div className="space-y-2">
-              {issueCategories.map(row => (
-                <div key={row.issue} className="rounded-lg bg-surface/70 border border-border px-3 py-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-[11px] font-bold text-text-primary" title={row.issue}>
-                        {row.issue}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-1.5">
-                        {row.categories.length > 0 ? row.categories.map(category => (
-                          <span
-                            key={`${row.issue}-${category.name}`}
-                            className="max-w-full truncate rounded-md bg-card px-2 py-1 text-[10px] font-semibold text-text-secondary border border-border"
-                            title={`${category.name}: ${category.count} cases`}
-                          >
-                            {category.name} - {category.count}
-                          </span>
-                        )) : (
-                          <span className="text-[10px] font-semibold text-text-muted">Category belum terisi</span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-sm font-black" style={{ color }}>{row.count}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <table className="w-full table-fixed text-left text-[10px]">
+                <thead className="bg-surface-muted text-text-muted">
+                  <tr>
+                    <th className="w-[34%] px-2.5 py-2 font-bold uppercase tracking-wide">Issue</th>
+                    <th className="px-2.5 py-2 font-bold uppercase tracking-wide">Top Categories</th>
+                    <th className="w-12 px-2.5 py-2 text-right font-bold uppercase tracking-wide">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {issueCategories.map(row => (
+                    <tr key={row.issue} className="border-t border-border align-top">
+                      <td className="px-2.5 py-2">
+                        <div className="truncate font-bold text-text-primary" title={row.issue}>
+                          {row.issue}
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {row.categories.length > 0 ? row.categories.map(category => (
+                            <span
+                              key={`${row.issue}-${category.name}`}
+                              className="max-w-[150px] truncate rounded border border-border bg-surface px-1.5 py-0.5 font-semibold text-text-secondary"
+                              title={`${category.name}: ${category.count} cases`}
+                            >
+                              {category.name} - {category.count}
+                            </span>
+                          )) : (
+                            <span className="font-semibold text-text-muted">Category belum terisi</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-2 text-right text-xs font-black" style={{ color }}>
+                        {row.count}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
