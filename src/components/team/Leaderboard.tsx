@@ -51,8 +51,10 @@ interface DevelopmentRow {
   stage: DevelopmentStage;
   cleanStreak: number;
   bottomCount: number;
+  bottomMonths: string[];
   lastBottomMonth: string;
   currentRank: number | null;
+  history: string[];
 }
 
 const DEVELOPMENT_STAGE_META: Record<
@@ -95,8 +97,10 @@ const DEVELOPMENT_HISTORY_SEEDS = [
   {
     name: "rupertus wilian brodus jelati",
     stage: "sp1" as DevelopmentStage,
-    bottomCount: 2,
+    bottomCount: 1,
+    bottomMonths: ["Apr 2026"],
     lastBottomMonth: "Apr 2026",
+    history: ["Apr 2026: SP1"],
   },
 ] as const;
 
@@ -511,8 +515,10 @@ export const Leaderboard: React.FC = () => {
         stage: seed.stage,
         cleanStreak: 0,
         bottomCount: seed.bottomCount,
+        bottomMonths: [...seed.bottomMonths],
         lastBottomMonth: seed.lastBottomMonth,
         currentRank: null,
+        history: [...seed.history],
       });
     });
 
@@ -579,8 +585,13 @@ export const Leaderboard: React.FC = () => {
             stage: nextStage,
             cleanStreak: 0,
             bottomCount: (current?.bottomCount || 0) + 1,
+            bottomMonths: [...(current?.bottomMonths || []), monthRange.label],
             lastBottomMonth: monthRange.label,
             currentRank: bottomRank,
+            history: [
+              ...(current?.history || []),
+              `${monthRange.label}: Bottom -> ${DEVELOPMENT_STAGE_META[nextStage].label}`,
+            ],
           });
           return;
         }
@@ -600,6 +611,10 @@ export const Leaderboard: React.FC = () => {
             tl: monthlyEntry.agent.teamLeader || current.tl,
             cleanStreak,
             currentRank: null,
+            history: [
+              ...current.history,
+              `${monthRange.label}: Aman ${cleanStreak}/3`,
+            ],
           });
         }
       });
@@ -856,6 +871,10 @@ export const Leaderboard: React.FC = () => {
           <span className="text-xs font-black text-text-primary">{developmentRows.length}</span>
         </div>
 
+        <div className="border-b border-border bg-primary-soft/20 px-3 py-2 text-[9px] leading-relaxed text-text-secondary">
+          SP tetap aktif selama masa pemantauan. Status baru bersih setelah 3 bulan berturut-turut tidak Bottom 3. Jika Bottom lagi sebelum 3 bulan, tahap langsung naik.
+        </div>
+
         <div className="max-h-[calc(100vh-344px)] overflow-y-auto">
           {developmentRows.length > 0 ? (
             <table className="w-full table-fixed text-left text-[10px]">
@@ -869,14 +888,15 @@ export const Leaderboard: React.FC = () => {
                 {developmentRows.map((row) => {
                   const stageMeta = DEVELOPMENT_STAGE_META[row.stage];
                   return (
-                    <tr key={row.csId} className="border-b border-border last:border-b-0 align-top">
+                    <React.Fragment key={row.csId}>
+                    <tr className="align-top">
                       <td className="px-3 py-2.5">
                         <div className="truncate font-bold text-text-primary" title={row.name}>{row.name}</div>
-                        <div className="mt-0.5 truncate text-[9px] text-text-muted" title={`${row.csId} · ${row.tl}`}>
-                          {row.csId} · {row.tl}
+                        <div className="mt-0.5 truncate text-[9px] text-text-muted" title={`${row.csId} | ${row.tl}`}>
+                          {row.csId} | {row.tl}
                         </div>
                         <div className="mt-1 text-[9px] font-semibold text-text-secondary">
-                          Bottom {row.bottomCount}x · Last {row.lastBottomMonth}
+                          Bottom {row.bottomCount}x | {row.bottomMonths.join(", ")}
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
@@ -893,6 +913,14 @@ export const Leaderboard: React.FC = () => {
                         </div>
                       </td>
                     </tr>
+                    <tr className="border-b border-border last:border-b-0">
+                      <td colSpan={2} className="px-3 pb-2.5 pt-0">
+                        <div className="whitespace-normal bg-surface-muted px-2 py-1.5 text-[9px] leading-relaxed text-text-secondary">
+                          {row.history.join(" | ")}
+                        </div>
+                      </td>
+                    </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
