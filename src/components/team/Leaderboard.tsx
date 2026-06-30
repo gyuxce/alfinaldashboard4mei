@@ -444,27 +444,27 @@ export const Leaderboard: React.FC = () => {
 
       <div className="relative w-full overflow-auto bg-card border border-border rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
         <table className="w-full min-w-[2100px] border-collapse whitespace-nowrap text-left text-[10px]">
-          <thead className="sticky top-0 z-30 text-primary-text">
+          <thead className="sticky top-0 z-30 text-white">
             <tr className="bg-primary">
-              <th rowSpan={2} className="w-12 border-r border-primary-text/20 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
-              <th rowSpan={2} className="w-[190px] border-r border-primary-text/20 p-2 font-bold md:sticky md:left-12 z-50 bg-primary">Name</th>
-              <th rowSpan={2} className="w-[110px] border-r border-primary-text/20 p-2 font-bold md:sticky md:left-[238px] z-50 bg-primary">Email / CS ID</th>
-              <th rowSpan={2} className="w-[160px] border-r border-primary-text/20 p-2 font-bold md:sticky md:left-[348px] z-50 bg-primary shadow-[8px_0_12px_-10px_rgba(0,0,0,0.8)]">Leader Name</th>
-              <th colSpan={2} className="border-r border-primary-text/20 p-2 text-center font-bold">QC Score (50 Points)</th>
-              <th colSpan={7} className="border-r border-primary-text/20 p-2 text-center font-bold">Productivity (20 Points)</th>
-              <th rowSpan={2} className="w-[90px] border-r border-primary-text/20 p-2 text-center font-bold">CSAT (20 Points)</th>
-              <th colSpan={4} className="border-r border-primary-text/20 p-2 text-center font-bold">Training Completion (5 Points)</th>
-              <th colSpan={4} className="border-r border-primary-text/20 p-2 text-center font-bold">Quiz Score (5 Points)</th>
+              <th rowSpan={2} className="w-12 border-r border-white/30 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
+              <th rowSpan={2} className="w-[190px] border-r border-white/30 p-2 font-bold md:sticky md:left-12 z-50 bg-primary">Name</th>
+              <th rowSpan={2} className="w-[110px] border-r border-white/30 p-2 font-bold md:sticky md:left-[238px] z-50 bg-primary">Email / CS ID</th>
+              <th rowSpan={2} className="w-[160px] border-r border-white/30 p-2 font-bold md:sticky md:left-[348px] z-50 bg-primary shadow-[8px_0_12px_-10px_rgba(0,0,0,0.8)]">Leader Name</th>
+              <th colSpan={2} className="border-r border-white/30 p-2 text-center font-bold">QC Score (50 Points)</th>
+              <th colSpan={7} className="border-r border-white/30 p-2 text-center font-bold">Productivity (20 Points)</th>
+              <th rowSpan={2} className="w-[90px] border-r border-white/30 p-2 text-center font-bold">CSAT (20 Points)</th>
+              <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">Training Completion (5 Points)</th>
+              <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">Quiz Score (5 Points)</th>
               <th rowSpan={2} className="w-[90px] p-2 text-center font-bold">Final Score</th>
             </tr>
-            <tr className="bg-primary border-t border-primary-text/20">
+            <tr className="bg-primary border-t border-white/30">
               {[
                 "% Ach", "Total Points",
                 "Daily Target", "Total Duty", "Target Chat", "Total Chat", "Total Points", "Final Points", "Difference",
                 "Total Training", "Agent Completion", "% Ach", "Total Points",
                 "Target", "Agent Score", "% Ach", "Total Points",
               ].map((label, index) => (
-                <th key={`${label}-${index}`} className="min-w-[84px] border-r border-primary-text/20 px-2 py-1.5 text-center font-bold">
+                <th key={`${label}-${index}`} className="min-w-[84px] border-r border-white/30 px-2 py-1.5 text-center font-bold">
                   {label}
                 </th>
               ))}
