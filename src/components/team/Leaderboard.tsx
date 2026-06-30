@@ -624,7 +624,7 @@ export const Leaderboard: React.FC = () => {
             currentRank: null,
             history: [
               ...current.history,
-              `${monthRange.label}: Aman ${cleanStreak}/3`,
+              `${monthRange.label}: Tidak Bottom 3 (SP tetap aktif)`,
             ],
           });
         }
@@ -745,7 +745,7 @@ export const Leaderboard: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="flex flex-col gap-4">
       <div className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
         <table className="w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left text-[10px]">
           <colgroup>
@@ -872,7 +872,7 @@ export const Leaderboard: React.FC = () => {
         </table>
       </div>
 
-      <aside className="overflow-hidden rounded-lg border border-border-strong bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] xl:sticky xl:top-4">
+      <aside className="overflow-hidden rounded-lg border border-border-strong bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-between border-b border-border-strong bg-surface-muted px-3 py-2.5">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-primary" />
@@ -884,11 +884,7 @@ export const Leaderboard: React.FC = () => {
           <span className="text-xs font-black text-text-primary">{developmentRows.length}</span>
         </div>
 
-        <div className="border-b border-border bg-primary-soft/20 px-3 py-2 text-[9px] leading-relaxed text-text-secondary">
-          Bottom 2x berarti masuk Bottom 3 pada dua bulan berbeda. Aman 1/3 berarti baru satu bulan aman berturut-turut dari tiga bulan yang diwajibkan setelah SP. Status bulan berjalan belum final sampai bulan ditutup.
-        </div>
-
-        <div className="max-h-[calc(100vh-344px)] overflow-y-auto">
+        <div>
           {developmentRows.length > 0 ? (
             <table className="w-full table-fixed text-left text-[10px]">
               <thead className="sticky top-0 z-10 bg-surface text-text-muted">
@@ -923,13 +919,8 @@ export const Leaderboard: React.FC = () => {
                         <div className="mt-1.5 text-[9px] text-text-secondary">
                           {row.currentRank !== null
                             ? `${pendingMeta ? "Peringkat bulan berjalan" : "Peringkat saat Bottom"} #${row.currentRank}`
-                            : `Bulan aman selesai: ${row.cleanStreak} dari 3`}
+                            : "Tidak Bottom 3 bulan ini"}
                         </div>
-                        {row.stage === "sp1" || row.stage === "sp2" ? (
-                          <div className="mt-0.5 text-[9px] text-text-muted">
-                            Bulan aman berturut-turut: {row.cleanStreak}/3
-                          </div>
-                        ) : null}
                       </td>
                     </tr>
                     <tr className="border-b border-border last:border-b-0">
