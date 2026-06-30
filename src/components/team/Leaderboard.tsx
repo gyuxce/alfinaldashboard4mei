@@ -81,6 +81,34 @@ const DEVELOPMENT_STAGE_META: Record<
   },
 };
 
+const normalizeAgentName = (value: string) =>
+  value.trim().replace(/\s+/g, " ").toLowerCase();
+
+const INACTIVE_AGENT_RULES = [
+  {
+    name: "edgar gasita adhigama",
+    inactiveFrom: "2026-06",
+  },
+] as const;
+
+const DEVELOPMENT_HISTORY_SEEDS = [
+  {
+    name: "rupertus wilian brodus jelati",
+    stage: "sp1" as DevelopmentStage,
+    bottomCount: 2,
+    lastBottomMonth: "Apr 2026",
+  },
+] as const;
+
+const isAgentInactive = (agent: Pick<AgentKPI, "name">, periodEnd: string) => {
+  const periodMonth = periodEnd.slice(0, 7);
+  const agentName = normalizeAgentName(agent.name || "");
+  return INACTIVE_AGENT_RULES.some(
+    (rule) =>
+      agentName === rule.name && periodMonth >= rule.inactiveFrom,
+  );
+};
+
 const getProductivityColumns = (totalChat: number, totalDuty: number) => {
   const targetChat = totalDuty * DAILY_PRODUCTIVITY_TARGET;
   const achievement = targetChat > 0 ? (totalChat / targetChat) * 100 : null;
@@ -276,6 +304,8 @@ export const Leaderboard: React.FC = () => {
     > = {};
 
     rawData.forEach((agent) => {
+      if (isAgentInactive(agent, endDate)) return;
+
       const { composite, csatGood, csatBad, csatPct } =
         getLeaderboardComposite(agent);
       const productivity = getProductivityColumns(
@@ -468,8 +498,31 @@ export const Leaderboard: React.FC = () => {
     }
 
     const developmentMap = new Map<string, DevelopmentRow>();
+    DEVELOPMENT_HISTORY_SEEDS.forEach((seed) => {
+      const dictionaryEntry = Object.entries(agentDictionary).find(
+        ([, info]) => normalizeAgentName(info.name || "") === seed.name,
+      );
+      if (!dictionaryEntry) return;
+      const [csId, info] = dictionaryEntry;
+      developmentMap.set(csId, {
+        csId,
+        name: info.name || csId,
+        tl: info.teamLeader || "-",
+        stage: seed.stage,
+        cleanStreak: 0,
+        bottomCount: seed.bottomCount,
+        lastBottomMonth: seed.lastBottomMonth,
+        currentRank: null,
+      });
+    });
 
     monthRanges.forEach((monthRange) => {
+      Array.from(developmentMap.entries()).forEach(([csId, row]) => {
+        if (isAgentInactive({ name: row.name }, monthRange.end)) {
+          developmentMap.delete(csId);
+        }
+      });
+
       const monthlyAgents = processKPIs(
         productivityData,
         csatScData,
@@ -480,6 +533,7 @@ export const Leaderboard: React.FC = () => {
         monthRange.end,
         agentDictionary,
       )
+        .filter((agent) => !isAgentInactive(agent, monthRange.end))
         .map((agent) => ({
           agent,
           score: getLeaderboardComposite(agent).composite.score,
@@ -532,6 +586,10 @@ export const Leaderboard: React.FC = () => {
         }
 
         if (!current || current.stage === "termination") return;
+        if (current.stage === "development") {
+          developmentMap.delete(csId);
+          return;
+        }
         const cleanStreak = current.cleanStreak + 1;
         if (cleanStreak >= 3) {
           developmentMap.delete(csId);
