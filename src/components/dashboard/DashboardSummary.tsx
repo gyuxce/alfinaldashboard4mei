@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
-import { AgentKPI, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
+import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
 import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
 import { useStore } from "../../store";
@@ -29,14 +29,14 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
 
   const stats = useMemo(() => {
     const calculate = (dataset: AgentKPI[]) => {
-      let totalProd = 0, sumManDays = 0, sumCsat = 0, sumSla1m = 0, sumSla3m = 0, sumWhu = 0;
+      let totalProd = 0, sumManDays = 0, sumSla1m = 0, sumSla3m = 0, sumWhu = 0;
       let sumCsatScFull = 0, countCsatScFull = 0, sumCsatScFair = 0, countCsatScFair = 0;
-      let sumQa = 0, countQa = 0, csatCount = 0, slaCount = 0, whuCount = 0, attPresence = 0, attDuty = 0;
+      let sumQa = 0, countQa = 0, slaCount = 0, whuCount = 0, attPresence = 0, attDuty = 0;
+      const officialCsat = getOfficialCsatAggregate(dataset);
 
       dataset.forEach((d) => {
         totalProd += d.productivityTotal;
         sumManDays += d.manDays;
-        if (d.csatAsli !== null) { sumCsat += d.csatAsli; csatCount++; }
         if (d.sla1m !== null) sumSla1m += d.sla1m;
         if (d.sla3m !== null) { sumSla3m += d.sla3m; slaCount++; }
         if (d.whu !== null) { sumWhu += d.whu; whuCount++; }
@@ -53,8 +53,8 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
       return {
         productivity: totalProd,
         avgProductivity: sumManDays > 0 ? totalProd / sumManDays : 0,
-        csat: csatCount > 0 ? sumCsat / csatCount : 0,
-        csatPercent: csatCount > 0 ? (sumCsat / csatCount / 5) * 100 : 0,
+        csat: officialCsat.score || 0,
+        csatPercent: officialCsat.score !== null ? (officialCsat.score / 5) * 100 : 0,
         csatScFull: countCsatScFull > 0 ? (sumCsatScFull / countCsatScFull) * 100 : 0,
         csatScFullCount: countCsatScFull,
         csatScFair: countCsatScFair > 0 ? (sumCsatScFair / countCsatScFair) * 100 : 0,
@@ -113,7 +113,11 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
         if (prodEntry && prodEntry.value) totalProd += prodEntry.value;
 
         const csatEntry = a.dailyHistory.csat.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (csatEntry && csatEntry.value) { sumCsat += csatEntry.value; countCsat++; }
+        if (csatEntry && csatEntry.value) {
+          const respondentCount = csatEntry.count || 1;
+          sumCsat += csatEntry.sum ?? csatEntry.value * respondentCount;
+          countCsat += respondentCount;
+        }
 
         const sla1mEntry = a.dailyHistory.sla1m.find(h => (rawToNormDate.get(h.date) || h.date) === date);
         if (sla1mEntry && sla1mEntry.value) { sumSla1m += sla1mEntry.value; countSla1m++; }
@@ -261,7 +265,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
               kpiTheme="csat"
             />
             <StatCard
-              title="CSAT SC Takeout"
+              title="CSAT SC After Takeout"
               value={formatNum(currentStats.csatScFair) + "%"}
               subValue={currentStats.csatScFair > 0 ? formatNum((currentStats.csatScFair / 100) * 5, 2) + " poin" : undefined}
               delta={getDelta(currentStats.csatScFair, previousStats.csatScFair)}
@@ -352,7 +356,7 @@ const KPI_FORMULAS: Record<string, KpiFormula> = {
   },
   "CSAT Official": {
     target: "3.75 / 5",
-    formula: "Rata-rata nilai CSAT official dari data productivity.",
+    formula: "Total poin rating 1-5 / total responden (weighted by respondents).",
     source: "Productivity CSAT WHU",
   },
   "CSAT SC Full": {
@@ -361,7 +365,7 @@ const KPI_FORMULAS: Record<string, KpiFormula> = {
     source: "CSAT SC",
     note: "Data takeout tetap ikut dihitung.",
   },
-  "CSAT SC Takeout": {
+  "CSAT SC After Takeout": {
     target: "92%",
     formula: "Score good (4-5) / total score valid setelah data takeout dikeluarkan.",
     source: "CSAT SC",
@@ -704,7 +708,7 @@ const WeeklyReportPanel = ({
     { label: 'Avg Productivity',   curr: formatNum(currentStats.avgProductivity, 0),prev: formatNum(previousStats.avgProductivity, 0),prev2: formatNum(previousStats2?.avgProductivity || 0, 0),prev3: formatNum(previousStats3?.avgProductivity || 0, 0),delta: currentStats.avgProductivity - previousStats.avgProductivity,isCount: true,  target: 100,   rawCurr: currentStats.avgProductivity, rawPrev: previousStats.avgProductivity, rawPrev2: previousStats2?.avgProductivity || 0, rawPrev3: previousStats3?.avgProductivity || 0 },
     { label: 'CSAT Official',      curr: formatNum(currentStats.csat),        prev: formatNum(previousStats.csat), prev2: formatNum(previousStats2?.csat || 0), prev3: formatNum(previousStats3?.csat || 0), delta: currentStats.csat - previousStats.csat,                     isCount: false, target: 3.75,    rawCurr: currentStats.csat,            rawPrev: previousStats.csat, rawPrev2: previousStats2?.csat || 0, rawPrev3: previousStats3?.csat || 0 },
     { label: 'CSAT SC Full',       curr: formatNum(currentStats.csatScFull) + '%',  prev: formatNum(previousStats.csatScFull) + '%', prev2: formatNum(previousStats2?.csatScFull || 0) + '%', prev3: formatNum(previousStats3?.csatScFull || 0) + '%', delta: currentStats.csatScFull - previousStats.csatScFull,         isCount: false, target: 75,    rawCurr: currentStats.csatScFull,      rawPrev: previousStats.csatScFull, rawPrev2: previousStats2?.csatScFull || 0, rawPrev3: previousStats3?.csatScFull || 0 },
-    { label: 'CSAT SC Takeout',    curr: formatNum(currentStats.csatScFair) + '%',  prev: formatNum(previousStats.csatScFair) + '%', prev2: formatNum(previousStats2?.csatScFair || 0) + '%', prev3: formatNum(previousStats3?.csatScFair || 0) + '%', delta: currentStats.csatScFair - previousStats.csatScFair,         isCount: false, target: 92,    rawCurr: currentStats.csatScFair,      rawPrev: previousStats.csatScFair, rawPrev2: previousStats2?.csatScFair || 0, rawPrev3: previousStats3?.csatScFair || 0 },
+    { label: 'CSAT SC After Takeout', curr: formatNum(currentStats.csatScFair) + '%', prev: formatNum(previousStats.csatScFair) + '%', prev2: formatNum(previousStats2?.csatScFair || 0) + '%', prev3: formatNum(previousStats3?.csatScFair || 0) + '%', delta: currentStats.csatScFair - previousStats.csatScFair, isCount: false, target: 92, rawCurr: currentStats.csatScFair, rawPrev: previousStats.csatScFair, rawPrev2: previousStats2?.csatScFair || 0, rawPrev3: previousStats3?.csatScFair || 0 },
     { label: 'SLA 1 Menit',        curr: formatNum(currentStats.sla1m) + '%',       prev: formatNum(previousStats.sla1m) + '%', prev2: formatNum(previousStats2?.sla1m || 0) + '%', prev3: formatNum(previousStats3?.sla1m || 0) + '%', delta: currentStats.sla1m - previousStats.sla1m,                   isCount: false, target: 92,    rawCurr: currentStats.sla1m,           rawPrev: previousStats.sla1m, rawPrev2: previousStats2?.sla1m || 0, rawPrev3: previousStats3?.sla1m || 0 },
     { label: 'SLA 3 Menit',        curr: formatNum(currentStats.sla3m) + '%',       prev: formatNum(previousStats.sla3m) + '%', prev2: formatNum(previousStats2?.sla3m || 0) + '%', prev3: formatNum(previousStats3?.sla3m || 0) + '%', delta: currentStats.sla3m - previousStats.sla3m,                   isCount: false, target: 96,    rawCurr: currentStats.sla3m,           rawPrev: previousStats.sla3m, rawPrev2: previousStats2?.sla3m || 0, rawPrev3: previousStats3?.sla3m || 0 },
     { label: 'WHU (%)',             curr: formatNum(currentStats.whu) + '%',         prev: formatNum(previousStats.whu) + '%', prev2: formatNum(previousStats2?.whu || 0) + '%', prev3: formatNum(previousStats3?.whu || 0) + '%', delta: currentStats.whu - previousStats.whu,                       isCount: false, target: 96,    rawCurr: currentStats.whu,             rawPrev: previousStats.whu, rawPrev2: previousStats2?.whu || 0, rawPrev3: previousStats3?.whu || 0 },

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AgentKPI, CSATEntry } from '../../lib/dataProcessor';
+import { AgentKPI, CSATEntry, isCsatTakeoutCategory } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useStore } from '../../store';
@@ -138,12 +138,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     return { critical, stable };
   }, [tableData, viewMode]);
 
-  const TAKEOUT_CATEGORIES = [
-    "Tidak Bisa Transaksi Namun Memiliki Limit",
-    "Pengajuan Limit Kredit Ditolak",
-    "Pertanyaan Belum Bisa Diidentifikasi"
-  ];
-
   const scoreDistribution = useMemo(() => {
     const dist = {
       'All': 0, 'No Survey': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0,
@@ -154,7 +148,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
            if (a.csatScScoreDistribution[scoreKey]) {
               const cases = a.csatScScoreDistribution[scoreKey];
               for (const c in cases) {
-                 if (viewMode === 'fair' && TAKEOUT_CATEGORIES.includes(c)) continue;
+                 if (viewMode === 'fair' && isCsatTakeoutCategory(c)) continue;
                  dist[scoreKey as keyof typeof dist] += cases[c] || 0;
                  dist['All'] += cases[c] || 0;
               }
@@ -200,10 +194,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             break;
           case 'average':
           default:
-            const aCount = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
-            const bCount = viewMode === 'full' ? b.csatScFullCount : b.csatScFairCount;
-            aVal = aCount > 0 ? ((viewMode === 'full' ? a.csatScFullScore : a.csatScFairScore) / aCount) * 100 / 5 : -1;
-            bVal = bCount > 0 ? ((viewMode === 'full' ? b.csatScFullScore : b.csatScFairScore) / bCount) * 100 / 5 : -1;
+            aVal = viewMode === 'full' ? (a.csatScFull ?? -1) : (a.csatScFair ?? -1);
+            bVal = viewMode === 'full' ? (b.csatScFull ?? -1) : (b.csatScFair ?? -1);
             break;
         }
 
@@ -305,7 +297,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             if (a.csatScScoreDistribution[scoreKey]) {
                 const cases = a.csatScScoreDistribution[scoreKey];
                 for (const c in cases) {
-                   if (viewMode === 'fair' && TAKEOUT_CATEGORIES.includes(c)) continue;
+                   if (viewMode === 'fair' && isCsatTakeoutCategory(c)) continue;
                    if (!caseDist[c]) caseDist[c] = 0;
                    caseDist[c] += cases[c];
                 }
@@ -326,7 +318,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 const cases = a.csatScScoreDistribution[scoreKey];
                 let totalForAgent = 0;
                 for (const c in cases) {
-                    if (viewMode === 'fair' && TAKEOUT_CATEGORIES.includes(c)) continue;
+                    if (viewMode === 'fair' && isCsatTakeoutCategory(c)) continue;
                     totalForAgent += cases[c] || 0;
                 }
                 if (totalForAgent > 0) {
@@ -455,6 +447,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             previousData={previousData} 
             previousData2={previousData2} 
             previousData3={previousData3} 
+            viewMode={viewMode}
           />
         </>
       )}
@@ -532,7 +525,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                      </thead>
                      <tbody className="">
                        {scoreAnalysisTopCases.slice((scoreCasePage - 1) * 20, scoreCasePage * 20).map((cat) => {
-                         const isTakeoutCategory = TAKEOUT_CATEGORIES.includes(cat.name);
+                         const isTakeoutCategory = isCsatTakeoutCategory(cat.name);
                          return (
                          <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group">
                            <td className="p-2 text-center text-text-muted font-medium">{cat.rank}</td>
@@ -774,7 +767,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             </thead>
             <tbody className="">
               {sortedAgentData.map((agent, index) => {
-                const totalScore = viewMode === 'full' ? agent.csatScFullScore : agent.csatScFairScore;
                 const totalCount = viewMode === 'full' ? agent.csatScFullCount : agent.csatScFairCount;
                 
                 const displayName = agent.name || agent.csId;
@@ -836,7 +828,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                           <span className={`text-[11px] font-bold ${textColor}`}>
                             {formatNum(avg)}%
                           </span>
-                          <span className={`text-[9px] font-medium ${isPullout ? 'text-text-muted/70 italic' : 'text-text-muted'}`}>({daily.count} surveys)</span>
+                          <span className={`text-[9px] font-medium ${isPullout ? 'text-text-muted/70 italic' : 'text-text-muted'}`}>({daily.count} valid ratings)</span>
                           <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 text-text-muted transition-opacity absolute right-1" />
                         </button>
                       </td>
@@ -858,7 +850,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                               : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0)
                           )}%
                         </span>
-                        <span className="text-[9px] text-text-muted font-medium">({totalCount} surveys)</span>
+                        <span className="text-[9px] text-text-muted font-medium">({totalCount} valid ratings)</span>
                       </div>
                     ) : '-'}
                   </td>
@@ -1081,10 +1073,10 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
   const w3 = calcStats(previousData3);
 
   const chartData = [
-    { name: getWeekLabel(3), 'SC Full': w3.full, 'SC Takeout': w3.takeout },
-    { name: getWeekLabel(2), 'SC Full': w2.full, 'SC Takeout': w2.takeout },
-    { name: getWeekLabel(1), 'SC Full': w1.full, 'SC Takeout': w1.takeout },
-    { name: getWeekLabel(0), 'SC Full': w0.full, 'SC Takeout': w0.takeout },
+    { name: getWeekLabel(3), 'SC Full': w3.full, 'SC After Takeout': w3.takeout },
+    { name: getWeekLabel(2), 'SC Full': w2.full, 'SC After Takeout': w2.takeout },
+    { name: getWeekLabel(1), 'SC Full': w1.full, 'SC After Takeout': w1.takeout },
+    { name: getWeekLabel(0), 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
 
   const dailyData = React.useMemo(() => {
@@ -1113,7 +1105,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
         return {
           date: validDate,
           'SC Full': stats.totalFull > 0 ? Number(((stats.goodFull / stats.totalFull) * 100).toFixed(2)) : 0,
-          'SC Takeout': stats.totalTakeout > 0 ? Number(((stats.goodTakeout / stats.totalTakeout) * 100).toFixed(2)) : 0,
+          'SC After Takeout': stats.totalTakeout > 0 ? Number(((stats.goodTakeout / stats.totalTakeout) * 100).toFixed(2)) : 0,
           rawDate: date
         };
       })
@@ -1139,8 +1131,8 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
                 <Bar dataKey="SC Full" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40}>
                   <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#8b5cf6'}} />
                 </Bar>
-                <Bar dataKey="SC Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
+                <Bar dataKey="SC After Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -1162,8 +1154,8 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
                 <Bar dataKey="SC Full" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40}>
                   <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#8b5cf6'}} />
                 </Bar>
-                <Bar dataKey="SC Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
+                <Bar dataKey="SC After Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -1193,12 +1185,6 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     const weekNum = Math.ceil(end.getDate() / 7);
     return `W${weekNum} ${month}`;
   };
-
-  const TAKEOUT_CATEGORIES = [
-    "tidak bisa transaksi namun memiliki limit",
-    "pengajuan limit kredit ditolak",
-    "pertanyaan belum bisa diidentifikasi"
-  ];
 
   const selectedBpo = useStore(state => state.selectedBpo);
   const upperBpo = (selectedBpo || '').toUpperCase();
@@ -1284,7 +1270,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
               </thead>
               <tbody>
                 {week.cats.map((cat, i) => {
-                  const isTakeoutCategory = TAKEOUT_CATEGORIES.includes(cat.name.toLowerCase());
+                  const isTakeoutCategory = isCsatTakeoutCategory(cat.name);
                   return (
                     <tr 
                       key={cat.name} 
@@ -1354,7 +1340,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     </div>
   );
 };
-const RespondentChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
+const RespondentChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
   const { startDate, endDate } = useStore();
   const comparisonMode = useStore(state => state.comparisonMode);
 
@@ -1378,8 +1364,11 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
     let totalRespondents = 0;
     let s5 = 0, s4 = 0, s3 = 0, s2 = 0, s1 = 0;
     (dataset || []).forEach(a => {
-      totalProcessed += a.csatHistory.length;
-      a.csatHistory.forEach(h => {
+      const histories = a.csatHistory.filter(
+        h => viewMode === 'full' || !h.isTakeout,
+      );
+      totalProcessed += histories.length;
+      histories.forEach(h => {
         if (h.score >= 1 && h.score <= 5) {
           totalRespondents += 1;
           if (h.score === 5) s5++;
@@ -1406,12 +1395,14 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
       { name: getWeekLabel(1), ...w1 },
       { name: getWeekLabel(0), ...w0 },
     ].filter(d => d.name !== 'WNaN Invalid Date');
-  }, [data, previousData, previousData2, previousData3, startDate, endDate]);
+  }, [data, previousData, previousData2, previousData3, startDate, endDate, viewMode]);
 
   const dailyRespData = React.useMemo(() => {
     const dates = new Map<string, { processed: number, respondents: number, s5: number, s4: number, s3: number, s2: number, s1: number }>();
     (data || []).forEach(a => {
-      a.csatHistory.forEach(h => {
+      a.csatHistory
+        .filter(h => viewMode === 'full' || !h.isTakeout)
+        .forEach(h => {
         if (!dates.has(h.date)) dates.set(h.date, { processed: 0, respondents: 0, s5:0, s4:0, s3:0, s2:0, s1:0 });
         const dInfo = dates.get(h.date)!;
         dInfo.processed += 1;
@@ -1423,7 +1414,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           if (h.score === 2) dInfo.s2++;
           if (h.score === 1) dInfo.s1++;
         }
-      });
+        });
     });
     
     return Array.from(dates.entries())
@@ -1444,7 +1435,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
         };
       })
       .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
-  }, [data]);
+  }, [data, viewMode]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -1469,7 +1460,9 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
   return (
     <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
       <div className="flex items-center justify-center mb-4">
-        <h3 className="text-sm font-bold text-text-primary text-center">Respondent Volume Trend</h3>
+        <h3 className="text-sm font-bold text-text-primary text-center">
+          Respondent Volume Trend ({viewMode === 'full' ? 'Full Data' : 'After Takeout'})
+        </h3>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         

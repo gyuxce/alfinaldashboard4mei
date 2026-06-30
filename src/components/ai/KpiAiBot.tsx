@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Bot, Loader2, Minus, Send, Sparkles, UserCheck, X } from 'lucide-react';
-import { AgentKPI } from '../../lib/dataProcessor';
+import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
 import { cn } from '../../lib/utils';
 
 type ChatMessage = {
@@ -300,6 +300,9 @@ function buildKpiContext(
   intent: ChatIntent,
 ) {
   const agents = data.map(agent => toAgentSnapshot(agent, intent));
+  const officialCsat = getOfficialCsatAggregate(data);
+  const takeoutGood = data.reduce((sum, agent) => sum + agent.csatScFairGoodCount, 0);
+  const takeoutValid = data.reduce((sum, agent) => sum + agent.csatScFairTotalValid, 0);
   const riskAgents = [...agents]
     .sort((a, b) => b.riskScore - a.riskScore)
     .slice(0, 8);
@@ -317,8 +320,8 @@ function buildKpiContext(
     summary: {
       agentCount: agents.length,
       avgProductivity: average(agents.map(agent => agent.productivityAverage)),
-      avgCsatOfficial: average(agents.map(agent => agent.csatOfficial).filter(isNumber)),
-      avgCsatTakeout: average(agents.map(agent => agent.csatTakeout).filter(isNumber)),
+      avgCsatOfficial: officialCsat.score,
+      avgCsatTakeout: takeoutValid > 0 ? (takeoutGood / takeoutValid) * 100 : null,
       avgQaScore: average(agents.map(agent => agent.qaScore).filter(isNumber)),
       avgSla1m: average(agents.map(agent => agent.sla1m).filter(isNumber)),
       avgWhu: average(agents.map(agent => agent.whu).filter(isNumber)),

@@ -37,7 +37,26 @@ export interface QAEntry {
 export interface HistoryEntry {
   date: string;
   value: number;
+  count?: number;
+  sum?: number;
 }
+
+export const CSAT_TAKEOUT_CATEGORIES = [
+  "tidak bisa transaksi namun memiliki limit",
+  "pengajuan limit kredit ditolak",
+  "pertanyaan belum bisa diidentifikasi",
+] as const;
+
+const normalizeCsatCategory = (value: unknown) =>
+  String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+export const isCsatTakeoutCategory = (category: unknown) =>
+  CSAT_TAKEOUT_CATEGORIES.includes(
+    normalizeCsatCategory(category) as (typeof CSAT_TAKEOUT_CATEGORIES)[number],
+  );
+
+export const isValidCsatScScore = (score: number) =>
+  score === 1 || score === 2 || score === 4 || score === 5;
 
 export interface AgentKPI {
   csId: string;
@@ -123,6 +142,27 @@ export interface AgentKPI {
     }[];
   };
 }
+
+export const getOfficialCsatAggregate = (data: AgentKPI[]) => {
+  let points = 0;
+  let respondents = 0;
+
+  data.forEach((agent) => {
+    points +=
+      agent.csat5Count * 5 +
+      agent.csat4Count * 4 +
+      agent.csat3Count * 3 +
+      agent.csat2Count * 2 +
+      agent.csat1Count;
+    respondents += agent.csatRespondents;
+  });
+
+  return {
+    points,
+    respondents,
+    score: respondents > 0 ? points / respondents : null,
+  };
+};
 
 // Helpers
 export function getPreviousPeriod(startDate: string, endDate: string) {
@@ -641,11 +681,17 @@ export const processKPIs = (
           (h) => h.date === targetDateLabel,
         );
         if (existingCsat) {
-          existingCsat.value = csatDaily;
+          const existingCount = existingCsat.count || 0;
+          const existingSum = existingCsat.sum ?? existingCsat.value * existingCount;
+          existingCsat.count = existingCount + totalResAsli;
+          existingCsat.sum = existingSum + pointsAsli;
+          existingCsat.value = existingCsat.sum / existingCsat.count;
         } else {
           agent.dailyHistory.csat.push({
             date: targetDateLabel,
             value: csatDaily,
+            count: totalResAsli,
+            sum: pointsAsli,
           });
         }
       }
@@ -757,11 +803,7 @@ export const processKPIs = (
       if (seenCsatScEntries.has(csatScEntryKey)) continue;
       seenCsatScEntries.add(csatScEntryKey);
       
-      const isTakeoutRecord = [
-        "tidak bisa transaksi namun memiliki limit",
-        "pengajuan limit kredit ditolak",
-        "pertanyaan belum bisa diidentifikasi",
-      ].includes(category);
+      const isTakeoutRecord = isCsatTakeoutCategory(category);
       
       if (dateStr) {
          agent.csatHistory.push({
@@ -819,10 +861,7 @@ export const processKPIs = (
       agent.csatScScoreDistribution[scoreKey][cleanCatForDist] += 1;
       // --------------------------------
 
-      if (!isNaN(score)) {
-        // Only include if score != 3 for SC calculations as per previous rules (though user says "Tetap gunakan aturan EXCLUDE SCORE 3")
-        // Wait, if I exclude 3, I should skip adding it to these sums
-        if (score !== 3) {
+      if (isValidCsatScScore(score)) {
           // Keep old vars for CsatRoom
           agent.csatScFullScore += score;
           agent.csatScFullCount += 1;
@@ -846,11 +885,7 @@ export const processKPIs = (
           if (score >= 4) fullDay.score += 1;
           fullDay.count += 1;
 
-          const isTakeout = [
-            "tidak bisa transaksi namun memiliki limit",
-            "pengajuan limit kredit ditolak",
-            "pertanyaan belum bisa diidentifikasi",
-          ].includes(category);
+          const isTakeout = isCsatTakeoutCategory(category);
 
           if (!isTakeout) {
             // Keep old vars for CsatRoom
@@ -896,7 +931,6 @@ export const processKPIs = (
               }
             }
           }
-        }
       }
     }
   }

@@ -115,7 +115,7 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
         status: agent.csatScTotalValid > 0 ? 'Ready' : 'No valid score',
       },
       {
-        label: 'CSAT SC Takeout',
+        label: 'CSAT SC After Takeout',
         source: 'CSAT SC raw data',
         formula: 'Good score 4-5 / valid score after takeout * 100',
         raw: `${formatNum(agent.csatScFairGoodCount, 0)} good / ${formatNum(agent.csatScFairTotalValid, 0)} valid`,

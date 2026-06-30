@@ -47,7 +47,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 data={[
                   { name: 'CSAT Official', actual: parseFloat(((stats.csat / 5) * 100 || 0).toFixed(2)), target: 75, color: '#F59E0B', isCsat: true, rawVal: stats.csat || 0 },
                   { name: 'CSAT SC Full', actual: parseFloat((stats.csatScFull || 0).toFixed(2)), target: 75, color: '#F59E0B' },
-                  { name: 'CSAT SC Takeout', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: '#F59E0B' },
+                  { name: 'CSAT SC After Takeout', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: '#F59E0B' },
                   { name: 'QA Score', actual: parseFloat(stats.qa.toFixed(2)), target: 92, color: '#F59E0B' },
                   { name: 'Avg Attendance', actual: parseFloat(stats.attendance.toFixed(2)), target: 95, color: '#3B82F6' },
                   { name: 'WHU (%)', actual: parseFloat(stats.whu.toFixed(2)), target: 96, color: '#22C55E' },

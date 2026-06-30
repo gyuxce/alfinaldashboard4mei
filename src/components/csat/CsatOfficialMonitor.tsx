@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AgentKPI } from '../../lib/dataProcessor';
+import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort } from '../../lib/utils';
 import { Search, Star } from 'lucide-react';
 import { useStore } from '../../store';
@@ -206,12 +206,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
   };
 
   const calcStats = (dataset: AgentKPI[]) => {
-    let sumCsat = 0, csatCount = 0;
     let sumFull = 0, countFull = 0;
     let sumTakeout = 0, countTakeout = 0;
+    const officialCsat = getOfficialCsatAggregate(dataset || []);
     
     (dataset || []).forEach(d => {
-      if (d.csatAsli !== null) { sumCsat += d.csatAsli; csatCount++; }
       sumFull += d.csatScGoodCount || 0;
       countFull += d.csatScTotalValid || 0;
       sumTakeout += d.csatScFairGoodCount || 0;
@@ -219,7 +218,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
     });
 
     return {
-      asli: csatCount > 0 ? Number((sumCsat / csatCount).toFixed(2)) : 0,
+      asli: officialCsat.score !== null ? Number(officialCsat.score.toFixed(2)) : 0,
       full: countFull > 0 ? Number(((sumFull / countFull) * 100).toFixed(2)) : 0,
       takeout: countTakeout > 0 ? Number(((sumTakeout / countTakeout) * 100).toFixed(2)) : 0,
     };
@@ -231,10 +230,10 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
   const w3 = calcStats(previousData3);
 
   const chartData = [
-    { name: getWeekLabel(3), 'CSAT Official': w3.asli, 'SC Full': w3.full, 'SC Takeout': w3.takeout },
-    { name: getWeekLabel(2), 'CSAT Official': w2.asli, 'SC Full': w2.full, 'SC Takeout': w2.takeout },
-    { name: getWeekLabel(1), 'CSAT Official': w1.asli, 'SC Full': w1.full, 'SC Takeout': w1.takeout },
-    { name: getWeekLabel(0), 'CSAT Official': w0.asli, 'SC Full': w0.full, 'SC Takeout': w0.takeout },
+    { name: getWeekLabel(3), 'CSAT Official': w3.asli, 'SC Full': w3.full, 'SC After Takeout': w3.takeout },
+    { name: getWeekLabel(2), 'CSAT Official': w2.asli, 'SC Full': w2.full, 'SC After Takeout': w2.takeout },
+    { name: getWeekLabel(1), 'CSAT Official': w1.asli, 'SC Full': w1.full, 'SC After Takeout': w1.takeout },
+    { name: getWeekLabel(0), 'CSAT Official': w0.asli, 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
 
   const dailyData = React.useMemo(() => {
@@ -243,8 +242,9 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
       a.dailyHistory?.csat?.forEach(h => {
         if (!dates.has(h.date)) dates.set(h.date, { sum: 0, count: 0 });
         if (h.value !== null) {
-           dates.get(h.date)!.sum += h.value;
-           dates.get(h.date)!.count += 1;
+           const respondentCount = h.count || 1;
+           dates.get(h.date)!.sum += h.sum ?? h.value * respondentCount;
+           dates.get(h.date)!.count += respondentCount;
         }
       });
     });
