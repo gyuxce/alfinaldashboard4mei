@@ -345,15 +345,27 @@ export const useStore = create<AppState>((set, get) => ({
         scheduleData: countDataRows(sheetDataToParseResult(currentMonthData.schedule).data),
         qaData: countDataRows(sheetDataToParseResult(currentMonthData.qa).data),
       };
-      const previousMonthKey = getPreviousSheetMonthKey(selectedMonth);
-      const allData = previousMonthKey
-        ? mergeAllSheetsData(
-            await fetchAllSheets(getSheetConfigForMonth(previousMonthKey)),
-            currentMonthData,
-          )
-        : currentMonthData;
-      const loadedMonthLabel = previousMonthKey
-        ? `${monthOption.label} + ${getSheetMonthOption(previousMonthKey).label}`
+      const historyMonthKeys = [selectedMonth];
+      let historyCursor = getPreviousSheetMonthKey(selectedMonth);
+      while (historyCursor) {
+        historyMonthKeys.unshift(historyCursor);
+        historyCursor = getPreviousSheetMonthKey(historyCursor);
+      }
+
+      const historicalSheets = await Promise.all(
+        historyMonthKeys.map(monthKey =>
+          monthKey === selectedMonth
+            ? Promise.resolve(currentMonthData)
+            : fetchAllSheets(getSheetConfigForMonth(monthKey)),
+        ),
+      );
+      const allData = historicalSheets.reduce(
+        (merged, monthData) =>
+          merged ? mergeAllSheetsData(merged, monthData) : monthData,
+        null as typeof currentMonthData | null,
+      ) || currentMonthData;
+      const loadedMonthLabel = historyMonthKeys.length > 1
+        ? `${getSheetMonthOption(historyMonthKeys[0]).label} - ${monthOption.label}`
         : monthOption.label;
       
       const csvCsid = sheetDataToParseResult(allData.csid);

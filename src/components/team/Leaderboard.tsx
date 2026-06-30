@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
-import { processKPIs } from "../../lib/dataProcessor";
-import { Trophy, Users, User, ArrowRight } from "lucide-react";
+import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
+import { Trophy, Users, User, ArrowRight, ClipboardList } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
@@ -42,6 +42,45 @@ interface LeaderboardRow {
   quiz_points: number;
 }
 
+type DevelopmentStage = "development" | "sp1" | "sp2" | "termination";
+
+interface DevelopmentRow {
+  csId: string;
+  name: string;
+  tl: string;
+  stage: DevelopmentStage;
+  cleanStreak: number;
+  bottomCount: number;
+  lastBottomMonth: string;
+  currentRank: number | null;
+}
+
+const DEVELOPMENT_STAGE_META: Record<
+  DevelopmentStage,
+  { label: string; next: string; className: string }
+> = {
+  development: {
+    label: "Development Plan",
+    next: "SP 1",
+    className: "bg-warning-soft text-warning",
+  },
+  sp1: {
+    label: "SP 1",
+    next: "SP 2",
+    className: "bg-orange-100 text-orange-700",
+  },
+  sp2: {
+    label: "SP 2",
+    next: "Termination",
+    className: "bg-danger-soft text-danger",
+  },
+  termination: {
+    label: "Termination",
+    next: "Final",
+    className: "bg-danger text-white",
+  },
+};
+
 const getProductivityColumns = (totalChat: number, totalDuty: number) => {
   const targetChat = totalDuty * DAILY_PRODUCTIVITY_TARGET;
   const achievement = targetChat > 0 ? (totalChat / targetChat) * 100 : null;
@@ -57,6 +96,42 @@ const getProductivityColumns = (totalChat: number, totalDuty: number) => {
       points !== null && finalPoints !== null
         ? Math.round(points - finalPoints)
         : null,
+  };
+};
+
+const getLeaderboardComposite = (agent: AgentKPI) => {
+  const baseComposite = calculateAgentCompositeScore(agent);
+  const csatGood = agent.csat4Count + agent.csat5Count;
+  const csatBad = agent.qaHistory.filter((entry) => {
+    const checkingType = String(entry.systemCheckingType || "")
+      .trim()
+      .toUpperCase();
+    const mistakeLevel = String(entry.mistakeLevel || "")
+      .trim()
+      .toUpperCase();
+    return (
+      checkingType === "CSAT" &&
+      mistakeLevel !== "" &&
+      !mistakeLevel.includes("NO MISTAKE")
+    );
+  }).length;
+  const csatTotal = csatGood + csatBad;
+  const csatPct = csatTotal > 0 ? (csatGood / csatTotal) * 100 : null;
+
+  return {
+    composite: {
+      ...baseComposite,
+      csatOriginal: csatPct,
+      csatPct,
+      score: calculateCompositeScore({
+        qaPct: baseComposite.qaPct,
+        productivityPct: baseComposite.productivityPct,
+        csatPct,
+      }).score,
+    },
+    csatGood,
+    csatBad,
+    csatPct,
   };
 };
 
@@ -157,8 +232,8 @@ export const Leaderboard: React.FC = () => {
     scheduleData.length > 0 ||
     qaData.length > 0;
 
-  const { agentRows, tlRows } = useMemo(() => {
-    if (!hasData) return { agentRows: [], tlRows: [] };
+  const { agentRows, tlRows, developmentRows } = useMemo(() => {
+    if (!hasData) return { agentRows: [], tlRows: [], developmentRows: [] };
 
     const rawData = processKPIs(
       productivityData,
@@ -201,33 +276,8 @@ export const Leaderboard: React.FC = () => {
     > = {};
 
     rawData.forEach((agent) => {
-      const baseComposite = calculateAgentCompositeScore(agent);
-      const csatGood = agent.csat4Count + agent.csat5Count;
-      const csatBad = agent.qaHistory.filter((entry) => {
-        const checkingType = String(entry.systemCheckingType || "")
-          .trim()
-          .toUpperCase();
-        const mistakeLevel = String(entry.mistakeLevel || "")
-          .trim()
-          .toUpperCase();
-        return (
-          checkingType === "CSAT" &&
-          mistakeLevel !== "" &&
-          !mistakeLevel.includes("NO MISTAKE")
-        );
-      }).length;
-      const csatTotal = csatGood + csatBad;
-      const csatPct = csatTotal > 0 ? (csatGood / csatTotal) * 100 : null;
-      const composite = {
-        ...baseComposite,
-        csatOriginal: csatPct,
-        csatPct,
-        score: calculateCompositeScore({
-          qaPct: baseComposite.qaPct,
-          productivityPct: baseComposite.productivityPct,
-          csatPct,
-        }).score,
-      };
+      const { composite, csatGood, csatBad, csatPct } =
+        getLeaderboardComposite(agent);
       const productivity = getProductivityColumns(
         agent.productivityTotal,
         agent.manDays,
@@ -390,7 +440,126 @@ export const Leaderboard: React.FC = () => {
     aList.sort((a, b) => b.score - a.score);
     tList.sort((a, b) => b.score - a.score);
 
-    return { agentRows: aList, tlRows: tList };
+    const monthRanges: { start: string; end: string; label: string }[] = [];
+    const activeEnd = new Date(`${endDate}T12:00:00`);
+    if (!Number.isNaN(activeEnd.getTime())) {
+      let year = 2026;
+      let monthIndex = 4;
+      while (
+        year < activeEnd.getFullYear() ||
+        (year === activeEnd.getFullYear() && monthIndex <= activeEnd.getMonth())
+      ) {
+        const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+        const monthNumber = String(monthIndex + 1).padStart(2, "0");
+        monthRanges.push({
+          start: `${year}-${monthNumber}-01`,
+          end: `${year}-${monthNumber}-${String(lastDay).padStart(2, "0")}`,
+          label: new Intl.DateTimeFormat("id-ID", {
+            month: "short",
+            year: "numeric",
+          }).format(new Date(year, monthIndex, 1)),
+        });
+        monthIndex += 1;
+        if (monthIndex > 11) {
+          monthIndex = 0;
+          year += 1;
+        }
+      }
+    }
+
+    const developmentMap = new Map<string, DevelopmentRow>();
+
+    monthRanges.forEach((monthRange) => {
+      const monthlyAgents = processKPIs(
+        productivityData,
+        csatScData,
+        slaData,
+        scheduleData,
+        qaData,
+        monthRange.start,
+        monthRange.end,
+        agentDictionary,
+      )
+        .map((agent) => ({
+          agent,
+          score: getLeaderboardComposite(agent).composite.score,
+        }))
+        .filter(
+          (entry): entry is { agent: AgentKPI; score: number } =>
+            entry.score !== null,
+        )
+        .sort(
+          (a, b) =>
+            b.score - a.score ||
+            (a.agent.name || a.agent.csId).localeCompare(
+              b.agent.name || b.agent.csId,
+            ),
+        );
+
+      const eligibleIds = new Set(monthlyAgents.map((entry) => entry.agent.csId));
+      const bottomRanks = new Map(
+        monthlyAgents.slice(-3).map((entry) => [
+          entry.agent.csId,
+          monthlyAgents.findIndex((candidate) => candidate.agent.csId === entry.agent.csId) + 1,
+        ]),
+      );
+
+      eligibleIds.forEach((csId) => {
+        const monthlyEntry = monthlyAgents.find((entry) => entry.agent.csId === csId)!;
+        const current = developmentMap.get(csId);
+        const bottomRank = bottomRanks.get(csId);
+
+        if (bottomRank !== undefined) {
+          const nextStage: DevelopmentStage = !current
+            ? "development"
+            : current.stage === "development"
+              ? "sp1"
+              : current.stage === "sp1"
+                ? "sp2"
+                : "termination";
+
+          developmentMap.set(csId, {
+            csId,
+            name: monthlyEntry.agent.name || csId,
+            tl: monthlyEntry.agent.teamLeader || "-",
+            stage: nextStage,
+            cleanStreak: 0,
+            bottomCount: (current?.bottomCount || 0) + 1,
+            lastBottomMonth: monthRange.label,
+            currentRank: bottomRank,
+          });
+          return;
+        }
+
+        if (!current || current.stage === "termination") return;
+        const cleanStreak = current.cleanStreak + 1;
+        if (cleanStreak >= 3) {
+          developmentMap.delete(csId);
+        } else {
+          developmentMap.set(csId, {
+            ...current,
+            name: monthlyEntry.agent.name || current.name,
+            tl: monthlyEntry.agent.teamLeader || current.tl,
+            cleanStreak,
+            currentRank: null,
+          });
+        }
+      });
+    });
+
+    const stagePriority: Record<DevelopmentStage, number> = {
+      termination: 4,
+      sp2: 3,
+      sp1: 2,
+      development: 1,
+    };
+    const developmentList = Array.from(developmentMap.values()).sort(
+      (a, b) =>
+        stagePriority[b.stage] - stagePriority[a.stage] ||
+        a.name.localeCompare(b.name),
+    );
+
+    return { agentRows: aList, tlRows: tList, developmentRows: developmentList };
   }, [
     hasData,
     productivityData,
@@ -490,6 +659,7 @@ export const Leaderboard: React.FC = () => {
         </button>
       </div>
 
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
         <table className="w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left text-[10px]">
           <colgroup>
@@ -614,6 +784,69 @@ export const Leaderboard: React.FC = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <aside className="overflow-hidden rounded-lg border border-border-strong bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] xl:sticky xl:top-4">
+        <div className="flex items-center justify-between border-b border-border-strong bg-surface-muted px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-primary" />
+            <div>
+              <h3 className="text-xs font-bold text-text-primary">Development Plan</h3>
+              <p className="text-[9px] text-text-muted">Monthly Bottom 3 tracking</p>
+            </div>
+          </div>
+          <span className="text-xs font-black text-text-primary">{developmentRows.length}</span>
+        </div>
+
+        <div className="max-h-[calc(100vh-344px)] overflow-y-auto">
+          {developmentRows.length > 0 ? (
+            <table className="w-full table-fixed text-left text-[10px]">
+              <thead className="sticky top-0 z-10 bg-surface text-text-muted">
+                <tr className="border-b border-border-strong">
+                  <th className="w-[46%] px-3 py-2 font-bold uppercase">Agent</th>
+                  <th className="px-3 py-2 font-bold uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {developmentRows.map((row) => {
+                  const stageMeta = DEVELOPMENT_STAGE_META[row.stage];
+                  return (
+                    <tr key={row.csId} className="border-b border-border last:border-b-0 align-top">
+                      <td className="px-3 py-2.5">
+                        <div className="truncate font-bold text-text-primary" title={row.name}>{row.name}</div>
+                        <div className="mt-0.5 truncate text-[9px] text-text-muted" title={`${row.csId} · ${row.tl}`}>
+                          {row.csId} · {row.tl}
+                        </div>
+                        <div className="mt-1 text-[9px] font-semibold text-text-secondary">
+                          Bottom {row.bottomCount}x · Last {row.lastBottomMonth}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={cn("inline-flex px-1.5 py-0.5 text-[9px] font-black", stageMeta.className)}>
+                          {stageMeta.label}
+                        </span>
+                        <div className="mt-1.5 text-[9px] text-text-secondary">
+                          {row.currentRank !== null
+                            ? `Current rank #${row.currentRank}`
+                            : `Clean streak ${row.cleanStreak}/3`}
+                        </div>
+                        <div className="mt-0.5 text-[9px] text-text-muted">
+                          Next: {stageMeta.next}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className="px-4 py-8 text-center">
+              <p className="text-xs font-bold text-text-primary">Tidak ada status aktif</p>
+              <p className="mt-1 text-[10px] text-text-muted">Riwayat dimulai dari Mei 2026.</p>
+            </div>
+          )}
+        </div>
+      </aside>
       </div>
 
       {selectedAgent && (
