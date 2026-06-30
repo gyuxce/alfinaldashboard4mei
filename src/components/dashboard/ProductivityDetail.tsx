@@ -284,8 +284,7 @@ export const ProductivityDetail: React.FC<{
   const activeHourIndex = selectedHourIndex ?? busiestHourIndex;
   const selectedIntervalInsight = intervalCategoryInsights[activeHourIndex];
 
-  const handleChartIntervalClick = (state: any) => {
-    const index = state?.activeTooltipIndex;
+  const handleChartIntervalClick = (_data: unknown, index?: number) => {
     if (typeof index === "number") {
       setSelectedHourIndex(index);
     }
@@ -323,7 +322,6 @@ export const ProductivityDetail: React.FC<{
               <LineChart
                 data={hourlyDataWow}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                onClick={handleChartIntervalClick}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
@@ -348,7 +346,15 @@ export const ProductivityDetail: React.FC<{
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Ini' : 'Minggu Ini'} dataKey="total" stroke="#E31E24" strokeWidth={3} dot={{ r: 3, cursor: "pointer" }} activeDot={{ r: 5, cursor: "pointer" }} />
+                <Line
+                  type="monotone"
+                  name={comparisonMode === 'mom' ? 'Bulan Ini' : 'Minggu Ini'}
+                  dataKey="total"
+                  stroke="#E31E24"
+                  strokeWidth={3}
+                  dot={{ r: 3, cursor: "pointer", onClick: handleChartIntervalClick }}
+                  activeDot={{ r: 5, cursor: "pointer", onClick: handleChartIntervalClick }}
+                />
                 <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Lalu' : 'Minggu Lalu'} dataKey="prev" stroke="#6B7280" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                 {previousData2.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '2 Bulan Lalu' : '2 Minggu Lalu'} dataKey="prev2" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="3 3" dot={false} />}
                 {previousData3.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '3 Bulan Lalu' : '3 Minggu Lalu'} dataKey="prev3" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="2 2" dot={false} />}
@@ -357,7 +363,6 @@ export const ProductivityDetail: React.FC<{
               <BarChart
                 data={hourlyDataWow}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                onClick={handleChartIntervalClick}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
@@ -376,11 +381,12 @@ export const ProductivityDetail: React.FC<{
                     return null;
                   }}
                 />
-                <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="total" radius={[4, 4, 0, 0]} onClick={handleChartIntervalClick}>
                   {hourlyDataWow.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       cursor="pointer"
+                      onClick={() => setSelectedHourIndex(index)}
                       fill={
                         index === activeHourIndex
                           ? "var(--color-danger-text)"
@@ -389,8 +395,6 @@ export const ProductivityDetail: React.FC<{
                             : "var(--color-border)"
                       }
                       fillOpacity={index === activeHourIndex ? 1 : 0.88}
-                      stroke={index === activeHourIndex ? "var(--color-text-primary)" : "transparent"}
-                      strokeWidth={index === activeHourIndex ? 1 : 0}
                     />
                   ))}
                 </Bar>
