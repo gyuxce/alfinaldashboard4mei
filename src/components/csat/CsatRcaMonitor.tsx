@@ -14,6 +14,12 @@ const COLORS = {
   akulaku: '#f59e0b',
 };
 
+type IssueCategoryRow = {
+  issue: string;
+  count: number;
+  categories: { name: string; count: number }[];
+};
+
 const CustomPieLabel = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
   if (percent < 0.04) return null;
   const RADIAN = Math.PI / 180;
@@ -40,11 +46,38 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     );
   }, [data]);
 
-  const { pieData, agentDetailBar, customerDetailBar, akulakuDetailBar, agentRanking, totalAgent, totalCustomer, totalAkulaku } = useMemo(() => {
+  const {
+    pieData,
+    agentDetailBar,
+    customerDetailBar,
+    akulakuDetailBar,
+    agentIssueCategories,
+    customerIssueCategories,
+    akulakuIssueCategories,
+    agentRanking,
+    totalAgent,
+    totalCustomer,
+    totalAkulaku,
+  } = useMemo(() => {
     const agentTotal: Record<string, number> = {};
     const customerTotal: Record<string, number> = {};
     const akulakuTotal: Record<string, number> = {};
+    const agentCategoryMap: Record<string, Record<string, number>> = {};
+    const customerCategoryMap: Record<string, Record<string, number>> = {};
+    const akulakuCategoryMap: Record<string, Record<string, number>> = {};
     const agentCaseSummary: Record<string, { agentCases: number; customerCases: number; akulakuCases: number; name: string; tl: string }> = {};
+
+    const addIssueCategory = (
+      target: Record<string, Record<string, number>>,
+      issue: string | undefined,
+      category: string | undefined,
+    ) => {
+      const cleanIssue = String(issue || '').trim();
+      if (!cleanIssue) return;
+      const cleanCategory = String(category || 'Unknown Case').trim() || 'Unknown Case';
+      if (!target[cleanIssue]) target[cleanIssue] = {};
+      target[cleanIssue][cleanCategory] = (target[cleanIssue][cleanCategory] || 0) + 1;
+    };
 
     data.forEach(a => {
       const name = a.name || a.csId;
@@ -63,6 +96,12 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         akulakuTotal[k] = (akulakuTotal[k] || 0) + v;
         agentCaseSummary[a.csId].akulakuCases += v;
       });
+
+      a.csatHistory?.forEach(entry => {
+        addIssueCategory(agentCategoryMap, entry.rcaAgent, entry.category);
+        addIssueCategory(customerCategoryMap, entry.rcaCustomer, entry.category);
+        addIssueCategory(akulakuCategoryMap, entry.rcaAkulaku, entry.category);
+      });
     });
 
     const tA = Object.values(agentTotal).reduce((a, b) => a + b, 0);
@@ -79,6 +118,22 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       Object.entries(rec).sort((a, b) => b[1] - a[1]).slice(0, 8)
         .map(([name, count]) => ({ name, count, fill: color }));
 
+    const toIssueCategoryRows = (
+      issueTotals: Record<string, number>,
+      categoryMap: Record<string, Record<string, number>>,
+    ): IssueCategoryRow[] =>
+      Object.entries(issueTotals)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([issue, count]) => ({
+          issue,
+          count,
+          categories: Object.entries(categoryMap[issue] || {})
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([name, categoryCount]) => ({ name, count: categoryCount })),
+        }));
+
     const agentRanking = Object.values(agentCaseSummary)
       .map(a => ({ ...a, total: a.agentCases + a.customerCases + a.akulakuCases }))
       .filter(a => a.total > 0)
@@ -89,6 +144,9 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       agentDetailBar: toBar(agentTotal, COLORS.agent),
       customerDetailBar: toBar(customerTotal, COLORS.customer),
       akulakuDetailBar: toBar(akulakuTotal, COLORS.akulaku),
+      agentIssueCategories: toIssueCategoryRows(agentTotal, agentCategoryMap),
+      customerIssueCategories: toIssueCategoryRows(customerTotal, customerCategoryMap),
+      akulakuIssueCategories: toIssueCategoryRows(akulakuTotal, akulakuCategoryMap),
       agentRanking,
       totalAgent: tA,
       totalCustomer: tC,
@@ -115,7 +173,17 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     { key: 'akulaku', label: 'Akulaku Process', count: totalAkulaku, color: COLORS.akulaku, bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', items: akulakuDetailBar },
   ];
 
-  const DetailBarChart = ({ data: barData, color, title }: { data: { name: string; count: number }[]; color: string; title: string }) => {
+  const DetailBarChart = ({
+    data: barData,
+    color,
+    title,
+    issueCategories,
+  }: {
+    data: { name: string; count: number }[];
+    color: string;
+    title: string;
+    issueCategories: IssueCategoryRow[];
+  }) => {
     const dynamicHeight = Math.max(100, barData.length * 36);
     return (
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col">
@@ -142,6 +210,40 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        )}
+        {issueCategories.length > 0 && (
+          <div className="mt-4 border-t border-border pt-3">
+            <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">
+              Category per issue
+            </div>
+            <div className="space-y-2">
+              {issueCategories.map(row => (
+                <div key={row.issue} className="rounded-lg bg-surface/70 border border-border px-3 py-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] font-bold text-text-primary" title={row.issue}>
+                        {row.issue}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {row.categories.length > 0 ? row.categories.map(category => (
+                          <span
+                            key={`${row.issue}-${category.name}`}
+                            className="max-w-full truncate rounded-md bg-card px-2 py-1 text-[10px] font-semibold text-text-secondary border border-border"
+                            title={`${category.name}: ${category.count} cases`}
+                          >
+                            {category.name} - {category.count}
+                          </span>
+                        )) : (
+                          <span className="text-[10px] font-semibold text-text-muted">Category belum terisi</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-sm font-black" style={{ color }}>{row.count}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     );
@@ -241,9 +343,9 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
       {/* Tier 2: 3 Detail Bar Charts */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <DetailBarChart data={agentDetailBar} color={COLORS.agent} title="Top Issue - Agent Area" />
-        <DetailBarChart data={customerDetailBar} color={COLORS.customer} title="Top Issue - Customer Area" />
-        <DetailBarChart data={akulakuDetailBar} color={COLORS.akulaku} title="Top Issue - Akulaku Process" />
+        <DetailBarChart data={agentDetailBar} color={COLORS.agent} title="Top Issue - Agent Area" issueCategories={agentIssueCategories} />
+        <DetailBarChart data={customerDetailBar} color={COLORS.customer} title="Top Issue - Customer Area" issueCategories={customerIssueCategories} />
+        <DetailBarChart data={akulakuDetailBar} color={COLORS.akulaku} title="Top Issue - Akulaku Process" issueCategories={akulakuIssueCategories} />
       </div>
 
       {/* Tier 3: Agent RCA Table */}
