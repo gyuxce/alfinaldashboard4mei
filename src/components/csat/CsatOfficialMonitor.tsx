@@ -3,7 +3,6 @@ import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort } from '../../lib/utils';
 import { Search, Star } from 'lucide-react';
 import { useStore } from '../../store';
-import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
@@ -75,50 +74,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
-  const tickerItems: TickerItem[] = useMemo(() => {
-    // We must manually compute bpo and tl since we don't have KpiInfoBar anymore
-    let totalSum = 0;
-    let totalCount = 0;
-    const bpoStats: Record<string, { sum: number; count: number }> = {};
-    const tlStats: Record<string, { sum: number; count: number }> = {};
-
-    tableData.forEach(agent => {
-       if (agent.csatAsli !== null) {
-          totalSum += agent.csatAsli;
-          totalCount += 1;
-          const bpo = agent.bpo || 'Unknown';
-          if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
-          bpoStats[bpo].sum += agent.csatAsli;
-          bpoStats[bpo].count += 1;
-
-          const tl = agent.teamLeader || 'Unknown';
-          if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
-          tlStats[tl].sum += agent.csatAsli;
-          tlStats[tl].count += 1;
-       }
-    });
-
-    const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, avg: st.sum / st.count })).sort((a,b) => b.avg - a.avg);
-    const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, avg: st.sum / st.count })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => b.avg - a.avg);
-
-    const sortedTLs = tlArr.slice(0, 5);
-    const sortedAgents = [...tableData].filter(a => a.csatAsli !== null).sort((a, b) => (b.csatAsli || 0) - (a.csatAsli || 0)).slice(0, 5);
-
-    const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 2)}`).join(' · ');
-    const overallAvg = totalCount > 0 ? formatNum(totalSum / totalCount, 2) : '-';
-
-    return [
-      { label: 'CSAT OFFICIAL', value: overallAvg, colorType: 'warning' },
-      { isSeparator: true },
-      { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
-      { isSeparator: true },
-      ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: formatNum(t.avg, 2) })), 'TL:', 3),
-      { isSeparator: true },
-      ...buildRankingItems(sortedAgents.map(a => {
-           return { name: (a.name || a.csId).split(' ')[0], value: formatNum(a.csatAsli || 0, 2) };
-      }), 'Agent:', 5), { isSeparator: true } ];
-  }, [tableData]);
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
@@ -150,8 +105,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
           previousData3={previousData3} 
         />
       )}
-
-      <KpiTicker items={tickerItems} />
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">

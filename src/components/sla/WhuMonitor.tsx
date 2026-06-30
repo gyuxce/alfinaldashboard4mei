@@ -3,7 +3,6 @@ import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort } from '../../lib/utils';
 import { Search, Clock } from 'lucide-react';
 import { useStore } from '../../store';
-import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
 
@@ -81,51 +80,6 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
-  
-  const tickerItems: TickerItem[] = useMemo(() => {
-    let totalSum = 0;
-    let totalCount = 0;
-    const bpoStats: Record<string, { sum: number; count: number }> = {};
-    const tlStats: Record<string, { sum: number; count: number }> = {};
-
-    tableData.forEach(agent => {
-       if (agent.whu !== null && agent.whuCount > 0) {
-          totalSum += agent.whu * agent.whuCount;
-          totalCount += agent.whuCount;
-          const bpo = agent.bpo || 'Unknown';
-          if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
-          bpoStats[bpo].sum += agent.whu * agent.whuCount;
-          bpoStats[bpo].count += agent.whuCount;
-
-          const tl = agent.teamLeader || 'Unknown';
-          if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
-          tlStats[tl].sum += agent.whu * agent.whuCount;
-          tlStats[tl].count += agent.whuCount;
-       }
-    });
-
-    const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, avg: st.sum / st.count })).sort((a,b) => a.avg - b.avg); // WHU ascending/descending? Usually WHU is Work Hour Utilization, higher is better? Let's check prompt -> Sort TL by whu DESC. So higher is better.
-    const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, avg: st.sum / st.count })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => b.avg - a.avg);
-
-    const sortedTLs = tlArr.slice(0, 5);
-    const sortedAgents = [...tableData].filter(a => a.whu !== null).map(a => {
-       return { ...a, avg: a.whu };
-    }).sort((a, b) => b.avg - a.avg).slice(0, 5);
-
-    const bpoArrStr = bpoArr.sort((a,b) => b.avg - a.avg).map(b => `${b.bpo} ${formatNum(b.avg, 2)}%`).join(' · ');
-    const overallAvg = totalCount > 0 ? formatNum(totalSum / totalCount, 2) + '%' : '-';
-
-    return [
-      
-      { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
-      { isSeparator: true },
-      ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: formatNum(t.avg, 2) + '%' })), 'TL:', 3),
-      { isSeparator: true },
-      ...buildRankingItems(sortedAgents.map(a => {
-           return { name: (a.name || a.csId).split(' ')[0], value: formatNum(a.avg, 2) + '%' };
-      }), 'Agent:', 5), { isSeparator: true } ];
-  }, [tableData]);
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
@@ -145,8 +99,6 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           </div>
         </div>
       </div>
-
-      <KpiTicker items={tickerItems} />
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">

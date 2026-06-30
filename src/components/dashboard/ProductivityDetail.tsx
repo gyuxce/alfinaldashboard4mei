@@ -4,15 +4,8 @@ import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
 import { useStore } from "../../store";
 import {
   Search,
-  TrendingUp,
   Activity,
-  BarChart3,
-  ChevronUp,
-  ChevronDown,
-  Award,
   AlertCircle,
-  Target,
-  TrendingDown,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from "recharts";
 import { SortableHeader } from '../ui/SortableHeader';
@@ -252,6 +245,39 @@ export const ProductivityDetail: React.FC<{
     });
   }, [tableData, previousData, previousData2, previousData3, search, filterTL]);
 
+  const intervalCategoryInsights = useMemo(() => {
+    return hourlyDataWow
+      .map((hourData, hourIndex) => {
+        const categoryCounts: Record<string, number> = {};
+
+        tableData.forEach((agent) => {
+          const hourlyCounts = agent.hourlyCategoryCounts?.[hourIndex] || {};
+          Object.entries(hourlyCounts).forEach(([category, count]) => {
+            categoryCounts[category] = (categoryCounts[category] || 0) + count;
+          });
+        });
+
+        const topCategories = Object.entries(categoryCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([category, count]) => ({
+            category,
+            count,
+            share: hourData.total > 0 ? (count / hourData.total) * 100 : 0,
+          }));
+
+        return {
+          hour: hourData.hour,
+          total: hourData.total,
+          change: typeof hourData.prev === "number" ? hourData.total - hourData.prev : null,
+          topCategories,
+        };
+      })
+      .filter((item) => item.total > 0 && item.topCategories.length > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [hourlyDataWow, tableData]);
+
   return (
     <div className="flex flex-col gap-6 p-2">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -338,6 +364,63 @@ export const ProductivityDetail: React.FC<{
             )}
           </ResponsiveContainer>
         </div>
+
+        {intervalCategoryInsights.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 pt-2 border-t border-border">
+            {intervalCategoryInsights.map((item) => {
+              const topCategory = item.topCategories[0];
+              const changeLabel = item.change === null
+                ? null
+                : `${item.change >= 0 ? "+" : ""}${formatNum(item.change, 0)} vs pembanding`;
+
+              return (
+                <div key={item.hour} className="rounded-lg border border-border bg-surface/60 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-bold text-text-muted uppercase tracking-wide">
+                        Interval {item.hour}
+                      </div>
+                      <div className="mt-1 text-lg font-black text-text-primary leading-none">
+                        {formatNum(item.total, 0)}
+                        <span className="ml-1 text-[11px] font-semibold text-text-muted">chats</span>
+                      </div>
+                    </div>
+                    {changeLabel && (
+                      <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold ${item.change && item.change > 0 ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>
+                        {changeLabel}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-bold text-text-primary" title={topCategory.category}>
+                          {topCategory.category}
+                        </div>
+                        <div className="text-[11px] text-text-secondary">
+                          {formatNum(topCategory.count, 0)} cases &middot; {formatNum(topCategory.share, 1)}% dari interval
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {item.topCategories.slice(1).map((category) => (
+                        <span
+                          key={category.category}
+                          className="max-w-full truncate rounded-md bg-card px-2 py-1 text-[10px] font-semibold text-text-secondary border border-border"
+                          title={`${category.category}: ${category.count} cases`}
+                        >
+                          {category.category} &middot; {formatNum(category.count, 0)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all max-h-[calc(100vh-280px)]">

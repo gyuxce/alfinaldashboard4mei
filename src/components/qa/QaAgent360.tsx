@@ -3,7 +3,6 @@ import { AgentKPI, QAEntry } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
 import { useStore } from '../../store';
-import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
@@ -120,84 +119,6 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       };
     }).sort((a, b) => b.totalDefect - a.totalDefect);
   }, [tableData]);
-
-  
-  const tickerItems: TickerItem[] = useMemo(() => {
-    let totalSum = 0;
-    let totalCount = 0;
-    const bpoStats: Record<string, { sum: number; count: number }> = {};
-    const tlStats: Record<string, { sum: number; count: number }> = {};
-
-    tableData.forEach(agent => {
-       if (viewMode === 'performance') {
-          if (agent.qaScoreCount > 0) {
-             const score = agent.qaScoreSum / agent.qaScoreCount;
-             totalSum += score * agent.qaScoreCount;
-             totalCount += agent.qaScoreCount;
-             const bpo = agent.bpo || 'Unknown';
-             if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
-             bpoStats[bpo].sum += score * agent.qaScoreCount;
-             bpoStats[bpo].count += agent.qaScoreCount;
-
-             const tl = agent.teamLeader || 'Unknown';
-             if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
-             tlStats[tl].sum += score * agent.qaScoreCount;
-             tlStats[tl].count += agent.qaScoreCount;
-          }
-       } else {
-          const defectCount = agent.qaHistory.filter(isQaDefect).length;
-          totalSum += defectCount;
-          totalCount += agent.qaHistory.length || 1; 
-          const bpo = agent.bpo || 'Unknown';
-          if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
-          bpoStats[bpo].sum += defectCount;
-          bpoStats[bpo].count += 1;
-
-          const tl = agent.teamLeader || 'Unknown';
-          if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
-          tlStats[tl].sum += defectCount;
-          tlStats[tl].count += 1;
-       }
-    });
-
-    if (viewMode === 'performance') {
-       const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, avg: st.sum / st.count })).sort((a,b) => b.avg - a.avg);
-       const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, avg: st.sum / st.count })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => b.avg - a.avg);
-       const sortedTLs = tlArr.slice(0, 5);
-       const sortedAgents = [...tableData].filter(a => a.qaScoreCount > 0).map(a => ({ ...a, avg: a.qaScoreSum / a.qaScoreCount })).sort((a, b) => b.avg - a.avg).slice(0, 5);
-
-       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 1)}%`).join(' | ');
-       const overallAvg = totalCount > 0 ? formatNum(totalSum / totalCount, 1) + '%' : '-';
-
-       return [
-         
-         { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
-         { isSeparator: true },
-         ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: formatNum(t.avg, 1) + '%' })), 'TL:', 3),
-         { isSeparator: true },
-         ...buildRankingItems(sortedAgents.map(a => {
-              return { name: (a.name || a.csId).split(' ')[0], value: formatNum(a.avg, 1) + '%' };
-         }), 'Agent:', 5), { isSeparator: true } ];
-    } else {
-       const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, count: st.sum })).sort((a,b) => a.count - b.count);
-       const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, count: st.sum })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => a.count - b.count);
-       const sortedTLs = tlArr.slice(0, 5);
-       const sortedAgents = [...tableData].map(a => ({ ...a, defectCount: a.qaHistory.filter(isQaDefect).length })).sort((a, b) => a.defectCount - b.defectCount).slice(0, 5);
-       
-       const bpoArrStr = bpoArr.map(b => `${b.bpo} ${b.count} defect`).join(' | ');
-       const overallAvg = totalSum.toString();
-       
-       return [
-         
-         { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
-         { isSeparator: true },
-         ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: `${t.count} defect` })), 'TL:', 3),
-         { isSeparator: true },
-         ...buildRankingItems(sortedAgents.map(a => {
-              return { name: (a.name || a.csId).split(' ')[0], value: `${a.defectCount} defect` };
-         }), 'Agent:', 5), { isSeparator: true } ];
-    }
-  }, [tableData, viewMode]);
 
   const sortedPerformanceData = useMemo(() => {
     let sortable = [...defectData];
@@ -337,8 +258,6 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           </div>
         </div>
       </div>
-
-      <KpiTicker items={tickerItems} />
 
       {viewMode === 'performance' ? (
         <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">

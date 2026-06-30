@@ -3,7 +3,6 @@ import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search } from 'lucide-react';
 import { useStore } from '../../store';
-import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
 
@@ -74,57 +73,6 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
-  
-  const tickerItems: TickerItem[] = useMemo(() => {
-    let totalSum = 0;
-    let totalCount = 0;
-    const bpoStats: Record<string, { sum: number; count: number }> = {};
-    const tlStats: Record<string, { sum: number; count: number }> = {};
-    
-    tableData.forEach(agent => {
-       const sla = viewMode === '1m' ? agent.sla1m : agent.sla3m;
-       const count = viewMode === '1m' ? agent.sla1mCount : agent.sla3mCount;
-       if (sla !== null && count > 0) {
-          totalSum += sla * count;
-          totalCount += count;
-          const bpo = agent.bpo || 'Unknown';
-          if (!bpoStats[bpo]) bpoStats[bpo] = { sum: 0, count: 0 };
-          bpoStats[bpo].sum += sla * count;
-          bpoStats[bpo].count += count;
-
-          const tl = agent.teamLeader || 'Unknown';
-          if (!tlStats[tl]) tlStats[tl] = { sum: 0, count: 0 };
-          tlStats[tl].sum += sla * count;
-          tlStats[tl].count += count;
-       }
-    });
-
-    const isLowerBetter = viewMode === '3m';
-    const sortFn = (a, b) => isLowerBetter ? a.avg - b.avg : b.avg - a.avg;
-
-    const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({ bpo, avg: st.sum / st.count })).sort(sortFn);
-    const tlArr = Object.entries(tlStats).map(([tl, st]) => ({ tl, avg: st.sum / st.count })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort(sortFn);
-
-    const sortedTLs = tlArr.slice(0, 5);
-    const sortedAgents = [...tableData].filter(a => (viewMode === '1m' ? a.sla1m : a.sla3m) !== null).map(a => {
-       return { ...a, avg: viewMode === '1m' ? a.sla1m : a.sla3m };
-    }).sort(sortFn).slice(0, 5);
-
-    const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 1)}%`).join(' · ');
-    const overallAvg = totalCount > 0 ? formatNum(totalSum / totalCount, 1) + '%' : '-';
-
-    return [
-      { label: `AVG SLA ${viewMode === '1m' ? '<1m' : '>3m'}`, value: overallAvg, colorType: 'primary' },
-      { isSeparator: true },
-      { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
-      { isSeparator: true },
-      ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: formatNum(t.avg, 1) + '%' })), 'TL:', 3),
-      { isSeparator: true },
-      ...buildRankingItems(sortedAgents.map(a => {
-           return { name: (a.name || a.csId).split(' ')[0], value: formatNum(a.avg, 1) + '%' };
-      }), 'Agent:', 5), { isSeparator: true } ];
-  }, [tableData, viewMode]);
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
@@ -169,8 +117,6 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           </div>
         </div>
       </div>
-
-      <KpiTicker items={tickerItems} />
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">

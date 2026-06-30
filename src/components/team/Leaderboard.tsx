@@ -4,7 +4,6 @@ import { processKPIs } from "../../lib/dataProcessor";
 import { Trophy, Users, User, ArrowRight } from "lucide-react";
 import { formatNum, getKpiColor } from "../../lib/utils";
 import { cn } from "../../lib/utils";
-import { KpiTicker, TickerItem } from '../ui/KpiTicker';
 import { EmptyState } from '../ui/EmptyState';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
 
@@ -263,25 +262,6 @@ export const Leaderboard: React.FC = () => {
     agentDictionary,
   ]);
 
-  const tickerItems: TickerItem[] = useMemo(() => {
-    const topAgents = agentRows.slice(0, 5);
-    const topTls = tlRows.slice(0, 5);
-    const topAgentAvg = topAgents.length > 0
-      ? topAgents.reduce((acc, curr) => acc + curr.score, 0) / topAgents.length
-      : 0;
-    const topTlAvg = topTls.length > 0
-      ? topTls.reduce((acc, curr) => acc + curr.score, 0) / topTls.length
-      : 0;
-    
-    const globalAgentAvg = agentRows.length > 0 ? (agentRows.reduce((sum, a) => sum + a.score, 0) / agentRows.length) : 0;
-
-    return [
-      { label: 'Overall Weighted Avg Score', value: `${formatNum(globalAgentAvg, 2)}`, colorType: 'primary', isSeparator: false, hasDotRight: true },
-      { label: 'Top 5 Agents Avg', value: `${formatNum(topAgentAvg, 2)}`, colorType: 'success', hasDotRight: true },
-      { label: 'Top 5 TLs Avg', value: `${formatNum(topTlAvg, 2)}`, colorType: 'success' },
-    ];
-  }, [agentRows, tlRows]);
-
   if (!hasData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full mt-10">
@@ -372,8 +352,6 @@ export const Leaderboard: React.FC = () => {
           Menampilkan data lengkap, tidak mengikuti filter sidebar
         </p>
       </div>
-
-      <KpiTicker items={tickerItems} />
 
       <div className="inline-flex bg-surface-muted p-1 rounded-lg w-max gap-1">
         <button

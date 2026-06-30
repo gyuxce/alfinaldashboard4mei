@@ -3,7 +3,6 @@ import { AgentKPI, CSATEntry } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useStore } from '../../store';
-import { KpiTicker, buildRankingItems, TickerItem } from '../ui/KpiTicker';
 
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
@@ -342,59 +341,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     return Object.entries(agentDist).sort((a,b) => b[1] - a[1]).map((e, idx) => ({ rank: idx+1, name: e[0], count: e[1] }));
   }, [tableData, selectedScoreCase, viewMode]);
 
-  
-  const tickerItems: TickerItem[] = useMemo(() => {
-    const bpoStats: Record<string, { good: number; total: number }> = {};
-    const tlStats: Record<string, { good: number; total: number }> = {};
-
-    tableData.forEach(agent => {
-       const goodCount = viewMode === 'full' ? agent.csatScGoodCount : agent.csatScFairGoodCount;
-       const totalValid = viewMode === 'full' ? agent.csatScTotalValid : agent.csatScFairTotalValid;
-       if (totalValid > 0) {
-          const bpo = agent.bpo || 'Unknown';
-          if (!bpoStats[bpo]) bpoStats[bpo] = { good: 0, total: 0 };
-          bpoStats[bpo].good += goodCount;
-          bpoStats[bpo].total += totalValid;
-
-          const tl = agent.teamLeader || 'Unknown';
-          if (!tlStats[tl]) tlStats[tl] = { good: 0, total: 0 };
-          tlStats[tl].good += goodCount;
-          tlStats[tl].total += totalValid;
-       }
-    });
-
-    const bpoArr = Object.entries(bpoStats).map(([bpo, st]) => ({
-      bpo,
-      avg: st.total > 0 ? (st.good / st.total) * 100 : 0
-    })).sort((a,b) => b.avg - a.avg);
-    const tlArr = Object.entries(tlStats).map(([tl, st]) => ({
-      tl,
-      avg: st.total > 0 ? (st.good / st.total) * 100 : 0
-    })).filter(x => x.tl !== 'Unknown' && x.tl !== '-').sort((a,b) => b.avg - a.avg);
-
-    const sortedTLs = tlArr.slice(0, 5);
-    const sortedAgents = [...tableData].filter(a => (viewMode === 'full' ? a.csatScTotalValid : a.csatScFairTotalValid) > 0).map(a => {
-       const goodCount = viewMode === 'full' ? a.csatScGoodCount : a.csatScFairGoodCount;
-       const totalValid = viewMode === 'full' ? a.csatScTotalValid : a.csatScFairTotalValid;
-       return { ...a, avg: totalValid > 0 ? (goodCount / totalValid) * 100 : 0 };
-    }).sort((a, b) => b.avg - a.avg).slice(0, 5);
-
-    const bpoArrStr = bpoArr.map(b => `${b.bpo} ${formatNum(b.avg, 1)}%`).join(' · ');
-    const overallGood = tableData.reduce((s, a) => s + (viewMode === 'full' ? a.csatScGoodCount : a.csatScFairGoodCount), 0);
-    const overallValid = tableData.reduce((s, a) => s + (viewMode === 'full' ? a.csatScTotalValid : a.csatScFairTotalValid), 0);
-    const overallAvg = overallValid > 0 ? formatNum((overallGood / overallValid) * 100, 1) + '%' : '-';
-
-    return [
-      
-      { label: 'BPO:', value: bpoArrStr, colorType: 'neutral' },
-      { isSeparator: true },
-      ...buildRankingItems(sortedTLs.map(t => ({ name: t.tl, value: formatNum(t.avg, 1) + '%' })), 'TL:', 3),
-      { isSeparator: true },
-      ...buildRankingItems(sortedAgents.map(a => {
-           return { name: (a.name || a.csId).split(' ')[0], value: formatNum(a.avg, 1) + '%' };
-      }), 'Agent:', 5), { isSeparator: true } ];
-  }, [tableData, viewMode]);
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
@@ -512,8 +458,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           />
         </>
       )}
-
-      <KpiTicker items={tickerItems} />
 
       {analysisMode === 'score' ? (
         <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">

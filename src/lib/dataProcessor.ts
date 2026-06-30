@@ -105,6 +105,7 @@ export interface AgentKPI {
   qaHistory: QAEntry[];
   csatHistory: CSATEntry[];
   hourlyProductivity: number[];
+  hourlyCategoryCounts: Record<string, number>[];
   dailyHistory: {
     productivity: HistoryEntry[];
     csat: HistoryEntry[];
@@ -410,6 +411,7 @@ export const processKPIs = (
         qaHistory: [],
         csatHistory: [],
         hourlyProductivity: new Array(24).fill(0),
+        hourlyCategoryCounts: Array.from({ length: 24 }, () => ({})),
         dailyHistory: {
           productivity: [],
           csat: [],
@@ -724,6 +726,10 @@ export const processKPIs = (
            const hr = parseInt(hrStr, 10);
            if (!isNaN(hr) && hr >= 0 && hr < 24) {
              agent.hourlyProductivity[hr] += 1;
+             const categoryLabel = category
+               ? category.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+               : "Unknown Case";
+             agent.hourlyCategoryCounts[hr][categoryLabel] = (agent.hourlyCategoryCounts[hr][categoryLabel] || 0) + 1;
            }
         }
       }
