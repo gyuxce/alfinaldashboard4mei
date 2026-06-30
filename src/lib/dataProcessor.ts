@@ -18,6 +18,7 @@ export interface CSATEntry {
 export interface QAEntry {
   date: string;
   normDate?: string | null;
+  systemCheckingType?: string;
   ticketId: string;
   chatId?: string;
   uid?: string;
@@ -985,6 +986,7 @@ export const processKPIs = (
       const uid = String(row[5] || "").trim(); // F
       const chatId = String(row[6] || "").trim(); // G
       const caseDate = String(row[8] || "").trim(); // I
+      const systemCheckingType = String(row[12] || "").trim(); // M
       const qcName = String(row[14] || "").trim(); // O
       const mistakeLevel = String(row[15] || "").trim(); // P
       const deduction = 0; // Not mentioned, defaulting to 0
@@ -1011,6 +1013,7 @@ export const processKPIs = (
         uid,
         chatId,
         caseDate,
+        systemCheckingType,
         qcName,
         mistakeLevel,
         category,
@@ -1030,6 +1033,7 @@ export const processKPIs = (
       agent.qaHistory.push({
         date: dateStr,
         normDate,
+        systemCheckingType,
         ticketId,
         uid,
         chatId,

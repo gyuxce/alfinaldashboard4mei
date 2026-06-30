@@ -29,6 +29,9 @@ interface LeaderboardRow {
   prod_difference: number | null;
   csat: number | null;
   csat_pct: number | null;
+  csat_good: number;
+  csat_bad: number;
+  csat_points: number | null;
   training_total: number | null;
   training_completion: number | null;
   training_pct: number;
@@ -188,13 +191,41 @@ export const Leaderboard: React.FC = () => {
         prodOrigCount: number;
         csatOrigSum: number;
         csatOrigCount: number;
+        csatGood: number;
+        csatBad: number;
         totalDuty: number;
         totalChat: number;
       }
     > = {};
 
     rawData.forEach((agent) => {
-      const composite = calculateAgentCompositeScore(agent);
+      const baseComposite = calculateAgentCompositeScore(agent);
+      const csatGood = agent.csat4Count + agent.csat5Count;
+      const csatBad = agent.qaHistory.filter((entry) => {
+        const checkingType = String(entry.systemCheckingType || "")
+          .trim()
+          .toUpperCase();
+        const mistakeLevel = String(entry.mistakeLevel || "")
+          .trim()
+          .toUpperCase();
+        return (
+          checkingType === "CSAT" &&
+          mistakeLevel !== "" &&
+          !mistakeLevel.includes("NO MISTAKE")
+        );
+      }).length;
+      const csatTotal = csatGood + csatBad;
+      const csatPct = csatTotal > 0 ? (csatGood / csatTotal) * 100 : null;
+      const composite = {
+        ...baseComposite,
+        csatOriginal: csatPct,
+        csatPct,
+        score: calculateCompositeScore({
+          qaPct: baseComposite.qaPct,
+          productivityPct: baseComposite.productivityPct,
+          csatPct,
+        }).score,
+      };
       const productivity = getProductivityColumns(
         agent.productivityTotal,
         agent.manDays,
@@ -221,6 +252,9 @@ export const Leaderboard: React.FC = () => {
           prod_difference: productivity.difference,
           csat: composite.csatOriginal,
           csat_pct: composite.csatPct,
+          csat_good: csatGood,
+          csat_bad: csatBad,
+          csat_points: csatPct !== null ? (csatPct / 100) * 20 : null,
           training_total: null,
           training_completion: null,
           training_pct: 100,
@@ -250,6 +284,8 @@ export const Leaderboard: React.FC = () => {
             prodOrigCount: 0,
             csatOrigSum: 0,
             csatOrigCount: 0,
+            csatGood: 0,
+            csatBad: 0,
             totalDuty: 0,
             totalChat: 0,
           };
@@ -257,6 +293,8 @@ export const Leaderboard: React.FC = () => {
         tlMap[tl].agents.add(agent.csId);
         tlMap[tl].totalDuty += agent.manDays;
         tlMap[tl].totalChat += agent.productivityTotal;
+        tlMap[tl].csatGood += csatGood;
+        tlMap[tl].csatBad += csatBad;
 
         if (composite.qaPct !== null) {
           tlMap[tl].qaPctSum += composite.qaPct;
@@ -288,8 +326,9 @@ export const Leaderboard: React.FC = () => {
         stats.qaPctCount > 0 ? stats.qaPctSum / stats.qaPctCount : null;
       const tl_prod_pct =
         stats.prodPctCount > 0 ? stats.prodPctSum / stats.prodPctCount : null;
+      const tlCsatTotal = stats.csatGood + stats.csatBad;
       const tl_csat_pct =
-        stats.csatPctCount > 0 ? stats.csatPctSum / stats.csatPctCount : null;
+        tlCsatTotal > 0 ? (stats.csatGood / tlCsatTotal) * 100 : null;
 
       const tl_qa_orig =
         stats.qaOrigCount > 0 ? stats.qaOrigSum / stats.qaOrigCount : null;
@@ -297,10 +336,7 @@ export const Leaderboard: React.FC = () => {
         stats.prodOrigCount > 0
           ? stats.prodOrigSum / stats.prodOrigCount
           : null;
-      const tl_csat_orig =
-        stats.csatOrigCount > 0
-          ? stats.csatOrigSum / stats.csatOrigCount
-          : null;
+      const tl_csat_orig = tl_csat_pct;
       const productivity = getProductivityColumns(
         stats.totalChat,
         stats.totalDuty,
@@ -330,6 +366,10 @@ export const Leaderboard: React.FC = () => {
           prod_difference: productivity.difference,
           csat: tl_csat_orig,
           csat_pct: tl_csat_pct,
+          csat_good: stats.csatGood,
+          csat_bad: stats.csatBad,
+          csat_points:
+            tl_csat_pct !== null ? (tl_csat_pct / 100) * 20 : null,
           training_total: null,
           training_completion: null,
           training_pct: 100,
@@ -446,7 +486,7 @@ export const Leaderboard: React.FC = () => {
       </div>
 
       <div className="relative w-full overflow-auto bg-card border border-border rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
-        <table className="w-full min-w-[2100px] border-collapse whitespace-nowrap text-left text-[10px]">
+        <table className="w-full min-w-[2350px] border-collapse whitespace-nowrap text-left text-[10px]">
           <thead className="sticky top-0 z-30 text-white">
             <tr className="bg-primary">
               <th rowSpan={2} className="w-12 border-r border-white/30 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
@@ -455,7 +495,7 @@ export const Leaderboard: React.FC = () => {
               <th rowSpan={2} className="w-[160px] border-r border-white/30 p-2 font-bold md:sticky md:left-[348px] z-50 bg-primary shadow-[8px_0_12px_-10px_rgba(0,0,0,0.8)]">Leader Name</th>
               <th colSpan={2} className="border-r border-white/30 p-2 text-center font-bold">QC Score (50 Points)</th>
               <th colSpan={7} className="border-r border-white/30 p-2 text-center font-bold">Productivity (20 Points)</th>
-              <th rowSpan={2} className="w-[90px] border-r border-white/30 p-2 text-center font-bold">CSAT (20 Points)</th>
+              <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">CSAT Score (20 Points)</th>
               <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">Training Completion (5 Points)</th>
               <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">Quiz Score (5 Points)</th>
               <th rowSpan={2} className="w-[90px] p-2 text-center font-bold">Final Score</th>
@@ -464,6 +504,7 @@ export const Leaderboard: React.FC = () => {
               {[
                 "% Ach", "Total Points",
                 "Daily Target", "Total Duty", "Target Chat", "Total Chat", "Total Points", "Final Points", "Difference",
+                "Total Good Rating", "Total Bad Rating", "Total CSAT", "Total Points",
                 "Total Training", "Agent Completion", "% Ach", "Total Points",
                 "Target", "Agent Score", "% Ach", "Total Points",
               ].map((label, index) => (
@@ -516,9 +557,10 @@ export const Leaderboard: React.FC = () => {
                     {item.prod_difference !== null ? item.prod_difference : "-"}
                   </td>
 
-                  <td className={metricCell}>
-                    {item.csat === null ? "-" : item.csat > 5 ? `${formatNum(item.csat, 2)}%` : formatNum(item.csat, 2)}
-                  </td>
+                  <td className={metricCell}>{formatNum(item.csat_good, 0)}</td>
+                  <td className={metricCell}>{formatNum(item.csat_bad, 0)}</td>
+                  <td className={metricCell}>{item.csat_pct !== null ? `${formatNum(item.csat_pct, 2)}%` : "-"}</td>
+                  <td className={metricCell}>{item.csat_points !== null ? formatNum(item.csat_points, 2) : "-"}</td>
 
                   <td className={metricCell}>{item.training_total ?? "-"}</td>
                   <td className={metricCell}>{item.training_completion ?? "-"}</td>
@@ -539,7 +581,7 @@ export const Leaderboard: React.FC = () => {
 
             {activeData.length === 0 && (
               <tr>
-                <td colSpan={23} className="p-4">
+                <td colSpan={26} className="p-4">
                   <EmptyState
                     title="Tidak ada data leaderboard"
                     description="Jika belum sync, buka File Center lalu klik Sync Now. Untuk mode TL, pastikan TL memiliki minimal 3 agent."
