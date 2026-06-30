@@ -25,6 +25,7 @@ export const ProductivityDetail: React.FC<{
   const [search, setSearch] = useState("");
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [selectedHourIndex, setSelectedHourIndex] = useState<number | null>(null);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -246,37 +247,49 @@ export const ProductivityDetail: React.FC<{
   }, [tableData, previousData, previousData2, previousData3, search, filterTL]);
 
   const intervalCategoryInsights = useMemo(() => {
-    return hourlyDataWow
-      .map((hourData, hourIndex) => {
-        const categoryCounts: Record<string, number> = {};
+    return hourlyDataWow.map((hourData, hourIndex) => {
+      const categoryCounts: Record<string, number> = {};
 
-        tableData.forEach((agent) => {
-          const hourlyCounts = agent.hourlyCategoryCounts?.[hourIndex] || {};
-          Object.entries(hourlyCounts).forEach(([category, count]) => {
-            categoryCounts[category] = (categoryCounts[category] || 0) + count;
-          });
+      tableData.forEach((agent) => {
+        const hourlyCounts = agent.hourlyCategoryCounts?.[hourIndex] || {};
+        Object.entries(hourlyCounts).forEach(([category, count]) => {
+          categoryCounts[category] = (categoryCounts[category] || 0) + count;
         });
+      });
 
-        const topCategories = Object.entries(categoryCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([category, count]) => ({
-            category,
-            count,
-            share: hourData.total > 0 ? (count / hourData.total) * 100 : 0,
-          }));
+      const topCategories = Object.entries(categoryCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([category, count]) => ({
+          category,
+          count,
+          share: hourData.total > 0 ? (count / hourData.total) * 100 : 0,
+        }));
 
-        return {
-          hour: hourData.hour,
-          total: hourData.total,
-          change: typeof hourData.prev === "number" ? hourData.total - hourData.prev : null,
-          topCategories,
-        };
-      })
-      .filter((item) => item.total > 0 && item.topCategories.length > 0)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 6);
+      return {
+        hour: hourData.hour,
+        total: hourData.total,
+        change: typeof hourData.prev === "number" ? hourData.total - hourData.prev : null,
+        topCategories,
+      };
+    });
   }, [hourlyDataWow, tableData]);
+
+  const busiestHourIndex = useMemo(() => {
+    return hourlyDataWow.reduce((bestIndex, item, index) => {
+      return item.total > hourlyDataWow[bestIndex].total ? index : bestIndex;
+    }, 0);
+  }, [hourlyDataWow]);
+
+  const activeHourIndex = selectedHourIndex ?? busiestHourIndex;
+  const selectedIntervalInsight = intervalCategoryInsights[activeHourIndex];
+
+  const handleChartIntervalClick = (state: any) => {
+    const index = state?.activeTooltipIndex;
+    if (typeof index === "number") {
+      setSelectedHourIndex(index);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 p-2">
@@ -307,7 +320,11 @@ export const ProductivityDetail: React.FC<{
         <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             {isComparisonEnabled && previousData.length > 0 ? (
-              <LineChart data={hourlyDataWow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart
+                data={hourlyDataWow}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                onClick={handleChartIntervalClick}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
@@ -331,13 +348,17 @@ export const ProductivityDetail: React.FC<{
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Ini' : 'Minggu Ini'} dataKey="total" stroke="#E31E24" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Ini' : 'Minggu Ini'} dataKey="total" stroke="#E31E24" strokeWidth={3} dot={{ r: 3, cursor: "pointer" }} activeDot={{ r: 5, cursor: "pointer" }} />
                 <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Lalu' : 'Minggu Lalu'} dataKey="prev" stroke="#6B7280" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                 {previousData2.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '2 Bulan Lalu' : '2 Minggu Lalu'} dataKey="prev2" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="3 3" dot={false} />}
                 {previousData3.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '3 Bulan Lalu' : '3 Minggu Lalu'} dataKey="prev3" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="2 2" dot={false} />}
               </LineChart>
             ) : (
-              <BarChart data={hourlyDataWow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart
+                data={hourlyDataWow}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                onClick={handleChartIntervalClick}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
@@ -357,7 +378,20 @@ export const ProductivityDetail: React.FC<{
                 />
                 <Bar dataKey="total" radius={[4, 4, 0, 0]}>
                   {hourlyDataWow.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.total > 0 ? "var(--color-primary)" : "var(--color-border)"} />
+                    <Cell
+                      key={`cell-${index}`}
+                      cursor="pointer"
+                      fill={
+                        index === activeHourIndex
+                          ? "var(--color-danger-text)"
+                          : entry.total > 0
+                            ? "var(--color-primary)"
+                            : "var(--color-border)"
+                      }
+                      fillOpacity={index === activeHourIndex ? 1 : 0.88}
+                      stroke={index === activeHourIndex ? "var(--color-text-primary)" : "transparent"}
+                      strokeWidth={index === activeHourIndex ? 1 : 0}
+                    />
                   ))}
                 </Bar>
               </BarChart>
@@ -365,60 +399,77 @@ export const ProductivityDetail: React.FC<{
           </ResponsiveContainer>
         </div>
 
-        {intervalCategoryInsights.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 pt-2 border-t border-border">
-            {intervalCategoryInsights.map((item) => {
-              const topCategory = item.topCategories[0];
-              const changeLabel = item.change === null
-                ? null
-                : `${item.change >= 0 ? "+" : ""}${formatNum(item.change, 0)} vs pembanding`;
-
-              return (
-                <div key={item.hour} className="rounded-lg border border-border bg-surface/60 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-bold text-text-muted uppercase tracking-wide">
-                        Interval {item.hour}
+        {selectedIntervalInsight && (
+          <div className="rounded-xl border border-border bg-surface/60 p-4 pt-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-[11px] font-bold text-text-muted uppercase tracking-wide">
+                  Selected Interval {selectedIntervalInsight.hour}
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-black leading-none text-text-primary">
+                    {formatNum(selectedIntervalInsight.total, 0)}
+                  </span>
+                  <span className="text-xs font-semibold text-text-muted">chats</span>
+                  {selectedIntervalInsight.change !== null && (
+                    <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${selectedIntervalInsight.change > 0 ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>
+                      {selectedIntervalInsight.change >= 0 ? "+" : ""}
+                      {formatNum(selectedIntervalInsight.change, 0)} vs pembanding
+                    </span>
+                  )}
+                </div>
+              </div>
+              {selectedIntervalInsight.topCategories[0] && (
+                <div className="min-w-0 rounded-lg border border-border bg-card px-3 py-2 md:max-w-md">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-bold text-text-primary" title={selectedIntervalInsight.topCategories[0].category}>
+                        {selectedIntervalInsight.topCategories[0].category}
                       </div>
-                      <div className="mt-1 text-lg font-black text-text-primary leading-none">
-                        {formatNum(item.total, 0)}
-                        <span className="ml-1 text-[11px] font-semibold text-text-muted">chats</span>
+                      <div className="text-[11px] text-text-secondary">
+                        {formatNum(selectedIntervalInsight.topCategories[0].count, 0)} cases &middot; {formatNum(selectedIntervalInsight.topCategories[0].share, 1)}% dari interval
                       </div>
-                    </div>
-                    {changeLabel && (
-                      <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold ${item.change && item.change > 0 ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>
-                        {changeLabel}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-bold text-text-primary" title={topCategory.category}>
-                          {topCategory.category}
-                        </div>
-                        <div className="text-[11px] text-text-secondary">
-                          {formatNum(topCategory.count, 0)} cases &middot; {formatNum(topCategory.share, 1)}% dari interval
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {item.topCategories.slice(1).map((category) => (
-                        <span
-                          key={category.category}
-                          className="max-w-full truncate rounded-md bg-card px-2 py-1 text-[10px] font-semibold text-text-secondary border border-border"
-                          title={`${category.category}: ${category.count} cases`}
-                        >
-                          {category.category} &middot; {formatNum(category.count, 0)}
-                        </span>
-                      ))}
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              )}
+            </div>
+
+            {selectedIntervalInsight.topCategories.length > 0 ? (
+              <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-muted text-text-muted">
+                    <tr>
+                      <th className="w-12 px-3 py-2 font-bold uppercase tracking-wide">Rank</th>
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide">Category</th>
+                      <th className="w-28 px-3 py-2 text-right font-bold uppercase tracking-wide">Cases</th>
+                      <th className="w-28 px-3 py-2 text-right font-bold uppercase tracking-wide">Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedIntervalInsight.topCategories.map((category, index) => (
+                      <tr key={category.category} className="border-t border-border">
+                        <td className="px-3 py-2 font-bold text-text-muted">#{index + 1}</td>
+                        <td className="max-w-[360px] truncate px-3 py-2 font-semibold text-text-primary" title={category.category}>
+                          {category.category}
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold text-text-primary">
+                          {formatNum(category.count, 0)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold text-text-secondary">
+                          {formatNum(category.share, 1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg border border-dashed border-border bg-card px-3 py-4 text-sm font-semibold text-text-muted">
+                Tidak ada category terdeteksi untuk interval ini.
+              </div>
+            )}
           </div>
         )}
       </div>
