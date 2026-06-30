@@ -193,6 +193,8 @@ export const Leaderboard: React.FC = () => {
         csatOrigCount: number;
         csatGood: number;
         csatBad: number;
+        finalScoreSum: number;
+        finalScoreCount: number;
         totalDuty: number;
         totalChat: number;
       }
@@ -286,6 +288,8 @@ export const Leaderboard: React.FC = () => {
             csatOrigCount: 0,
             csatGood: 0,
             csatBad: 0,
+            finalScoreSum: 0,
+            finalScoreCount: 0,
             totalDuty: 0,
             totalChat: 0,
           };
@@ -295,6 +299,10 @@ export const Leaderboard: React.FC = () => {
         tlMap[tl].totalChat += agent.productivityTotal;
         tlMap[tl].csatGood += csatGood;
         tlMap[tl].csatBad += csatBad;
+        if (composite.score !== null) {
+          tlMap[tl].finalScoreSum += composite.score;
+          tlMap[tl].finalScoreCount += 1;
+        }
 
         if (composite.qaPct !== null) {
           tlMap[tl].qaPctSum += composite.qaPct;
@@ -320,8 +328,6 @@ export const Leaderboard: React.FC = () => {
     // Compute TL composite scores
     const tList: LeaderboardRow[] = [];
     Object.entries(tlMap).forEach(([tlName, stats]) => {
-      if (stats.agents.size < 3) return; // Fair filter: min 3 agents
-
       const tl_qa_pct =
         stats.qaPctCount > 0 ? stats.qaPctSum / stats.qaPctCount : null;
       const tl_prod_pct =
@@ -342,16 +348,15 @@ export const Leaderboard: React.FC = () => {
         stats.totalDuty,
       );
 
-      const composite = calculateCompositeScore({
-        qaPct: tl_qa_pct,
-        productivityPct: tl_prod_pct,
-        csatPct: tl_csat_pct,
-      });
+      const tlFinalScore =
+        stats.finalScoreCount > 0
+          ? stats.finalScoreSum / stats.finalScoreCount
+          : null;
 
-      if (composite.score !== null) {
+      if (tlFinalScore !== null) {
         tList.push({
           name: tlName,
-          score: composite.score,
+          score: tlFinalScore,
           qa: tl_qa_orig,
           qa_pct: tl_qa_pct,
           qa_points: tl_qa_pct !== null ? (tl_qa_pct / 100) * 50 : null,
@@ -485,20 +490,29 @@ export const Leaderboard: React.FC = () => {
         </button>
       </div>
 
-      <div className="relative w-full overflow-auto bg-card border border-border rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
-        <table className="w-full min-w-[2350px] border-collapse whitespace-nowrap text-left text-[10px]">
-          <thead className="sticky top-0 z-30 text-white">
+      <div className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
+        <table className="w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left text-[10px]">
+          <colgroup>
+            <col className="w-[52px]" />
+            <col className="w-[190px]" />
+            <col className="w-[130px]" />
+            <col className="w-[160px]" />
+            {Array.from({ length: 22 }).map((_, index) => (
+              <col key={`metric-column-${index}`} className="w-[96px]" />
+            ))}
+          </colgroup>
+          <thead className="sticky top-0 z-40 text-white">
             <tr className="bg-primary">
-              <th rowSpan={2} className="w-12 border-r border-white/30 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
-              <th rowSpan={2} className="w-[190px] border-r border-white/30 p-2 font-bold md:sticky md:left-12 z-50 bg-primary">Name</th>
-              <th rowSpan={2} className="w-[110px] border-r border-white/30 p-2 font-bold md:sticky md:left-[238px] z-50 bg-primary">Email / CS ID</th>
-              <th rowSpan={2} className="w-[160px] border-r border-white/30 p-2 font-bold md:sticky md:left-[348px] z-50 bg-primary shadow-[8px_0_12px_-10px_rgba(0,0,0,0.8)]">Leader Name</th>
-              <th colSpan={2} className="border-r border-white/30 p-2 text-center font-bold">QC Score (50 Points)</th>
-              <th colSpan={7} className="border-r border-white/30 p-2 text-center font-bold">Productivity (20 Points)</th>
-              <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">CSAT Score (20 Points)</th>
-              <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">Training Completion (5 Points)</th>
-              <th colSpan={4} className="border-r border-white/30 p-2 text-center font-bold">Quiz Score (5 Points)</th>
-              <th rowSpan={2} className="w-[90px] p-2 text-center font-bold">Final Score</th>
+              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
+              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 font-bold md:sticky md:left-[52px] z-50 bg-primary">Name</th>
+              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 font-bold md:sticky md:left-[242px] z-50 bg-primary">Email / CS ID</th>
+              <th rowSpan={2} className="overflow-hidden border-r-2 border-white/60 p-2 font-bold md:sticky md:left-[372px] z-50 bg-primary shadow-[8px_0_12px_-8px_rgba(0,0,0,0.45)]">Leader Name</th>
+              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 Points)</th>
+              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 Points)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 Points)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training Completion (5 Points)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz Score (5 Points)</th>
+              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Final Score</th>
             </tr>
             <tr className="bg-primary border-t border-white/30">
               {[
@@ -508,7 +522,13 @@ export const Leaderboard: React.FC = () => {
                 "Total Training", "Agent Completion", "% Ach", "Total Points",
                 "Target", "Agent Score", "% Ach", "Total Points",
               ].map((label, index) => (
-                <th key={`${label}-${index}`} className="min-w-[84px] border-r border-white/30 px-2 py-1.5 text-center font-bold">
+                <th
+                  key={`${label}-${index}`}
+                  className={cn(
+                    "overflow-hidden border-r border-white/40 px-2 py-1.5 text-center font-bold",
+                    [0, 2, 9, 13, 17].includes(index) && "border-l-2 border-l-white/60",
+                  )}
+                >
                   {label}
                 </th>
               ))}
@@ -521,33 +541,34 @@ export const Leaderboard: React.FC = () => {
               const stickyClass = isBottom
                 ? "bg-danger-soft group-hover:bg-danger-soft"
                 : "bg-card group-hover:bg-surface-muted";
-              const metricCell = "border-r border-border px-2 py-2 text-center font-semibold text-text-secondary";
+              const metricCell = "overflow-hidden border-r border-border-strong/70 px-2 py-2 text-center font-semibold text-text-secondary";
+              const metricGroupStart = `${metricCell} border-l-2 border-l-border-strong`;
 
               return (
                 <tr
                   key={item.csId || item.name}
                   className={cn(
-                    "group border-b border-border transition-colors",
+                    "group border-b border-border-strong/70 transition-colors",
                     isBottom ? "bg-danger-soft/30 hover:bg-danger-soft/50" : "hover:bg-surface-muted",
                   )}
                 >
-                  <td className={`w-12 px-2 py-2 text-center font-bold text-text-muted md:sticky md:left-0 z-20 ${stickyClass}`}>#{rank}</td>
-                  <td className={`w-[190px] max-w-[190px] px-2 py-2 md:sticky md:left-12 z-20 ${stickyClass}`}>
+                  <td className={`overflow-hidden border-r border-border-strong px-2 py-2 text-center font-bold text-text-muted md:sticky md:left-0 z-30 ${stickyClass}`}>#{rank}</td>
+                  <td className={`overflow-hidden border-r border-border-strong px-2 py-2 md:sticky md:left-[52px] z-30 ${stickyClass}`}>
                     <button onClick={() => setSelectedAgent(item)} className="block max-w-full truncate text-left font-bold text-kpi-neutral-text hover:underline" title={item.name}>
                       {item.name}
                     </button>
                   </td>
-                  <td className={`w-[110px] max-w-[110px] truncate px-2 py-2 font-medium text-text-secondary md:sticky md:left-[238px] z-20 ${stickyClass}`} title={item.csId || "-"}>
+                  <td className={`overflow-hidden truncate border-r border-border-strong px-2 py-2 font-medium text-text-secondary md:sticky md:left-[242px] z-30 ${stickyClass}`} title={item.csId || "-"}>
                     {item.csId || "-"}
                   </td>
-                  <td className={`w-[160px] max-w-[160px] truncate px-2 py-2 font-medium text-text-secondary md:sticky md:left-[348px] z-20 shadow-[8px_0_12px_-10px_rgba(0,0,0,0.5)] ${stickyClass}`} title={item.tl || "-"}>
+                  <td className={`overflow-hidden truncate border-r-2 border-border-strong px-2 py-2 font-medium text-text-secondary md:sticky md:left-[372px] z-30 shadow-[8px_0_12px_-8px_rgba(0,0,0,0.35)] ${stickyClass}`} title={item.tl || "-"}>
                     {item.tl || "-"}
                   </td>
 
-                  <td className={metricCell}>{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
+                  <td className={metricGroupStart}>{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
                   <td className={metricCell}>{item.qa_points !== null ? formatNum(item.qa_points, 2) : "-"}</td>
 
-                  <td className={metricCell}>{item.prod_daily_target}</td>
+                  <td className={metricGroupStart}>{item.prod_daily_target}</td>
                   <td className={metricCell}>{formatNum(item.prod_total_duty, 0)}</td>
                   <td className={metricCell}>{formatNum(item.prod_target_chat, 0)}</td>
                   <td className={metricCell}>{formatNum(item.prod_total_chat, 0)}</td>
@@ -557,22 +578,22 @@ export const Leaderboard: React.FC = () => {
                     {item.prod_difference !== null ? item.prod_difference : "-"}
                   </td>
 
-                  <td className={metricCell}>{formatNum(item.csat_good, 0)}</td>
+                  <td className={metricGroupStart}>{formatNum(item.csat_good, 0)}</td>
                   <td className={metricCell}>{formatNum(item.csat_bad, 0)}</td>
                   <td className={metricCell}>{item.csat_pct !== null ? `${formatNum(item.csat_pct, 2)}%` : "-"}</td>
                   <td className={metricCell}>{item.csat_points !== null ? formatNum(item.csat_points, 2) : "-"}</td>
 
-                  <td className={metricCell}>{item.training_total ?? "-"}</td>
+                  <td className={metricGroupStart}>{item.training_total ?? "-"}</td>
                   <td className={metricCell}>{item.training_completion ?? "-"}</td>
                   <td className={metricCell}>{formatNum(item.training_pct, 2)}%</td>
                   <td className={metricCell}>{formatNum(item.training_points, 2)}</td>
 
-                  <td className={metricCell}>{item.quiz_target}%</td>
+                  <td className={metricGroupStart}>{item.quiz_target}%</td>
                   <td className={metricCell}>{formatNum(item.quiz_score, 2)}%</td>
                   <td className={metricCell}>{formatNum(item.quiz_pct, 2)}%</td>
                   <td className={metricCell}>{formatNum(item.quiz_points, 2)}</td>
 
-                  <td className="px-2 py-2 text-center">
+                  <td className="border-l-2 border-border-strong px-2 py-2 text-center">
                     <span className={`text-[11px] ${getScoreColor(item.score)}`}>{formatNum(item.score, 2)}</span>
                   </td>
                 </tr>
@@ -584,7 +605,7 @@ export const Leaderboard: React.FC = () => {
                 <td colSpan={26} className="p-4">
                   <EmptyState
                     title="Tidak ada data leaderboard"
-                    description="Jika belum sync, buka File Center lalu klik Sync Now. Untuk mode TL, pastikan TL memiliki minimal 3 agent."
+                    description="Jika belum sync, buka File Center lalu klik Sync Now dan pastikan periode aktif memiliki data."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
                   />
