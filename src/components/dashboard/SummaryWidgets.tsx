@@ -74,8 +74,12 @@ export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({
 
   // Top TLs: ambil 3 pertama
   const topTls = tlAverages.slice(0, 3);
-  // Underperform TLs: ambil 3 terakhir, reverse supaya yang paling bawah di urutan 1
-  const underTls = tlAverages.slice(-3).reverse();
+  const topTlNames = new Set(topTls.map((t) => t.tl));
+  // Underperform: 3 terbawah yang belum masuk Top (hindari overlap Fandi dkk)
+  const underTls = tlAverages
+    .filter((t) => !topTlNames.has(t.tl))
+    .slice(-3)
+    .reverse();
 
   const getBaseKpiTheme = (type?: string) => {
     if (type?.includes('csat')) return 'csat';
@@ -93,6 +97,11 @@ export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({
       <div className="bg-surface rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-5 flex flex-col min-h-[160px] h-full">
         <div className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">{overallLabel}</div>
         <div className="text-3xl font-extrabold text-text-primary mt-auto">{totalCount > 0 ? formatFn(overallAvg) : '-'}</div>
+        {overallLabel.toLowerCase().includes('gap') && (
+          <p className="text-[10px] text-text-muted mt-2 leading-snug">
+            Rata-rata gap agent: productivity − target quota (100/man-day). + = di atas target.
+          </p>
+        )}
       </div>
 
       {/* Kartu 2: BPO Performance */}

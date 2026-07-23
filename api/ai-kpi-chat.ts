@@ -22,18 +22,20 @@ const MAX_MESSAGE_LENGTH = 1000;
 const MAX_HISTORY_ITEMS = 3;
 const MAX_CONTEXT_CHARS = 7000;
 const MAX_HISTORY_CHARS = 1800;
-const MAX_OUTPUT_TOKENS = 520;
+const MAX_OUTPUT_TOKENS = 700;
 
 const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
 const DEFAULT_FALLBACK_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
 
 const SYSTEM_PROMPT = [
   'Kamu adalah Ask KPI, asisten performa dashboard Live Chat KPI.',
+  'OUTPUT HANYA jawaban final untuk user. Dilarang menampilkan rencana, reasoning, "We need to", "Let\'s craft", atau instruksi internal.',
   'Jawab Bahasa Indonesia ringkas. Hanya pakai CONTEXT. Jangan mengarang angka/nama.',
   'Jika data tidak ada di CONTEXT, bilang belum tersedia di filter aktif.',
-  'Wajib awali 1 baris: Dasar data: <scope>, <periode>, <tab/metric>.',
-  'Format: Temuan, Angka, Aksi. Maks 8 bullet "-". Tanpa emoji, tanpa markdown bold/asterisk.',
-  'Untuk coaching/DMAIC: Define, Measure, Analyze, Improve, Control (singkat).',
+  'Baris pertama wajib: Dasar data: <scope>, <periode>, <tab>.',
+  'Lalu maksimal 6 bullet diawali "- " dengan pola: Temuan — Angka — Aksi (satu kalimat per bullet).',
+  'Tanpa emoji. Tanpa markdown bold/asterisk. Tanpa penjelasan cara menjawab.',
+  'Untuk coaching/DMAIC: Define, Measure, Analyze, Improve, Control (singkat, langsung isi).',
 ].join(' ');
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -150,7 +152,7 @@ async function callOpenRouter({
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: MAX_OUTPUT_TOKENS,
     }),
   });
@@ -172,17 +174,58 @@ async function callOpenRouter({
     };
   }
 
-  const answer = String(payload?.choices?.[0]?.message?.content || '').trim();
+  const rawAnswer = String(
+    payload?.choices?.[0]?.message?.content ||
+      payload?.choices?.[0]?.message?.reasoning ||
+      '',
+  ).trim();
   const finishReason = payload?.choices?.[0]?.finish_reason;
+  const cleaned = cleanModelAnswer(rawAnswer);
 
   return {
     ok: true,
-    answer: answer
+    answer: cleaned
       ? finishReason === 'length'
-        ? `${answer}\n\nCatatan: jawaban terpotong. Minta versi lebih singkat.`
-        : answer
-      : 'OpenRouter tidak mengembalikan jawaban.',
+        ? `${cleaned}\n\nCatatan: jawaban terpotong. Minta versi lebih singkat.`
+        : cleaned
+      : 'OpenRouter tidak mengembalikan jawaban yang bisa ditampilkan. Coba tanya lagi lebih singkat.',
   };
+}
+
+function cleanModelAnswer(raw: string) {
+  let text = String(raw || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<\/?thinking>/gi, '')
+    .trim();
+
+  // Drop leaked planning / instruction rehearsal before the real answer
+  const dasarIdx = text.search(/Dasar data\s*:/i);
+  if (dasarIdx > 0) {
+    text = text.slice(dasarIdx);
+  }
+
+  const leakPatterns = [
+    /^We need to follow[\s\S]*?(?=Dasar data\s*:)/i,
+    /^Let's (craft|do|start|write)[\s\S]*?(?=Dasar data\s*:)/i,
+    /^I (need|will|should)[\s\S]*?(?=Dasar data\s*:)/i,
+    /^The (user|instructions?)[\s\S]*?(?=Dasar data\s*:)/i,
+  ];
+  for (const pattern of leakPatterns) {
+    text = text.replace(pattern, '');
+  }
+
+  // If still mostly meta-talk without Dasar data, keep only bullet-looking lines
+  if (!/Dasar data\s*:/i.test(text) && /we need to|let's craft|follow instructions/i.test(text)) {
+    const bullets = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('- ') || line.startsWith('• '));
+    if (bullets.length > 0) {
+      text = ['Dasar data: filter aktif dashboard', ...bullets].join('\n');
+    }
+  }
+
+  return text.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function buildPrompt({
@@ -208,6 +251,7 @@ function buildPrompt({
     compactContext,
     'HISTORY:',
     compactHistory,
+    'INSTRUKSI OUTPUT: langsung tulis jawaban final saja. Jangan tulis rencana/reasoning.',
     `QUESTION: ${message}`,
   ].join('\n');
 }
