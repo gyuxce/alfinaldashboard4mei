@@ -141,6 +141,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   const scoreDistribution = useMemo(() => {
     const dist = {
       'All': 0, 'No Survey': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0,
+      'Bad': 0, 'Good': 0,
     };
     tableData.forEach(a => {
       if (a.csatScScoreDistribution) {
@@ -149,8 +150,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
               const cases = a.csatScScoreDistribution[scoreKey];
               for (const c in cases) {
                  if (viewMode === 'fair' && isCsatTakeoutCategory(c)) continue;
-                 dist[scoreKey as keyof typeof dist] += cases[c] || 0;
-                 dist['All'] += cases[c] || 0;
+                 const n = cases[c] || 0;
+                 dist[scoreKey as keyof typeof dist] += n;
+                 dist['All'] += n;
+                 if (scoreKey === '1' || scoreKey === '2') dist['Bad'] += n;
+                 if (scoreKey === '4' || scoreKey === '5') dist['Good'] += n;
               }
            }
         });
@@ -158,6 +162,30 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     });
     return dist;
   }, [tableData, viewMode]);
+
+  const getScoresForSelectedCase = (selected: string): string[] => {
+    if (selected === 'All') return ['No Survey', '1', '2', '3', '4', '5'];
+    if (selected === 'Bad') return ['1', '2'];
+    if (selected === 'Good') return ['4', '5'];
+    return [selected];
+  };
+
+  const scoreAnalysisLabel = useMemo(() => {
+    switch (selectedScoreCase) {
+      case 'No Survey': return 'No Survey';
+      case 'All': return 'All Surveys';
+      case 'Bad': return 'Bad Survey (Score 1 + 2)';
+      case 'Good': return 'Good Survey (Score 4 + 5)';
+      default: return `Score ${selectedScoreCase}`;
+    }
+  }, [selectedScoreCase]);
+
+  const isAccumulatedScoreCase = selectedScoreCase === 'Bad' || selectedScoreCase === 'Good';
+  const accumulatedScoreKeys = selectedScoreCase === 'Bad'
+    ? (['1', '2'] as const)
+    : selectedScoreCase === 'Good'
+      ? (['4', '5'] as const)
+      : null;
 
   const totalScoreRows = useMemo(() => {
     return scoreDistribution['All'];
@@ -290,47 +318,70 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
   const scoreAnalysisTopCases = useMemo(() => {
     const caseDist: Record<string, number> = {};
+    const caseByScore: Record<string, Record<string, number>> = {};
+    const scoresToProcess = getScoresForSelectedCase(selectedScoreCase);
+
     tableData.forEach(a => {
        if (a.csatScScoreDistribution) {
-          const scoresToProcess = selectedScoreCase === 'All' ? ['No Survey', '1', '2', '3', '4', '5'] : [selectedScoreCase];
           scoresToProcess.forEach(scoreKey => {
             if (a.csatScScoreDistribution[scoreKey]) {
                 const cases = a.csatScScoreDistribution[scoreKey];
                 for (const c in cases) {
                    if (viewMode === 'fair' && isCsatTakeoutCategory(c)) continue;
+                   const n = cases[c] || 0;
                    if (!caseDist[c]) caseDist[c] = 0;
-                   caseDist[c] += cases[c];
+                   caseDist[c] += n;
+                   if (!caseByScore[c]) caseByScore[c] = {};
+                   caseByScore[c][scoreKey] = (caseByScore[c][scoreKey] || 0) + n;
                 }
             }
           });
        }
     });
-    return Object.entries(caseDist).sort((a,b) => b[1] - a[1]).map((e, idx) => ({ rank: idx+1, name: e[0], count: e[1] }));
+    return Object.entries(caseDist)
+      .sort((a,b) => b[1] - a[1])
+      .map((e, idx) => ({
+        rank: idx+1,
+        name: e[0],
+        count: e[1],
+        byScore: caseByScore[e[0]] || {},
+      }));
   }, [tableData, selectedScoreCase, viewMode]);
 
   const scoreAnalysisTopAgents = useMemo(() => {
     const agentDist: Record<string, number> = {};
+    const agentByScore: Record<string, Record<string, number>> = {};
+    const scoresToProcess = getScoresForSelectedCase(selectedScoreCase);
+
     tableData.forEach(a => {
        if (a.csatScScoreDistribution) {
-          const scoresToProcess = selectedScoreCase === 'All' ? ['No Survey', '1', '2', '3', '4', '5'] : [selectedScoreCase];
+          const displayName = a.name || a.csId;
           scoresToProcess.forEach(scoreKey => {
             if (a.csatScScoreDistribution[scoreKey]) {
                 const cases = a.csatScScoreDistribution[scoreKey];
-                let totalForAgent = 0;
+                let totalForScore = 0;
                 for (const c in cases) {
                     if (viewMode === 'fair' && isCsatTakeoutCategory(c)) continue;
-                    totalForAgent += cases[c] || 0;
+                    totalForScore += cases[c] || 0;
                 }
-                if (totalForAgent > 0) {
-                    const displayName = a.name || a.csId;
+                if (totalForScore > 0) {
                     if (!agentDist[displayName]) agentDist[displayName] = 0;
-                    agentDist[displayName] += totalForAgent;
+                    agentDist[displayName] += totalForScore;
+                    if (!agentByScore[displayName]) agentByScore[displayName] = {};
+                    agentByScore[displayName][scoreKey] = (agentByScore[displayName][scoreKey] || 0) + totalForScore;
                 }
             }
           });
        }
     });
-    return Object.entries(agentDist).sort((a,b) => b[1] - a[1]).map((e, idx) => ({ rank: idx+1, name: e[0], count: e[1] }));
+    return Object.entries(agentDist)
+      .sort((a,b) => b[1] - a[1])
+      .map((e, idx) => ({
+        rank: idx+1,
+        name: e[0],
+        count: e[1],
+        byScore: agentByScore[e[0]] || {},
+      }));
   }, [tableData, selectedScoreCase, viewMode]);
 
   return (
@@ -484,23 +535,57 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-               {['All', 'No Survey', '1', '2', '3', '4', '5'].map(score => {
-                 const count = scoreDistribution[score as keyof typeof scoreDistribution];
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9 gap-3">
+               {([
+                 { key: 'All', label: 'All Surveys', tone: 'neutral' },
+                 { key: 'No Survey', label: 'No Survey', tone: 'neutral' },
+                 { key: 'Bad', label: 'Bad Survey', sub: 'Score 1 + 2', tone: 'bad' },
+                 { key: '1', label: 'Score 1', tone: 'bad' },
+                 { key: '2', label: 'Score 2', tone: 'bad' },
+                 { key: '3', label: 'Score 3', tone: 'mid' },
+                 { key: '4', label: 'Score 4', tone: 'good' },
+                 { key: '5', label: 'Score 5', tone: 'good' },
+                 { key: 'Good', label: 'Good Survey', sub: 'Score 4 + 5', tone: 'good' },
+               ] as const).map(card => {
+                 const count = scoreDistribution[card.key];
                  const pct = totalScoreRows > 0 ? (count / totalScoreRows) * 100 : 0;
-                 const isSelected = selectedScoreCase === score;
+                 const isSelected = selectedScoreCase === card.key;
+                 const countClass =
+                   card.tone === 'good' ? 'text-success' :
+                   card.tone === 'bad' ? 'text-danger' :
+                   card.tone === 'mid' ? 'text-warning' :
+                   'text-text-primary';
+                 const selectedBorder =
+                   card.tone === 'bad' ? 'border-danger ring-2 ring-danger/20 bg-danger/5' :
+                   card.tone === 'good' ? 'border-success ring-2 ring-success/20 bg-success/5' :
+                   'border-primary ring-2 ring-primary/20 bg-primary-soft/10';
 
                  return (
                    <button
-                     key={score}
-                     onClick={() => { setSelectedScoreCase(score); setScoreCasePage(1); }}
-                     className={`flex flex-col items-center p-4 rounded-xl border transition-all ${isSelected ? 'border-primary ring-2 ring-primary/20 bg-primary-soft/10 shadow-[0_1px_3px_rgba(0,0,0,0.04)]' : 'border-border hover:border-text-muted/30 bg-card hover:bg-surface-muted'}`}
+                     key={card.key}
+                     onClick={() => { setSelectedScoreCase(card.key); setScoreCasePage(1); }}
+                     className={`flex flex-col items-center p-4 rounded-xl border transition-all ${isSelected ? `${selectedBorder} shadow-[0_1px_3px_rgba(0,0,0,0.04)]` : 'border-border hover:border-text-muted/30 bg-card hover:bg-surface-muted'}`}
                    >
-                     <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 text-center">
-                        {score === 'No Survey' ? 'No Survey' : score === 'All' ? 'All Surveys' : `Score ${score}`}
+                     <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-1 text-center">
+                        {card.label}
                      </div>
-                     <div className={`text-2xl font-black mb-1 ${score === 'No Survey' || score === 'All' ? 'text-text-primary' : score === '4' || score === '5' ? 'text-success' : score === '3' ? 'text-warning' : 'text-danger'}`}>{formatNum(count, 0)}</div>
+                     {'sub' in card && card.sub ? (
+                       <div className="text-[10px] font-medium text-text-muted mb-1">{card.sub}</div>
+                     ) : (
+                       <div className="h-[15px] mb-1" />
+                     )}
+                     <div className={`text-2xl font-black mb-1 ${countClass}`}>{formatNum(count, 0)}</div>
                      <div className="text-xs font-medium text-text-muted">{formatNum(pct, 1)}%</div>
+                     {card.key === 'Bad' && (
+                       <div className="mt-2 text-[10px] font-semibold text-danger/80">
+                         1: {formatNum(scoreDistribution['1'], 0)} · 2: {formatNum(scoreDistribution['2'], 0)}
+                       </div>
+                     )}
+                     {card.key === 'Good' && (
+                       <div className="mt-2 text-[10px] font-semibold text-success/80">
+                         4: {formatNum(scoreDistribution['4'], 0)} · 5: {formatNum(scoreDistribution['5'], 0)}
+                       </div>
+                     )}
                    </button>
                  );
                })}
@@ -509,8 +594,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
           <div className="border-t border-border mt-2 bg-surface">
              <div className="p-4 border-b border-border bg-surface-muted">
-               <h2 className="text-sm font-bold text-text-primary">Detailed Analysis: {selectedScoreCase === 'No Survey' ? 'No Survey' : selectedScoreCase === 'All' ? 'All Surveys' : `Score ${selectedScoreCase}`}</h2>
-               <p className="text-xs text-text-muted mt-1">Select a score card above to view cases and agents associated with that score</p>
+               <h2 className="text-sm font-bold text-text-primary">Detailed Analysis: {scoreAnalysisLabel}</h2>
+               <p className="text-xs text-text-muted mt-1">
+                 {isAccumulatedScoreCase
+                   ? `Akumulasi top category & agent dari ${scoreAnalysisLabel}. Breakdown per score tetap ditampilkan.`
+                   : 'Select a score card above to view cases and agents associated with that score'}
+               </p>
              </div>
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
                  <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -520,7 +609,10 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                        <tr>
                          <th className="p-2 font-bold w-12 text-center  min-w-[60px] max-w-[60px]">Rank</th>
                          <th className="p-2 font-bold ">Case / Category Name</th>
-                         <th className="p-2 font-bold w-24 text-center">Freq</th>
+                         {accumulatedScoreKeys?.map((sk) => (
+                           <th key={sk} className="p-2 font-bold w-16 text-center">Score {sk}</th>
+                         ))}
+                         <th className="p-2 font-bold w-24 text-center">{isAccumulatedScoreCase ? 'Total' : 'Freq'}</th>
                        </tr>
                      </thead>
                      <tbody className="">
@@ -530,12 +622,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                          <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group">
                            <td className="p-2 text-center text-text-muted font-medium">{cat.rank}</td>
                            <td className={`p-2 font-medium max-w-[200px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
+                           {accumulatedScoreKeys?.map((sk) => (
+                             <td key={sk} className="p-2 text-center font-medium text-[11px] text-text-secondary">
+                               {formatNum(cat.byScore[sk] || 0, 0)}
+                             </td>
+                           ))}
                            <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{formatNum(cat.count, 0)}</td>
                          </tr>
                        )})}
                        {scoreAnalysisTopCases.length === 0 && (
                          <tr>
-                           <td colSpan={3} className="p-8 text-center text-text-muted text-sm border-b border-border">
+                           <td colSpan={3 + (accumulatedScoreKeys?.length || 0)} className="p-8 text-center text-text-muted text-sm border-b border-border">
                              No cases found.
                            </td>
                          </tr>
@@ -551,7 +648,10 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                        <tr>
                          <th className="p-2 font-bold w-12 text-center  min-w-[60px] max-w-[60px]">Rank</th>
                          <th className="p-2 font-bold ">Agent Name</th>
-                         <th className="p-2 font-bold w-24 text-center">Freq</th>
+                         {accumulatedScoreKeys?.map((sk) => (
+                           <th key={sk} className="p-2 font-bold w-16 text-center">Score {sk}</th>
+                         ))}
+                         <th className="p-2 font-bold w-24 text-center">{isAccumulatedScoreCase ? 'Total' : 'Freq'}</th>
                        </tr>
                      </thead>
                      <tbody className="">
@@ -559,12 +659,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                          <tr key={agt.name} className="border-b border-border hover:bg-surface-muted transition-colors group">
                            <td className="p-2 text-center text-text-muted font-medium">{agt.rank}</td>
                            <td className="p-2 font-medium text-text-primary max-w-[200px] truncate" title={agt.name}>{agt.name}</td>
+                           {accumulatedScoreKeys?.map((sk) => (
+                             <td key={sk} className="p-2 text-center font-medium text-[11px] text-text-secondary">
+                               {formatNum(agt.byScore[sk] || 0, 0)}
+                             </td>
+                           ))}
                            <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{formatNum(agt.count, 0)}</td>
                          </tr>
                        ))}
                        {scoreAnalysisTopAgents.length === 0 && (
                          <tr>
-                           <td colSpan={3} className="p-8 text-center text-text-muted text-sm border-b border-border">
+                           <td colSpan={3 + (accumulatedScoreKeys?.length || 0)} className="p-8 text-center text-text-muted text-sm border-b border-border">
                              No agents found.
                            </td>
                          </tr>
