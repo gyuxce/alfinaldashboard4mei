@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
-import { X, User, ClipboardCheck, Users } from 'lucide-react';
+import { X, User, ClipboardCheck, Users, TrendingUp } from 'lucide-react';
 import { calculateAgentCompositeScore } from '../../lib/kpiScoring';
+import { PeriodDelta } from '../ui/PeriodDelta';
+import { useStore } from '../../store';
 import {
   Radar,
   RadarChart,
@@ -15,6 +17,7 @@ import {
 
 interface Agent360RadarProps {
   agent: AgentKPI;
+  previousAgent?: AgentKPI | null;
   peers?: AgentKPI[];
   onClose: () => void;
 }
@@ -48,8 +51,17 @@ function avgNullable(values: Array<number | null | undefined>) {
   return nums.reduce((s, v) => s + v, 0) / nums.length;
 }
 
-export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, peers = [], onClose }) => {
+export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, previousAgent = null, peers = [], onClose }) => {
+  const comparisonMode = useStore((s) => s.comparisonMode);
+  const isComparisonEnabled = useStore((s) => s.isComparisonEnabled);
+  const deltaLabel = comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW';
+  const showWow = isComparisonEnabled && !!previousAgent;
+
   const agentMetrics = useMemo(() => metricBundle(agent), [agent]);
+  const prevMetrics = useMemo(
+    () => (previousAgent ? metricBundle(previousAgent) : null),
+    [previousAgent],
+  );
 
   const tlPeers = useMemo(() => {
     const tl = (agent.teamLeader || '').trim();
@@ -304,13 +316,44 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, peers = [],
            </div>
            
            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full gap-2 mt-2">
-              {radarData.map(d => (
+              {radarData.map(d => {
+                 const prevVal =
+                   prevMetrics == null ? null :
+                   d.subject === 'Productivity' ? prevMetrics.prod :
+                   d.subject === 'Attendance' ? prevMetrics.attendance :
+                   d.subject === 'CSAT' ? prevMetrics.csatDisplay :
+                   d.subject === 'QA' ? prevMetrics.qa :
+                   d.subject === 'SLA' ? prevMetrics.sla :
+                   d.subject === 'WHU' ? prevMetrics.whu :
+                   null;
+                 return (
                  <div key={d.subject} className="bg-card border border-border rounded-xl p-3 flex flex-col items-center justify-center gap-1">
                     <span className="text-[10px] uppercase font-bold text-text-muted text-center leading-tight h-6 flex items-center">{d.subject}</span>
                     <span className="text-sm font-black text-text-primary">{formatNum(d.original, 1)}{d.suffix}</span>
+                    {showWow && prevVal !== null && prevVal !== undefined && (
+                      <PeriodDelta
+                        current={typeof d.original === 'number' ? d.original : 0}
+                        previous={prevVal}
+                        suffix={d.suffix}
+                        label={deltaLabel}
+                        className="mt-0.5"
+                      />
+                    )}
                  </div>
-              ))}
+                 );
+              })}
            </div>
+
+           {showWow && (
+             <div className="mt-3 w-full rounded-xl border border-border bg-surface-muted/40 px-3 py-2.5 flex items-start gap-2">
+               <TrendingUp className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+               <div className="text-[11px] text-text-secondary leading-relaxed">
+                 <span className="font-bold text-text-primary">Mini {comparisonMode === 'mom' ? 'MoM' : 'WoW'}: </span>
+                 Delta di kartu KPI di atas membandingkan periode aktif vs periode sebelumnya
+                 {comparisonMode === 'mom' ? ' (bulan sebelumnya, durasi sama).' : ' (minggu sebelumnya, durasi sama).'}
+               </div>
+             </div>
+           )}
 
            <div className="mt-4 flex items-center justify-center p-3 bg-primary/5 text-primary rounded-xl w-full border border-primary/10">
               <span className="text-sm font-medium">Overall Balance Score: <strong className="font-black ml-1">{formatNum(avgScore, 1)}%</strong></span>

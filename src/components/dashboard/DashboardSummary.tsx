@@ -18,6 +18,14 @@ interface Props {
     label: string;
     detail: string;
     count: number;
+    syncIsStale?: boolean;
+    missingProductivity?: number;
+    missingSchedule?: number;
+    byTl?: Array<{
+      tl: string;
+      missingProductivity: number;
+      missingSchedule: number;
+    }>;
   };
   onOpenFiles?: () => void;
 }
@@ -248,35 +256,74 @@ export const DashboardSummary: React.FC<Props> = ({
         <>
           {dataQuality && dataQuality.status !== 'ok' && (
             <div
-              className={`rounded-xl border px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+              className={`rounded-xl border px-4 py-3 flex flex-col gap-3 ${
                 dataQuality.status === 'error'
                   ? 'border-danger/30 bg-danger/5'
                   : 'border-warning/30 bg-warning/5'
               }`}
             >
-              <div className="flex items-start gap-3">
-                <AlertTriangle
-                  className={`w-4 h-4 mt-0.5 shrink-0 ${
-                    dataQuality.status === 'error' ? 'text-danger' : 'text-warning'
-                  }`}
-                />
-                <div>
-                  <div className={`text-sm font-bold ${dataQuality.status === 'error' ? 'text-danger' : 'text-warning'}`}>
-                    Data Quality: {dataQuality.label}
-                  </div>
-                  <div className="text-xs text-text-muted mt-0.5">
-                    {dataQuality.detail || 'Ada indikasi data belum lengkap. Cek File Center sebelum presentasi ke atasan.'}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle
+                    className={`w-4 h-4 mt-0.5 shrink-0 ${
+                      dataQuality.status === 'error' ? 'text-danger' : 'text-warning'
+                    }`}
+                  />
+                  <div>
+                    <div className={`text-sm font-bold ${dataQuality.status === 'error' ? 'text-danger' : 'text-warning'}`}>
+                      Data Quality: {dataQuality.label}
+                    </div>
+                    <div className="text-xs text-text-muted mt-0.5">
+                      {dataQuality.detail || 'Ada indikasi data belum lengkap. Cek File Center sebelum presentasi ke atasan.'}
+                    </div>
+                    {dataQuality.syncIsStale && (
+                      <div className="text-[11px] text-warning font-semibold mt-1">
+                        Sync stale — refresh data sebelum presentasi.
+                      </div>
+                    )}
                   </div>
                 </div>
+                {onOpenFiles && (
+                  <button
+                    type="button"
+                    onClick={onOpenFiles}
+                    className="shrink-0 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-surface-muted"
+                  >
+                    Buka File Center
+                  </button>
+                )}
               </div>
-              {onOpenFiles && (
-                <button
-                  type="button"
-                  onClick={onOpenFiles}
-                  className="shrink-0 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-surface-muted"
-                >
-                  Buka File Center
-                </button>
+
+              {dataQuality.byTl && dataQuality.byTl.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border border-border/70 bg-card/80">
+                  <table className="w-full text-left text-[11px]">
+                    <thead className="bg-surface text-text-muted">
+                      <tr>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wide">Team Leader</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Missing Productivity</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Missing Schedule</th>
+                        <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dataQuality.byTl.map((row) => {
+                        const total = row.missingProductivity + row.missingSchedule;
+                        return (
+                          <tr key={row.tl} className="border-t border-border/60">
+                            <td className="px-3 py-2 font-semibold text-text-primary">{row.tl}</td>
+                            <td className={`px-3 py-2 text-center font-bold ${row.missingProductivity > 0 ? 'text-warning' : 'text-text-muted'}`}>
+                              {row.missingProductivity || '—'}
+                            </td>
+                            <td className={`px-3 py-2 text-center font-bold ${row.missingSchedule > 0 ? 'text-warning' : 'text-text-muted'}`}>
+                              {row.missingSchedule || '—'}
+                            </td>
+                            <td className="px-3 py-2 text-center font-black text-text-primary">{total}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

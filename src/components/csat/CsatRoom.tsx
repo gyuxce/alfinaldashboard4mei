@@ -729,6 +729,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  );
                })}
             </div>
+            <p className="mt-3 text-[11px] text-text-muted leading-relaxed">
+              <span className="font-semibold text-text-secondary">Catatan Score 3: </span>
+              Score 3 ditampilkan di distribusi sebagai mid/netral. Tidak masuk kartu Bad (1+2) maupun Good (4+5),
+              dan tidak dihitung dalam CSAT % (hanya score 1, 2, 4, 5 yang valid).
+            </p>
           </div>
 
           <div className="border-t border-border mt-2 bg-surface">
