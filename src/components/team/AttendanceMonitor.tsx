@@ -4,9 +4,12 @@ import { formatNum } from '../../lib/utils';
 import { Search, Users, Activity, HeartPulse, UserMinus } from 'lucide-react';
 import { useStore } from '../../store';
 import { EmptyState } from '../ui/EmptyState';
+import { PeriodDelta } from '../ui/PeriodDelta';
 
-export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
+export const AttendanceMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] }> = ({ data, previousData = [] }) => {
   const [search, setSearch] = useState('');
+  const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
+  const comparisonMode = useStore(state => state.comparisonMode);
   
   // Filter active agents only (those with duty or presence) to avoid listing empty records from dict
   const activeData = useMemo(() => {
@@ -17,27 +20,46 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return activeData.filter(a => a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase()));
   }, [activeData, search]);
 
-  const { avgTeamAttendance, totalSick, totalPullout, totalOff, totalC } = useMemo(() => {
-    let totDuty = 0;
-    let totPresence = 0;
-    let sick = 0;
-    let pullout = 0;
-    let offDays = 0;
-    let leaveDays = 0;
-    
-    activeData.forEach(a => {
-       totDuty += a.attendanceDuty;
-       totPresence += a.attendancePresence;
-       sick += a.attendanceS;
-       pullout += a.attendancePullout;
-       offDays += a.attendanceOff;
-       leaveDays += a.attendanceC;
-    });
-    
-    const avg = totDuty > 0 ? Math.min(100, (totPresence / totDuty) * 100) : 0;
-    return { avgTeamAttendance: avg, totalSick: sick, totalPullout: pullout, totalOff: offDays, totalC: leaveDays };
-  }, [activeData]);
+  const { avgTeamAttendance, totalSick, totalPullout, totalOff, totalC, prevAvg, prevSick, prevPullout, prevOff, prevC } = useMemo(() => {
+    const calc = (dataset: AgentKPI[]) => {
+      const active = dataset.filter(a => a.attendanceDuty > 0 || a.attendancePresence > 0 || a.attendanceS > 0 || a.attendanceC > 0 || a.attendancePullout > 0);
+      let totDuty = 0;
+      let totPresence = 0;
+      let sick = 0;
+      let pullout = 0;
+      let offDays = 0;
+      let leaveDays = 0;
+      active.forEach(a => {
+         totDuty += a.attendanceDuty;
+         totPresence += a.attendancePresence;
+         sick += a.attendanceS;
+         pullout += a.attendancePullout;
+         offDays += a.attendanceOff;
+         leaveDays += a.attendanceC;
+      });
+      return {
+        avg: totDuty > 0 ? Math.min(100, (totPresence / totDuty) * 100) : 0,
+        sick, pullout, offDays, leaveDays,
+      };
+    };
+    const curr = calc(data);
+    const prev = calc(previousData);
+    return {
+      avgTeamAttendance: curr.avg,
+      totalSick: curr.sick,
+      totalPullout: curr.pullout,
+      totalOff: curr.offDays,
+      totalC: curr.leaveDays,
+      prevAvg: prev.avg,
+      prevSick: prev.sick,
+      prevPullout: prev.pullout,
+      prevOff: prev.offDays,
+      prevC: prev.leaveDays,
+    };
+  }, [data, previousData]);
 
+  const deltaLabel = comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW';
+  const showDelta = isComparisonEnabled && previousData.length > 0;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
@@ -67,6 +89,9 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </div>
             </div>
             <div className="text-2xl font-bold tracking-tight text-primary z-10">{formatNum(avgTeamAttendance, 1)}%</div>
+            {showDelta && (
+              <PeriodDelta current={avgTeamAttendance} previous={prevAvg} suffix="%" label={deltaLabel} className="mt-1" />
+            )}
          </div>
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
@@ -76,6 +101,9 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </div>
             </div>
             <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalOff, 0)}</div>
+            {showDelta && (
+              <PeriodDelta current={totalOff} previous={prevOff} digits={0} lowerIsBetter label={deltaLabel} className="mt-1" />
+            )}
          </div>
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
@@ -85,6 +113,9 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </div>
             </div>
             <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalC, 0)}</div>
+            {showDelta && (
+              <PeriodDelta current={totalC} previous={prevC} digits={0} lowerIsBetter label={deltaLabel} className="mt-1" />
+            )}
          </div>
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
@@ -94,6 +125,9 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </div>
             </div>
             <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalSick, 0)}</div>
+            {showDelta && (
+              <PeriodDelta current={totalSick} previous={prevSick} digits={0} lowerIsBetter label={deltaLabel} className="mt-1" />
+            )}
          </div>
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
@@ -103,6 +137,9 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </div>
             </div>
             <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalPullout, 0)}</div>
+            {showDelta && (
+              <PeriodDelta current={totalPullout} previous={prevPullout} digits={0} lowerIsBetter label={deltaLabel} className="mt-1" />
+            )}
          </div>
       </div>
 

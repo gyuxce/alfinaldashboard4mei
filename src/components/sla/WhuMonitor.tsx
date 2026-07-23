@@ -5,11 +5,14 @@ import { Search, Clock } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
+import { PeriodDelta } from '../ui/PeriodDelta';
 
-export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
+export const WhuMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] }> = ({ data, previousData = [] }) => {
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
+  const comparisonMode = useStore(state => state.comparisonMode);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -62,17 +65,22 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return filtered;
   }, [data, search, filterTL, sortConfig]);
 
-  const avgWhu = useMemo(() => {
-    let sum = 0;
-    let count = 0;
-    data.forEach(d => {
-      if (d.whu !== null) {
-        sum += d.whu;
-        count++;
-      }
-    });
-    return count > 0 ? sum / count : 0;
-  }, [data]);
+  const whuSummary = useMemo(() => {
+    const calc = (dataset: AgentKPI[]) => {
+      let sum = 0;
+      let count = 0;
+      let under = 0;
+      dataset.forEach((d) => {
+        if (d.whu !== null) {
+          sum += d.whu;
+          count++;
+          if (d.whu < 96) under++;
+        }
+      });
+      return { avg: count > 0 ? sum / count : 0, under, count };
+    };
+    return { current: calc(data), previous: calc(previousData) };
+  }, [data, previousData]);
 
   const uniqueDates = useMemo(() => {
     const dates = new Set<string>();
@@ -83,8 +91,29 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
-        <div>
+        <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-lg font-bold text-text-primary">WHU Monitor</h1>
+          <div className="rounded-xl border border-border bg-card px-4 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Team Avg WHU
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-xl font-black ${getKpiColor(whuSummary.current.avg, 'whu')}`}>
+                {formatNum(whuSummary.current.avg, 1)}%
+              </span>
+              {isComparisonEnabled && previousData.length > 0 && (
+                <PeriodDelta
+                  current={whuSummary.current.avg}
+                  previous={whuSummary.previous.avg}
+                  suffix="%"
+                  label={comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW'}
+                />
+              )}
+            </div>
+            <div className="text-[10px] text-text-muted mt-0.5">
+              {formatNum(whuSummary.current.under, 0)} agent &lt; 96%
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="relative">

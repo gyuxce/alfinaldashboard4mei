@@ -295,6 +295,15 @@ export const ProductivityDetail: React.FC<{
           Productivity Dashboard
         </h1>
         <div className="flex items-center gap-4">
+          {filterTL && (
+            <button
+              type="button"
+              onClick={() => setFilterTL(null)}
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-primary/30 bg-primary-soft/30 text-primary hover:bg-primary-soft/50"
+            >
+              TL: {filterTL} ✕
+            </button>
+          )}
           <div className="relative">
             <input
               type="text"
@@ -347,19 +356,19 @@ export const ProductivityDetail: React.FC<{
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-surface-muted text-[11px] font-bold uppercase tracking-widest text-text-secondary">
-            BPO Performance (Avg / Man-Day)
+            BPO Performance (by Gap)
           </div>
           <div className="divide-y divide-border">
-            {[...bpoList].sort((a, b) => b.avg - a.avg).map((b) => (
+            {[...bpoList].sort((a, b) => b.gap - a.gap).map((b) => (
               <div key={b.bpo} className="flex items-center justify-between px-4 py-2.5 gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-text-primary truncate uppercase">{b.bpo}</div>
                   <div className="text-[10px] text-text-muted">
-                    Gap {b.gap >= 0 ? "+" : ""}{formatNum(b.gap, 0)} · {formatNum(b.achievement, 1)}% quota
+                    Avg {formatNum(b.avg, 0)} · {formatNum(b.achievement, 1)}% quota
                   </div>
                 </div>
-                <div className={`text-base font-black shrink-0 ${getKpiColor(b.avg, "productivity")}`}>
-                  {formatNum(b.avg, 0)}
+                <div className={`text-base font-black shrink-0 ${b.gap >= 0 ? "text-success" : "text-danger"}`}>
+                  {b.gap >= 0 ? "+" : ""}{formatNum(b.gap, 0)}
                 </div>
               </div>
             ))}
@@ -372,15 +381,15 @@ export const ProductivityDetail: React.FC<{
         <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center justify-between gap-2">
             <span className="text-[11px] font-bold uppercase tracking-widest text-text-secondary">
-              Team Leader Ranking (Avg / Man-Day)
+              Team Leader Ranking (by Gap)
             </span>
             <span className="text-[10px] text-text-muted">klik untuk filter</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
             <div className="p-3">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-success mb-2">Top TL</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-success mb-2">Top TL (Gap)</div>
               <div className="flex flex-col gap-1">
-                {[...tlList].sort((a, b) => b.avg - a.avg).slice(0, 5).map((t, idx) => {
+                {[...tlList].sort((a, b) => b.gap - a.gap).slice(0, 5).map((t, idx) => {
                   const isActive = filterTL === t.tl;
                   return (
                     <button
@@ -395,7 +404,9 @@ export const ProductivityDetail: React.FC<{
                         </span>
                         <span className="text-xs font-semibold text-text-primary truncate" title={t.tl}>{t.tl}</span>
                       </div>
-                      <span className={`text-xs font-bold shrink-0 ${getKpiColor(t.avg, "productivity")}`}>{formatNum(t.avg, 0)}</span>
+                      <span className={`text-xs font-bold shrink-0 ${t.gap >= 0 ? "text-success" : "text-danger"}`}>
+                        {t.gap >= 0 ? "+" : ""}{formatNum(t.gap, 0)}
+                      </span>
                     </button>
                   );
                 })}
@@ -403,9 +414,9 @@ export const ProductivityDetail: React.FC<{
               </div>
             </div>
             <div className="p-3">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-danger mb-2">Underperform TL</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-danger mb-2">Underperform TL (Gap)</div>
               <div className="flex flex-col gap-1">
-                {[...tlList].sort((a, b) => a.avg - b.avg).slice(0, 5).map((t, idx) => {
+                {[...tlList].sort((a, b) => a.gap - b.gap).slice(0, 5).map((t, idx) => {
                   const isActive = filterTL === t.tl;
                   return (
                     <button
@@ -420,7 +431,9 @@ export const ProductivityDetail: React.FC<{
                         </span>
                         <span className="text-xs font-semibold text-text-primary truncate" title={t.tl}>{t.tl}</span>
                       </div>
-                      <span className={`text-xs font-bold shrink-0 ${getKpiColor(t.avg, "productivity")}`}>{formatNum(t.avg, 0)}</span>
+                      <span className={`text-xs font-bold shrink-0 ${t.gap >= 0 ? "text-success" : "text-danger"}`}>
+                        {t.gap >= 0 ? "+" : ""}{formatNum(t.gap, 0)}
+                      </span>
                     </button>
                   );
                 })}

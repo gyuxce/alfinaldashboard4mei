@@ -314,10 +314,10 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
             data={data}
             metricFn={(agent) =>
               agent.manDays > 0
-                ? { value: agent.productivityAverage, count: agent.manDays }
+                ? { value: agent.gap, count: 1 }
                 : null
             }
-            formatFn={(val) => formatNum(val, 0)}
+            formatFn={(val) => `${val >= 0 ? "+" : ""}${formatNum(val, 0)}`}
             activeTlFilter={
               selectedTL && selectedTL !== "All TL" && selectedTL !== "All Team Leaders"
                 ? selectedTL
@@ -326,6 +326,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
             onTlClick={(tl) => setSelectedTL(tl || "All TL")}
             kpiType="productivity"
             minAgentCount={1}
+            overallLabel="Overall Gap (+/-)"
           />
 
           <KpiRulesPanel

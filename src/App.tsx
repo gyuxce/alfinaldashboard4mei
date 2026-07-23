@@ -922,12 +922,12 @@ export default function App() {
             {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-            {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
-            {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
-            {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
-            {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
+            {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} previousData={previousKpiData} />}
+            {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} previousData={previousKpiData} />}
+            {activeTab === 'whu' && <WhuMonitor data={kpiData} previousData={previousKpiData} />}
+            {activeTab === 'qa' && <QaAgent360 data={kpiData} previousData={previousKpiData} />}
             {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
-            {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} />}
+            {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} previousData={previousKpiData} />}
             {activeTab === 'files' && <FileCenter />}
           </React.Suspense>
         </div>

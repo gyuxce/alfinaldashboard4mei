@@ -384,6 +384,57 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       }));
   }, [tableData, selectedScoreCase, viewMode]);
 
+  const getAgentTakeoutPct = (agent: AgentKPI) => {
+    const total = agent.csatHistory?.length || 0;
+    const takeout = agent.csatHistory?.filter((h) => h.isTakeout).length || 0;
+    return {
+      total,
+      takeout,
+      pct: total > 0 ? (takeout / total) * 100 : 0,
+    };
+  };
+
+  const takeoutFairness = useMemo(() => {
+    const agentRows = tableData
+      .map((a) => {
+        const stats = getAgentTakeoutPct(a);
+        return {
+          csId: a.csId,
+          name: a.name || a.csId,
+          tl: a.teamLeader || '-',
+          bpo: a.bpo || '-',
+          ...stats,
+        };
+      })
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.pct - a.pct);
+
+    const tlMap: Record<string, { takeout: number; total: number }> = {};
+    agentRows.forEach((r) => {
+      if (!tlMap[r.tl]) tlMap[r.tl] = { takeout: 0, total: 0 };
+      tlMap[r.tl].takeout += r.takeout;
+      tlMap[r.tl].total += r.total;
+    });
+    const tlRows = Object.entries(tlMap)
+      .map(([tl, s]) => ({
+        tl,
+        takeout: s.takeout,
+        total: s.total,
+        pct: s.total > 0 ? (s.takeout / s.total) * 100 : 0,
+      }))
+      .sort((a, b) => b.pct - a.pct);
+
+    const teamTotal = agentRows.reduce((s, r) => s + r.total, 0);
+    const teamTakeout = agentRows.reduce((s, r) => s + r.takeout, 0);
+    return {
+      agentRows,
+      tlRows,
+      teamPct: teamTotal > 0 ? (teamTakeout / teamTotal) * 100 : 0,
+      teamTakeout,
+      teamTotal,
+    };
+  }, [tableData]);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
@@ -502,6 +553,94 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           />
         </>
       )}
+
+      <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-text-primary">Takeout Fairness (% Takeout)</h2>
+            <p className="text-xs text-text-muted mt-0.5">
+              % tiket takeout dari total tiket CSAT SC per agent / TL — untuk cek apakah takeout merata
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Team Takeout %</div>
+            <div className="text-lg font-black text-text-primary">
+              {formatNum(takeoutFairness.teamPct, 1)}%
+              <span className="text-[11px] font-medium text-text-muted ml-2">
+                ({formatNum(takeoutFairness.teamTakeout, 0)} / {formatNum(takeoutFairness.teamTotal, 0)})
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-border">
+          <div className="max-h-[280px] overflow-auto">
+            <div className="sticky top-0 px-3 py-2 bg-surface text-[10px] font-bold uppercase tracking-widest text-text-secondary border-b border-border">
+              Highest Takeout % — Agent
+            </div>
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-surface-muted text-text-muted">
+                <tr>
+                  <th className="p-2 w-10 text-center">#</th>
+                  <th className="p-2">Agent</th>
+                  <th className="p-2">TL</th>
+                  <th className="p-2 text-center">Takeout</th>
+                  <th className="p-2 text-center">Total</th>
+                  <th className="p-2 text-center">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {takeoutFairness.agentRows.slice(0, 15).map((r, idx) => (
+                  <tr key={r.csId} className="border-b border-border hover:bg-surface-muted">
+                    <td className="p-2 text-center text-text-muted">{idx + 1}</td>
+                    <td className="p-2 font-semibold text-text-primary truncate max-w-[160px]" title={r.name}>{r.name}</td>
+                    <td className="p-2 text-text-secondary truncate max-w-[100px]" title={r.tl}>{r.tl}</td>
+                    <td className="p-2 text-center">{formatNum(r.takeout, 0)}</td>
+                    <td className="p-2 text-center">{formatNum(r.total, 0)}</td>
+                    <td className={`p-2 text-center font-bold ${r.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
+                      {formatNum(r.pct, 1)}%
+                    </td>
+                  </tr>
+                ))}
+                {takeoutFairness.agentRows.length === 0 && (
+                  <tr><td colSpan={6} className="p-6 text-center text-text-muted">No ticket data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="max-h-[280px] overflow-auto">
+            <div className="sticky top-0 px-3 py-2 bg-surface text-[10px] font-bold uppercase tracking-widest text-text-secondary border-b border-border">
+              Highest Takeout % — Team Leader
+            </div>
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-surface-muted text-text-muted">
+                <tr>
+                  <th className="p-2 w-10 text-center">#</th>
+                  <th className="p-2">Team Leader</th>
+                  <th className="p-2 text-center">Takeout</th>
+                  <th className="p-2 text-center">Total</th>
+                  <th className="p-2 text-center">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {takeoutFairness.tlRows.slice(0, 15).map((r, idx) => (
+                  <tr key={r.tl} className="border-b border-border hover:bg-surface-muted">
+                    <td className="p-2 text-center text-text-muted">{idx + 1}</td>
+                    <td className="p-2 font-semibold text-text-primary truncate max-w-[180px]" title={r.tl}>{r.tl}</td>
+                    <td className="p-2 text-center">{formatNum(r.takeout, 0)}</td>
+                    <td className="p-2 text-center">{formatNum(r.total, 0)}</td>
+                    <td className={`p-2 text-center font-bold ${r.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
+                      {formatNum(r.pct, 1)}%
+                    </td>
+                  </tr>
+                ))}
+                {takeoutFairness.tlRows.length === 0 && (
+                  <tr><td colSpan={5} className="p-6 text-center text-text-muted">No TL data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
       {analysisMode === 'score' ? (
         <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
@@ -865,6 +1004,9 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   </th>
                 ))}
                 <SortableHeader label="Average" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                <th className="p-2 font-bold text-center text-text-muted bg-surface">Tickets</th>
+                <th className="p-2 font-bold text-center text-text-muted bg-surface">Takeout</th>
+                <th className="p-2 font-bold text-center text-text-primary bg-surface">Takeout %</th>
                 <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                   Action
                 </th>
@@ -873,6 +1015,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             <tbody className="">
               {sortedAgentData.map((agent, index) => {
                 const totalCount = viewMode === 'full' ? agent.csatScFullCount : agent.csatScFairCount;
+                const takeoutStats = getAgentTakeoutPct(agent);
                 
                 const displayName = agent.name || agent.csId;
 
@@ -958,6 +1101,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                         <span className="text-[9px] text-text-muted font-medium">({totalCount} valid ratings)</span>
                       </div>
                     ) : '-'}
+                  </td>
+                  <td className="p-2 text-center text-text-secondary z-10">{formatNum(takeoutStats.total, 0)}</td>
+                  <td className="p-2 text-center text-text-secondary z-10">{formatNum(takeoutStats.takeout, 0)}</td>
+                  <td className={`p-2 text-center font-bold z-10 ${takeoutStats.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
+                    {takeoutStats.total > 0 ? `${formatNum(takeoutStats.pct, 1)}%` : '-'}
                   </td>
                   <td className="p-2 text-center flex items-center justify-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50">
                     <button 
