@@ -57,10 +57,10 @@ const initialMessage = (scope: BotScope): ChatMessage => ({
   role: 'assistant',
   content:
     scope === 'agent'
-      ? 'Halo, saya Ask KPI. Pilih 1 agent di filter, atau ganti mode TL/BPO untuk baca performa tim.'
+      ? 'Halo, saya Ask KPI. Pilih 1 agent di filter, atau ganti mode TL/BPO untuk baca performa tim. Saya jawab dalam Bahasa Indonesia yang ringkas.'
       : scope === 'tl'
-        ? 'Mode TL aktif. Pilih Team Leader di filter, lalu tanya gap / underperform / coaching tim.'
-        : 'Mode BPO/All aktif. Tanya ringkasan portfolio dari filter BPO saat ini.',
+        ? 'Mode TL aktif. Pilih Team Leader di filter, lalu tanya gap, agent yang perlu perhatian, atau coaching tim.'
+        : 'Mode BPO aktif. Tanya ringkasan portfolio dari filter BPO saat ini.',
 });
 
 function startersFor(scope: BotScope, activeTab: string, comparisonOn: boolean) {
