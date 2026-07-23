@@ -1,9 +1,13 @@
+type ChatIntent = 'summary' | 'detail' | 'coaching' | 'compare';
+type BotScope = 'agent' | 'tl' | 'bpo';
+
 type ApiRequest = {
   method?: string;
   body?: {
     message?: string;
     context?: unknown;
-    intent?: 'summary' | 'detail' | 'coaching';
+    intent?: ChatIntent;
+    scopeMode?: BotScope;
     history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   };
 };
@@ -14,8 +18,23 @@ type ApiResponse = {
   setHeader?: (name: string, value: string) => void;
 };
 
-const MAX_MESSAGE_LENGTH = 1200;
-const MAX_HISTORY_ITEMS = 4;
+const MAX_MESSAGE_LENGTH = 1000;
+const MAX_HISTORY_ITEMS = 3;
+const MAX_CONTEXT_CHARS = 7000;
+const MAX_HISTORY_CHARS = 1800;
+const MAX_OUTPUT_TOKENS = 520;
+
+const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
+const DEFAULT_FALLBACK_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+
+const SYSTEM_PROMPT = [
+  'Kamu adalah Ask KPI, asisten performa dashboard Live Chat KPI.',
+  'Jawab Bahasa Indonesia ringkas. Hanya pakai CONTEXT. Jangan mengarang angka/nama.',
+  'Jika data tidak ada di CONTEXT, bilang belum tersedia di filter aktif.',
+  'Wajib awali 1 baris: Dasar data: <scope>, <periode>, <tab/metric>.',
+  'Format: Temuan, Angka, Aksi. Maks 8 bullet "-". Tanpa emoji, tanpa markdown bold/asterisk.',
+  'Untuk coaching/DMAIC: Define, Measure, Analyze, Improve, Control (singkat).',
+].join(' ');
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') {
@@ -23,10 +42,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
+  const primaryKey = process.env.OPENROUTER_API_KEY;
+  if (!primaryKey) {
     return res.status(500).json({
-      error: 'OPENROUTER_API_KEY belum diset di environment Vercel.',
+      error: 'OPENROUTER_API_KEY belum diset. Isi di Vercel Environment Variables.',
     });
   }
 
@@ -36,121 +55,159 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   const history = Array.isArray(req.body?.history)
-    ? req.body.history.slice(-MAX_HISTORY_ITEMS)
+    ? req.body.history
+        .slice(-MAX_HISTORY_ITEMS)
+        .map((item) => ({
+          role: item.role === 'assistant' ? 'assistant' as const : 'user' as const,
+          content: String(item.content || '').slice(0, 600),
+        }))
     : [];
 
   const baseUrl = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-  const model = process.env.OPENROUTER_MODEL || 'openrouter/auto';
+  const primaryModel = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  const fallbackModel = process.env.OPENROUTER_MODEL_FALLBACK || DEFAULT_FALLBACK_MODEL;
+  const fallbackKey = process.env.OPENROUTER_API_KEY_FALLBACK || primaryKey;
+
   const prompt = buildPrompt({
     message,
     context: req.body?.context,
     intent: req.body?.intent || 'summary',
+    scopeMode: req.body?.scopeMode || 'agent',
     history,
   });
 
-  try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'https://vercel.app',
-        'X-Title': process.env.OPENROUTER_APP_NAME || 'KPI Dashboard',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: 'Kamu adalah Lumi, asisten performa untuk dashboard internal contact center.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.35,
-        max_tokens: 900,
-      }),
-    });
+  const attempts: Array<{ model: string; apiKey: string; label: string }> = [
+    { model: primaryModel, apiKey: primaryKey, label: 'primary' },
+  ];
+  if (fallbackModel && fallbackModel !== primaryModel) {
+    attempts.push({ model: fallbackModel, apiKey: fallbackKey, label: 'fallback' });
+  }
 
-    const payload = await response.json();
+  let lastError = 'OpenRouter gagal merespons.';
 
-    if (!response.ok) {
-      const providerMessage =
-        payload?.error?.message ||
-        payload?.message ||
-        'OpenRouter gagal merespons. Coba lagi beberapa saat.';
-      const isQuota = response.status === 429;
-      return res.status(response.status).json({
-        error: isQuota
-          ? `OpenRouter menolak request untuk model ${model}. Biasanya ini karena rate limit, provider sedang penuh, atau limit akun/model. Tunggu 1-2 menit lalu coba lagi. Detail: ${providerMessage}`
-          : providerMessage,
+  for (const attempt of attempts) {
+    try {
+      const result = await callOpenRouter({
+        baseUrl,
+        apiKey: attempt.apiKey,
+        model: attempt.model,
+        prompt,
       });
-    }
 
-    const answer =
-      String(payload?.choices?.[0]?.message?.content || '')
-        .trim() || '';
-    const finishReason = payload?.choices?.[0]?.finish_reason;
+      if ('answer' in result && result.ok) {
+        return res.status(200).json({
+          answer: result.answer,
+          model: attempt.model,
+          usedFallback: attempt.label === 'fallback',
+        });
+      }
 
-    return res.status(200).json({
-      answer: answer
-        ? finishReason === 'length'
-          ? `${answer}\n\nCatatan: jawaban terpotong karena batas output AI. Coba minta versi lebih singkat.`
-          : answer
-        : 'OpenRouter tidak mengembalikan jawaban.',
-    });
-  } catch (error) {
-    return res.status(500).json({
-      error:
+      const fail = result as { ok: false; status: number; error: string };
+      lastError = fail.error;
+      const retryable =
+        fail.status === 429 ||
+        fail.status === 502 ||
+        fail.status === 503 ||
+        fail.status === 404;
+      if (!retryable) {
+        return res.status(fail.status).json({ error: fail.error });
+      }
+    } catch (error) {
+      lastError =
         error instanceof Error
           ? error.message
-          : 'Terjadi error saat menghubungi OpenRouter API.',
-    });
+          : 'Terjadi error saat menghubungi OpenRouter API.';
+    }
   }
+
+  return res.status(502).json({
+    error: `${lastError} (primary + fallback model gagal). Tunggu 1-2 menit lalu coba lagi.`,
+  });
+}
+
+async function callOpenRouter({
+  baseUrl,
+  apiKey,
+  model,
+  prompt,
+}: {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  prompt: string;
+}): Promise<{ ok: true; answer: string } | { ok: false; status: number; error: string }> {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'https://aldashboardlc.vercel.app',
+      'X-Title': process.env.OPENROUTER_APP_NAME || 'Ask KPI Dashboard',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.3,
+      max_tokens: MAX_OUTPUT_TOKENS,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const providerMessage =
+      payload?.error?.message ||
+      payload?.message ||
+      'OpenRouter gagal merespons. Coba lagi beberapa saat.';
+    const isQuota = response.status === 429;
+    return {
+      ok: false,
+      status: response.status,
+      error: isQuota
+        ? `Rate limit/model penuh untuk ${model}. Detail: ${providerMessage}`
+        : providerMessage,
+    };
+  }
+
+  const answer = String(payload?.choices?.[0]?.message?.content || '').trim();
+  const finishReason = payload?.choices?.[0]?.finish_reason;
+
+  return {
+    ok: true,
+    answer: answer
+      ? finishReason === 'length'
+        ? `${answer}\n\nCatatan: jawaban terpotong. Minta versi lebih singkat.`
+        : answer
+      : 'OpenRouter tidak mengembalikan jawaban.',
+  };
 }
 
 function buildPrompt({
   message,
   context,
   intent,
+  scopeMode,
   history,
 }: {
   message: string;
   context: unknown;
-  intent: 'summary' | 'detail' | 'coaching';
+  intent: ChatIntent;
+  scopeMode: BotScope;
   history: Array<{ role: 'user' | 'assistant'; content: string }>;
 }) {
+  const compactContext = JSON.stringify(context ?? {}).slice(0, MAX_CONTEXT_CHARS);
+  const compactHistory = JSON.stringify(history).slice(0, MAX_HISTORY_CHARS);
+
   return [
-    'Kamu adalah Lumi, asisten performa untuk dashboard internal contact center.',
-    'Jawab dalam Bahasa Indonesia yang ringkas, jelas, dan berbasis data.',
-    'Gunakan hanya data dashboard yang diberikan. Kalau data tidak cukup, bilang data belum tersedia.',
-    'Jangan mengarang angka, nama agent, atau penyebab yang tidak ada di context.',
-    'Saat memberi ringkasan performa atau coaching, cek KPI utama yang tersedia: Productivity, CSAT Official, CSAT Takeout/SC, QA Score, QA Defect, SLA 1 menit, SLA 3 menit, WHU, Attendance, RCA, trendSamples, dan ranking risiko.',
-    'Kamu bisa membaca semua area dashboard dari context: productivityTotal, productivityAverage, manDays, CSAT official, CSAT SC/takeout, badCsatDetails, QA, qaDefectDetails, highQaDetails, SLA, WHU, attendanceScore, RCA, trendSamples, dan ranking risiko.',
-    'Jika user bertanya CSAT, pakai csatScoreCounts, topCsatCategories, badCsatDetails, dan rcaBreakdown.',
-    'Jika user bertanya QA, pakai topQaCategories, qaDefectDetails, highQaDetails, crmCode, remarks, feedback, ticket/chat, dan qcName.',
-    'Jika user bertanya SLA/WHU/Productivity/Attendance, pakai nilai metrik utama dan trendSamples yang tersedia.',
-    'Jika user meminta Performa Agent, susun jawaban dengan bagian: Ringkasan umum, KPI kuat, KPI perlu perhatian, penyebab/risk, saran aksi.',
-    'Jika user meminta Private Coaching atau DMAIC, susun jawaban dengan bagian Define, Measure, Analyze, Improve, Control secara singkat dan pastikan Measure menyebut semua KPI utama yang tersedia.',
-    'Untuk coaching, gunakan bahasa yang suportif dan berbasis tindakan, bukan menghakimi agent.',
-    'Wajib awali jawaban dengan 1 baris "Dasar data:" yang menyebut scope/periode/metric utama yang benar-benar ada di context.',
-    'Contoh singkat: "Dasar data: Agent A, periode 1-30 Juni 2026, QA 32 evaluasi, CSAT Official 4.2."',
-    'Jawaban harus selesai utuh, jangan berhenti di tengah kalimat.',
-    'Jangan pakai emoji.',
-    'Jangan pakai markdown asterisk (*), bold (**), atau numbering panjang.',
-    'Jika memakai poin, wajib pakai bullet "-" dan setiap bullet harus di baris baru.',
-    'Batasi jawaban maksimal 8 bullet pendek. Tiap bullet maksimal 1 kalimat.',
-    'Jika pertanyaan meminta ringkasan, gunakan format: Performa umum, risiko utama, penyebab, saran aksi.',
-    '',
-    'CONTEXT DASHBOARD:',
-    `Mode context: ${intent}`,
-    JSON.stringify(context, null, 2).slice(0, 12000),
-    '',
-    'RIWAYAT CHAT TERAKHIR:',
-    JSON.stringify(history, null, 2).slice(0, 3000),
-    '',
-    `PERTANYAAN USER: ${message}`,
+    `Scope mode: ${scopeMode}`,
+    `Intent: ${intent}`,
+    'CONTEXT:',
+    compactContext,
+    'HISTORY:',
+    compactHistory,
+    `QUESTION: ${message}`,
   ].join('\n');
 }
