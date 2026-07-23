@@ -134,7 +134,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
         defects += (a.qaHistory || []).filter(isQaDefect).length;
       });
       return {
-        avg: scoreCount > 0 ? (scoreSum / scoreCount) * 100 : 0,
+        // qaScoreSum/Count already store percentage points (e.g. 95.8), do not *100
+        avg: scoreCount > 0 ? scoreSum / scoreCount : 0,
         defects,
       };
     };
@@ -163,8 +164,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
             break;
           case 'average':
           default:
-            aVal = a.qaScoreCount > 0 ? (a.qaScoreSum / a.qaScoreCount) * 100 : -1;
-            bVal = b.qaScoreCount > 0 ? (b.qaScoreSum / b.qaScoreCount) * 100 : -1;
+            aVal = a.qaScoreCount > 0 ? a.qaScoreSum / a.qaScoreCount : -1;
+            bVal = b.qaScoreCount > 0 ? b.qaScoreSum / b.qaScoreCount : -1;
             break;
         }
 

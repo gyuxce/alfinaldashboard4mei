@@ -673,8 +673,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
              </div>
           </div>
 
-          <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9 gap-3">
+          <div className="p-4 md:p-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                {([
                  { key: 'All', label: 'All Surveys', tone: 'neutral' },
                  { key: 'No Survey', label: 'No Survey', tone: 'neutral' },
@@ -703,25 +703,25 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    <button
                      key={card.key}
                      onClick={() => { setSelectedScoreCase(card.key); setScoreCasePage(1); }}
-                     className={`flex flex-col items-center p-4 rounded-xl border transition-all ${isSelected ? `${selectedBorder} shadow-[0_1px_3px_rgba(0,0,0,0.04)]` : 'border-border hover:border-text-muted/30 bg-card hover:bg-surface-muted'}`}
+                     className={`flex flex-col items-center justify-center min-h-[108px] px-3 py-3.5 rounded-xl border transition-all ${isSelected ? `${selectedBorder} shadow-[0_1px_3px_rgba(0,0,0,0.04)]` : 'border-border hover:border-text-muted/30 bg-card hover:bg-surface-muted'}`}
                    >
-                     <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-1 text-center">
+                     <div className="text-[10px] md:text-[11px] font-bold text-text-secondary uppercase tracking-wide mb-1 text-center leading-tight">
                         {card.label}
                      </div>
                      {'sub' in card && card.sub ? (
-                       <div className="text-[10px] font-medium text-text-muted mb-1">{card.sub}</div>
+                       <div className="text-[10px] font-medium text-text-muted mb-1.5">{card.sub}</div>
                      ) : (
-                       <div className="h-[15px] mb-1" />
+                       <div className="h-[14px] mb-1.5" />
                      )}
-                     <div className={`text-2xl font-black mb-1 ${countClass}`}>{formatNum(count, 0)}</div>
-                     <div className="text-xs font-medium text-text-muted">{formatNum(pct, 1)}%</div>
+                     <div className={`text-xl md:text-2xl font-black mb-0.5 ${countClass}`}>{formatNum(count, 0)}</div>
+                     <div className="text-[11px] font-medium text-text-muted">{formatNum(pct, 1)}%</div>
                      {card.key === 'Bad' && (
-                       <div className="mt-2 text-[10px] font-semibold text-danger/80">
+                       <div className="mt-1.5 text-[10px] font-semibold text-danger/80">
                          1: {formatNum(scoreDistribution['1'], 0)} · 2: {formatNum(scoreDistribution['2'], 0)}
                        </div>
                      )}
                      {card.key === 'Good' && (
-                       <div className="mt-2 text-[10px] font-semibold text-success/80">
+                       <div className="mt-1.5 text-[10px] font-semibold text-success/80">
                          4: {formatNum(scoreDistribution['4'], 0)} · 5: {formatNum(scoreDistribution['5'], 0)}
                        </div>
                      )}
