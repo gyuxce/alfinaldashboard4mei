@@ -5,11 +5,14 @@ import { Search, Clock } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
+import { PeriodDelta } from '../ui/PeriodDelta';
 
-export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
+export const WhuMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] }> = ({ data, previousData = [] }) => {
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
+  const comparisonMode = useStore(state => state.comparisonMode);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -62,16 +65,27 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return filtered;
   }, [data, search, filterTL, sortConfig]);
 
-  const avgWhu = useMemo(() => {
-    let sum = 0;
-    let count = 0;
-    data.forEach(d => {
-      if (d.whu !== null) {
-        sum += d.whu;
-        count++;
-      }
-    });
-    return count > 0 ? sum / count : 0;
+  const whuSummary = useMemo(() => {
+    const calc = (dataset: AgentKPI[]) => {
+      let sum = 0;
+      let count = 0;
+      let under = 0;
+      dataset.forEach((d) => {
+        if (d.whu !== null) {
+          sum += d.whu;
+          count++;
+          if (d.whu < 96) under++;
+        }
+      });
+      return { avg: count > 0 ? sum / count : 0, under, count };
+    };
+    return { current: calc(data), previous: calc(previousData) };
+  }, [data, previousData]);
+
+  const underWhuAgents = useMemo(() => {
+    return data
+      .filter((a) => a.whu !== null && (a.whu as number) < 96)
+      .sort((a, b) => (a.whu || 0) - (b.whu || 0));
   }, [data]);
 
   const uniqueDates = useMemo(() => {
@@ -83,8 +97,29 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
-        <div>
+        <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-lg font-bold text-text-primary">WHU Monitor</h1>
+          <div className="rounded-xl border border-border bg-card px-4 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Team Avg WHU
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-xl font-black ${getKpiColor(whuSummary.current.avg, 'whu')}`}>
+                {formatNum(whuSummary.current.avg, 1)}%
+              </span>
+              {isComparisonEnabled && previousData.length > 0 && (
+                <PeriodDelta
+                  current={whuSummary.current.avg}
+                  previous={whuSummary.previous.avg}
+                  suffix="%"
+                  label={comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW'}
+                />
+              )}
+            </div>
+            <div className="text-[10px] text-text-muted mt-0.5">
+              {formatNum(whuSummary.current.under, 0)} agent &lt; 96%
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="relative">
@@ -99,6 +134,47 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           </div>
         </div>
       </div>
+
+      {underWhuAgents.length > 0 && (
+        <div className="bg-card border border-danger/30 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-danger/5">
+            <div className="text-sm font-bold text-danger">Exception: WHU &lt; 96%</div>
+            <div className="text-xs text-text-muted mt-0.5">{underWhuAgents.length} agent di bawah target</div>
+          </div>
+          <div className="max-h-[200px] overflow-auto">
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-surface text-text-muted sticky top-0">
+                <tr>
+                  <th className="p-2 w-10 text-center">#</th>
+                  <th className="p-2">Agent</th>
+                  <th className="p-2">BPO</th>
+                  <th className="p-2">TL</th>
+                  <th className="p-2 text-center">WHU</th>
+                </tr>
+              </thead>
+              <tbody>
+                {underWhuAgents.map((a, idx) => (
+                  <tr key={a.csId} className="border-b border-border hover:bg-surface-muted">
+                    <td className="p-2 text-center text-text-muted">{idx + 1}</td>
+                    <td className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => useStore.getState().setSelectedAgentFor360(a.csId)}
+                        className="font-semibold text-kpi-neutral-text hover:underline"
+                      >
+                        {a.name || a.csId}
+                      </button>
+                    </td>
+                    <td className="p-2 uppercase text-text-secondary">{a.bpo || '-'}</td>
+                    <td className="p-2 text-text-secondary">{a.teamLeader || '-'}</td>
+                    <td className="p-2 text-center font-bold text-danger">{formatNum(a.whu, 1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">

@@ -324,12 +324,31 @@ export default function App() {
       { label: 'QA', rows: activeMonthRowCounts?.qaData ?? countDataRows(qaData) },
     ];
     const missingSources = sourceRows.filter((source) => source.rows === 0);
-    const masterIds = new Set(Object.keys(agentDictionary || {}));
+    const masterIds = Object.keys(agentDictionary || {});
     const productivityIds = extractCsIds(productivityData);
     const scheduleIds = extractCsIds(scheduleData);
-    const missingProductivity = Array.from(masterIds).filter((id) => !productivityIds.has(id)).length;
-    const missingSchedule = Array.from(masterIds).filter((id) => !scheduleIds.has(id)).length;
+    const missingProdIds = masterIds.filter((id) => !productivityIds.has(id));
+    const missingSchedIds = masterIds.filter((id) => !scheduleIds.has(id));
+    const missingProductivity = missingProdIds.length;
+    const missingSchedule = missingSchedIds.length;
     const duplicateProductivityRows = getProductivityDuplicateCount(productivityData);
+
+    const byTlMap = new Map<string, { tl: string; missingProductivity: number; missingSchedule: number }>();
+    const bumpTl = (id: string, field: 'missingProductivity' | 'missingSchedule') => {
+      const info = agentDictionary?.[id];
+      const tl = (info?.teamLeader || '').trim() || 'Tanpa TL';
+      const existing = byTlMap.get(tl) || { tl, missingProductivity: 0, missingSchedule: 0 };
+      existing[field] += 1;
+      byTlMap.set(tl, existing);
+    };
+    missingProdIds.forEach((id) => bumpTl(id, 'missingProductivity'));
+    missingSchedIds.forEach((id) => bumpTl(id, 'missingSchedule'));
+    const byTl = Array.from(byTlMap.values()).sort((a, b) => {
+      const totalA = a.missingProductivity + a.missingSchedule;
+      const totalB = b.missingProductivity + b.missingSchedule;
+      if (totalB !== totalA) return totalB - totalA;
+      return a.tl.localeCompare(b.tl);
+    });
 
     let warningCount = 0;
     if (syncIsStale) warningCount += 1;
@@ -347,25 +366,35 @@ export default function App() {
       syncIsStale ? 'stale sync' : '',
     ].filter(Boolean);
 
+    const base = {
+      detail: detailParts.join(' | '),
+      count: 0,
+      syncIsStale: !!syncIsStale,
+      missingProductivity,
+      missingSchedule,
+      byTl,
+    };
+
     if (errorCount > 0) {
       return {
+        ...base,
         status: 'error' as const,
         label: 'Need Review',
-        detail: detailParts.join(' | '),
         count: errorCount + warningCount,
       };
     }
 
     if (warningCount > 0) {
       return {
+        ...base,
         status: 'warning' as const,
         label: `${warningCount} Warning${warningCount > 1 ? 's' : ''}`,
-        detail: detailParts.join(' | '),
         count: warningCount,
       };
     }
 
     return {
+      ...base,
       status: 'ok' as const,
       label: 'Data OK',
       detail: lastSyncTime ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Waiting for sync',
@@ -485,6 +514,11 @@ export default function App() {
     if (!selectedAgentFor360) return null;
     return rawData.find(a => a.csId === selectedAgentFor360) || null;
   }, [selectedAgentFor360, rawData]);
+
+  const agent360Previous = useMemo(() => {
+    if (!selectedAgentFor360 || !isComparisonEnabled) return null;
+    return previousRawData.find((a) => a.csId === selectedAgentFor360) || null;
+  }, [selectedAgentFor360, isComparisonEnabled, previousRawData]);
 
   if (isHydrating) {
     return (
@@ -917,17 +951,26 @@ export default function App() {
 
         <div className="w-full pb-8">
           <React.Suspense fallback={<TabLoading />}>
-            {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+            {activeTab === 'summary' && (
+              <DashboardSummary
+                data={kpiData}
+                previousData={previousKpiData}
+                previousData2={previousKpiData2}
+                previousData3={previousKpiData3}
+                dataQuality={dataQuality}
+                onOpenFiles={() => setActiveTab('files')}
+              />
+            )}
             {activeTab === 'leaderboard' && <Leaderboard />}
             {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-            {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
-            {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
-            {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
-            {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
+            {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} previousData={previousKpiData} />}
+            {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} previousData={previousKpiData} />}
+            {activeTab === 'whu' && <WhuMonitor data={kpiData} previousData={previousKpiData} />}
+            {activeTab === 'qa' && <QaAgent360 data={kpiData} previousData={previousKpiData} />}
             {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
-            {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} />}
+            {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} previousData={previousKpiData} />}
             {activeTab === 'files' && <FileCenter />}
           </React.Suspense>
         </div>
@@ -953,6 +996,8 @@ export default function App() {
         <React.Suspense fallback={null}>
           <Agent360Radar
              agent={agent360Data}
+             previousAgent={agent360Previous}
+             peers={kpiData}
              onClose={() => setSelectedAgentFor360(null)}
           />
         </React.Suspense>

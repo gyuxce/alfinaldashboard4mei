@@ -7,6 +7,8 @@ import {
 } from 'recharts';
 import { AlertCircle } from 'lucide-react';
 import { EmptyState } from '../ui/EmptyState';
+import { PeriodDelta } from '../ui/PeriodDelta';
+import { formatNum } from '../../lib/utils';
 
 const COLORS = {
   agent: '#f43f5e',
@@ -34,8 +36,8 @@ const CustomPieLabel = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
   );
 };
 
-export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
-  const { selectedBpo, selectedTL } = useStore();
+export const CsatRcaMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] }> = ({ data, previousData = [] }) => {
+  const { selectedBpo, selectedTL, isComparisonEnabled, comparisonMode } = useStore();
   const [agentSearch, setAgentSearch] = useState('');
 
   const hasRcaData = useMemo(() => {
@@ -167,6 +169,16 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
   const grandTotal = totalAgent + totalCustomer + totalAkulaku;
 
+  const previousGrandTotal = useMemo(() => {
+    let tA = 0, tC = 0, tAk = 0;
+    previousData.forEach((a) => {
+      Object.values(a.rcaAgentAreaCounts as Record<string, number>).forEach((v) => { tA += v; });
+      Object.values(a.rcaCustomerAreaCounts as Record<string, number>).forEach((v) => { tC += v; });
+      Object.values(a.rcaAkulakuProcessCounts as Record<string, number>).forEach((v) => { tAk += v; });
+    });
+    return tA + tC + tAk;
+  }, [previousData]);
+
   const legendItems = [
     { key: 'agent', label: 'Agent Area', count: totalAgent, color: COLORS.agent, bg: 'rgba(244,63,94,0.08)', border: 'rgba(244,63,94,0.25)', items: agentDetailBar },
     { key: 'customer', label: 'Customer Area', count: totalCustomer, color: COLORS.customer, bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)', items: customerDetailBar },
@@ -266,6 +278,19 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         <p className="text-xs text-text-muted mt-0.5">
           Analisa akar masalah berdasarkan kasus after-takeout | {activeFilterText || 'All Data'}
         </p>
+        {isComparisonEnabled && previousData.length > 0 && (
+          <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total RCA Cases</span>
+            <span className="text-sm font-black text-text-primary">{formatNum(grandTotal, 0)}</span>
+            <PeriodDelta
+              current={grandTotal}
+              previous={previousGrandTotal}
+              digits={0}
+              lowerIsBetter
+              label={comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW'}
+            />
+          </div>
+        )}
       </div>
 
       {/* Warning if no RCA data */}

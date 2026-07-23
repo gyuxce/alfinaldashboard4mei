@@ -246,6 +246,9 @@ export const Leaderboard: React.FC = () => {
     agentDictionary,
     startDate,
     endDate,
+    selectedBpo,
+    selectedTL,
+    selectedGlobalAgent,
   } = useStore();
 
   const handleOpenFiles = () => {
@@ -265,18 +268,41 @@ export const Leaderboard: React.FC = () => {
     scheduleData.length > 0 ||
     qaData.length > 0;
 
+  const applyGlobalFilters = (agents: AgentKPI[]) => {
+    let filtered = agents;
+    if (selectedBpo && selectedBpo !== "All BPO") {
+      filtered = filtered.filter(
+        (a) => (a.bpo || "").toUpperCase() === selectedBpo.toUpperCase(),
+      );
+    }
+    if (selectedTL && selectedTL !== "All TL" && selectedTL !== "All Team Leaders") {
+      filtered = filtered.filter(
+        (a) => (a.teamLeader || "").toUpperCase() === selectedTL.toUpperCase(),
+      );
+    }
+    if (selectedGlobalAgent && selectedGlobalAgent !== "All Agents") {
+      filtered = filtered.filter(
+        (a) =>
+          a.name === selectedGlobalAgent || a.csId === selectedGlobalAgent,
+      );
+    }
+    return filtered;
+  };
+
   const { agentRows, tlRows, developmentRows } = useMemo(() => {
     if (!hasData) return { agentRows: [], tlRows: [], developmentRows: [] };
 
-    const rawData = processKPIs(
-      productivityData,
-      csatScData,
-      slaData,
-      scheduleData,
-      qaData,
-      startDate,
-      endDate,
-      agentDictionary,
+    const rawData = applyGlobalFilters(
+      processKPIs(
+        productivityData,
+        csatScData,
+        slaData,
+        scheduleData,
+        qaData,
+        startDate,
+        endDate,
+        agentDictionary,
+      ),
     );
 
     // Prepare Agent List
@@ -535,15 +561,17 @@ export const Leaderboard: React.FC = () => {
         }
       });
 
-      const monthlyAgents = processKPIs(
-        productivityData,
-        csatScData,
-        slaData,
-        scheduleData,
-        qaData,
-        monthRange.start,
-        monthRange.end,
-        agentDictionary,
+      const monthlyAgents = applyGlobalFilters(
+        processKPIs(
+          productivityData,
+          csatScData,
+          slaData,
+          scheduleData,
+          qaData,
+          monthRange.start,
+          monthRange.end,
+          agentDictionary,
+        ),
       )
         .filter((agent) => !isAgentInactive(agent, monthRange.end))
         .map((agent) => ({
@@ -656,6 +684,9 @@ export const Leaderboard: React.FC = () => {
     agentDictionary,
     startDate,
     endDate,
+    selectedBpo,
+    selectedTL,
+    selectedGlobalAgent,
   ]);
 
   if (!hasData) {
@@ -716,7 +747,7 @@ export const Leaderboard: React.FC = () => {
           Weighted Score: QA 50% &middot; Prod 20% &middot; CSAT 20% &middot; Training 5% &middot; Quiz 5%
         </p>
         <p className="text-[11px] text-text-muted italic mt-0.5">
-          Mengikuti periode aktif, ranking mencakup seluruh agent
+          Mengikuti periode aktif dan filter global BPO / TL / Agent di header
         </p>
       </div>
 

@@ -13,6 +13,7 @@ export interface SummaryWidgetsProps {
   kpiType?: KpiType;
   minAgentCount?: number;
   containerClassName?: string;
+  overallLabel?: string;
 }
 
 export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({ 
@@ -24,7 +25,8 @@ export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({
   isLowerBetter = false,
   kpiType = 'qa',
   minAgentCount = 1,
-  containerClassName = "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4"
+  containerClassName = "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4",
+  overallLabel = "Overall Average",
 }) => {
   let totalSum = 0;
   let totalCount = 0;
@@ -89,7 +91,7 @@ export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({
     <div className={containerClassName}>
       {/* Kartu 1: Overall Average */}
       <div className="bg-surface rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-5 flex flex-col min-h-[160px] h-full">
-        <div className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">Overall Average</div>
+        <div className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">{overallLabel}</div>
         <div className="text-3xl font-extrabold text-text-primary mt-auto">{totalCount > 0 ? formatFn(overallAvg) : '-'}</div>
       </div>
 
