@@ -57,10 +57,10 @@ const initialMessage = (scope: BotScope): ChatMessage => ({
   role: 'assistant',
   content:
     scope === 'agent'
-      ? 'Halo, saya Ask KPI. Pilih 1 agent di filter, atau ganti mode TL/BPO untuk baca performa tim.'
+      ? 'Halo, saya Ask KPI. Pilih 1 agent di filter, atau ganti mode TL/BPO untuk baca performa tim. Saya jawab dalam Bahasa Indonesia yang ringkas.'
       : scope === 'tl'
-        ? 'Mode TL aktif. Pilih Team Leader di filter, lalu tanya gap / underperform / coaching tim.'
-        : 'Mode BPO/All aktif. Tanya ringkasan portfolio dari filter BPO saat ini.',
+        ? 'Mode TL aktif. Pilih Team Leader di filter, lalu tanya gap, agent yang perlu perhatian, atau coaching tim.'
+        : 'Mode BPO aktif. Tanya ringkasan portfolio dari filter BPO saat ini.',
 });
 
 function startersFor(scope: BotScope, activeTab: string, comparisonOn: boolean) {
@@ -69,32 +69,32 @@ function startersFor(scope: BotScope, activeTab: string, comparisonOn: boolean) 
     return [
       {
         title: 'Performa Agent',
-        description: `Ringkas KPI agent (fokus tab ${tabHint}).`,
+        description: `Ringkas KPI agent (fokus ${tabHint}).`,
         prompt:
-          'Ringkas performa agent ini: productivity (total/avg/gap/quota), CSAT official, CSAT takeout, QA, SLA 1m/3m, WHU, attendance, RCA, dan trend. Sebut area fokus perbaikan.',
+          'Tolong ringkas performa agent ini dalam Bahasa Indonesia sederhana: produktivitas (total, rata-rata, gap, kuota), CSAT official, CSAT takeout, QA, SLA 1 menit, SLA 3 menit, WHU, kehadiran, dan tren. Sebut apa yang perlu diperbaiki.',
         intent: 'summary' as const,
       },
       {
         title: 'Detail CSAT & QA',
-        description: 'Bedah score rendah dan defect.',
+        description: 'Bedah skor rendah dan defect.',
         prompt:
-          'Cek detail CSAT dan QA agent ini. Fokus score 1-2, score 3 (mid), defect QA, kategori, level, remarks/feedback yang ada di data.',
+          'Tolong cek detail CSAT dan QA agent ini dalam Bahasa Indonesia. Fokus skor 1-2, skor 3, defect QA, kategori, level, dan catatan yang ada di data.',
         intent: 'detail' as const,
       },
       {
         title: 'Private Coaching',
         description: 'DMAIC singkat berbasis data.',
         prompt:
-          'Buat private coaching DMAIC untuk agent ini dari KPI dashboard. Suportif, action plan jelas, Measure sebut KPI yang tersedia.',
+          'Buat coaching pribadi DMAIC untuk agent ini dalam Bahasa Indonesia yang suportif dan mudah dipahami. Sebut angka KPI yang tersedia lalu beri rencana aksi jelas.',
         intent: 'coaching' as const,
       },
       ...(comparisonOn
         ? [
             {
               title: 'Bandingkan periode',
-              description: 'Delta vs periode sebelumnya.',
+              description: 'Naik/turun vs periode sebelumnya.',
               prompt:
-                'Bandingkan performa agent vs periode sebelumnya (WoW/MoM). Sebut KPI naik/turun dan prioritas aksi.',
+                'Bandingkan performa agent ini vs periode sebelumnya dalam Bahasa Indonesia. Sebut KPI yang naik atau turun beserta angkanya, lalu beri prioritas aksi.',
               intent: 'compare' as const,
             },
           ]
@@ -106,23 +106,23 @@ function startersFor(scope: BotScope, activeTab: string, comparisonOn: boolean) 
     return [
       {
         title: 'Ringkas TL',
-        description: 'Gap & risiko tim TL ini.',
+        description: 'Gap dan risiko tim TL ini.',
         prompt:
-          'Ringkas performa TL ini: jumlah agent, avg productivity/gap, CSAT, QA, SLA, WHU, attendance. Sebut risiko utama dan siapa yang perlu perhatian.',
+          'Ringkas performa TL ini dalam Bahasa Indonesia: jumlah agent, rata-rata produktivitas/gap, CSAT, QA, SLA, WHU, kehadiran. Sebut risiko utama dan siapa yang perlu perhatian.',
         intent: 'summary' as const,
       },
       {
-        title: 'Underperform',
+        title: 'Perlu perhatian',
         description: 'Agent paling berisiko di TL.',
         prompt:
-          'Dari data TL ini, daftar agent underperform / risk tertinggi. Sertakan alasan singkat dari KPI (prod gap, CSAT bad, QA defect, attendance, SLA/WHU).',
+          'Dari data TL ini, daftar agent yang paling perlu perhatian dalam Bahasa Indonesia. Sertakan alasan singkat dari KPI (gap produktivitas, CSAT buruk, defect QA, kehadiran, SLA/WHU).',
         intent: 'detail' as const,
       },
       {
         title: 'Coaching Tim',
         description: 'Rencana aksi TL.',
         prompt:
-          'Buat rencana coaching untuk TL ini berbasis DMAIC singkat: fokus 3 aksi prioritas berdasarkan data filter aktif.',
+          'Buat rencana coaching untuk TL ini dalam Bahasa Indonesia berbasis DMAIC singkat: fokus 3 aksi prioritas berdasarkan data filter aktif.',
         intent: 'coaching' as const,
       },
     ];
@@ -133,20 +133,20 @@ function startersFor(scope: BotScope, activeTab: string, comparisonOn: boolean) 
       title: 'Ringkas BPO / Filter',
       description: 'Portfolio dari filter aktif.',
       prompt:
-        'Ringkas performa BPO/filter aktif: jumlah agent, avg KPI utama, total bad CSAT, total QA defect, dan top risiko.',
+        'Ringkas performa BPO/filter aktif dalam Bahasa Indonesia: jumlah agent, rata-rata KPI utama, total CSAT buruk, total defect QA, dan risiko terbesar.',
       intent: 'summary' as const,
     },
     {
       title: 'Top & Under',
       description: 'Siapa bagus / perlu perhatian.',
       prompt:
-        'Tampilkan top productivity dan agent risk/underperform dari filter aktif. Beri rekomendasi fokus singkat.',
+        'Tampilkan agent produktivitas tertinggi dan yang paling perlu perhatian dari filter aktif dalam Bahasa Indonesia. Beri rekomendasi perbaikan singkat.',
       intent: 'detail' as const,
     },
     {
       title: 'Fokus tab ini',
       description: `Insight untuk ${tabHint}.`,
-      prompt: `Fokus pada tab ${tabHint}. Jelaskan temuan utama dari data filter aktif dan 3 aksi rekomendasi.`,
+      prompt: `Fokus pada tab ${tabHint}. Jelaskan temuan utama dari data filter aktif dalam Bahasa Indonesia dan beri 3 rekomendasi aksi.`,
       intent: 'summary' as const,
     },
   ];
@@ -813,12 +813,14 @@ function truncateText(value: string, maxLength: number) {
 function sanitizeAssistantText(raw: string) {
   let text = String(raw || '')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/\*\*/g, '')
     .trim();
   const dasarIdx = text.search(/Dasar data\s*:/i);
   if (dasarIdx > 0) text = text.slice(dasarIdx);
-  if (/we need to follow|let's craft|follow instructions/i.test(text) && /Dasar data\s*:/i.test(text)) {
-    text = text.slice(text.search(/Dasar data\s*:/i));
-  }
+  text = text.replace(
+    /^(?:We need to|Let's|I need to|Follow(?:ing)? instructions|Scope mode)[\s\S]*?(?=Dasar data\s*:)/i,
+    '',
+  );
   return text.replace(/\n{3,}/g, '\n\n').trim();
 }
 

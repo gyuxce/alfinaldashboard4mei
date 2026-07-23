@@ -19,24 +19,31 @@ type ApiResponse = {
 };
 
 const MAX_MESSAGE_LENGTH = 1000;
-const MAX_HISTORY_ITEMS = 3;
-const MAX_CONTEXT_CHARS = 7000;
-const MAX_HISTORY_CHARS = 1800;
-const MAX_OUTPUT_TOKENS = 700;
+const MAX_HISTORY_ITEMS = 2;
+const MAX_CONTEXT_CHARS = 6500;
+const MAX_HISTORY_CHARS = 1200;
+const MAX_OUTPUT_TOKENS = 550;
 
 const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
 const DEFAULT_FALLBACK_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
 
 const SYSTEM_PROMPT = [
-  'Kamu adalah Ask KPI, asisten performa dashboard Live Chat KPI.',
-  'OUTPUT HANYA jawaban final untuk user. Dilarang menampilkan rencana, reasoning, "We need to", "Let\'s craft", atau instruksi internal.',
-  'Jawab Bahasa Indonesia ringkas. Hanya pakai CONTEXT. Jangan mengarang angka/nama.',
-  'Jika data tidak ada di CONTEXT, bilang belum tersedia di filter aktif.',
-  'Baris pertama wajib: Dasar data: <scope>, <periode>, <tab>.',
-  'Lalu maksimal 6 bullet diawali "- " dengan pola: Temuan — Angka — Aksi (satu kalimat per bullet).',
-  'Tanpa emoji. Tanpa markdown bold/asterisk. Tanpa penjelasan cara menjawab.',
-  'Untuk coaching/DMAIC: Define, Measure, Analyze, Improve, Control (singkat, langsung isi).',
-].join(' ');
+  'Kamu adalah Ask KPI, asisten performa Live Chat.',
+  'WAJIB jawab hanya dalam Bahasa Indonesia yang sederhana dan mudah dimengerti agent/TL.',
+  'Dilarang menulis bahasa Inggris, campuran Inggris-Indonesia, rencana berpikir, atau kalimat seperti "We need to", "Let\'s", "Scope mode", "Temuan — Angka — Aksi" sebagai template mentah.',
+  'Dilarang menampilkan reasoning/instruksi internal.',
+  'Hanya pakai angka dari CONTEXT. Jangan mengarang.',
+  'Format jawaban tetap seperti ini:',
+  'Dasar data: <nama/scope>, <tanggal>, <fokus>',
+  '- <kalimat temuan lengkap dengan angka dan saran singkat>',
+  '- <kalimat berikutnya>',
+  'Maksimal 5 poin. Satu poin satu baris diawali "- ".',
+  'Gunakan istilah Indonesia: produktivitas, gap (selisih target), CSAT, QA, SLA, WHU, kehadiran, tren.',
+  'Contoh bagus:',
+  'Dasar data: Agent Budi, 13-19 Jul 2026, ringkasan',
+  '- Produktivitas turun dari 112,6 menjadi 95,6; fokus kejar target harian.',
+  '- CSAT Official naik ke 4,09; pertahankan kualitas respon.',
+].join('\n');
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') {
@@ -61,7 +68,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         .slice(-MAX_HISTORY_ITEMS)
         .map((item) => ({
           role: item.role === 'assistant' ? 'assistant' as const : 'user' as const,
-          content: String(item.content || '').slice(0, 600),
+          content: String(item.content || '').slice(0, 400),
         }))
     : [];
 
@@ -123,7 +130,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   return res.status(502).json({
-    error: `${lastError} (primary + fallback model gagal). Tunggu 1-2 menit lalu coba lagi.`,
+    error: `${lastError} (model utama dan cadangan gagal). Tunggu 1-2 menit lalu coba lagi.`,
   });
 }
 
@@ -152,8 +159,11 @@ async function callOpenRouter({
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.2,
+      temperature: 0.15,
       max_tokens: MAX_OUTPUT_TOKENS,
+      // Sembunyikan reasoning Nemotron dari response content
+      reasoning: { exclude: true, effort: 'low' },
+      include_reasoning: false,
     }),
   });
 
@@ -174,11 +184,9 @@ async function callOpenRouter({
     };
   }
 
-  const rawAnswer = String(
-    payload?.choices?.[0]?.message?.content ||
-      payload?.choices?.[0]?.message?.reasoning ||
-      '',
-  ).trim();
+  const messageObj = payload?.choices?.[0]?.message || {};
+  // Prefer content; never fall back to reasoning field for user display
+  const rawAnswer = String(messageObj?.content || '').trim();
   const finishReason = payload?.choices?.[0]?.finish_reason;
   const cleaned = cleanModelAnswer(rawAnswer);
 
@@ -188,7 +196,7 @@ async function callOpenRouter({
       ? finishReason === 'length'
         ? `${cleaned}\n\nCatatan: jawaban terpotong. Minta versi lebih singkat.`
         : cleaned
-      : 'OpenRouter tidak mengembalikan jawaban yang bisa ditampilkan. Coba tanya lagi lebih singkat.',
+      : 'Maaf, jawaban tidak bisa ditampilkan. Coba tanya lagi dengan kalimat lebih singkat.',
   };
 }
 
@@ -196,36 +204,43 @@ function cleanModelAnswer(raw: string) {
   let text = String(raw || '')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<\/?thinking>/gi, '')
+    .replace(/\*\*/g, '')
     .trim();
 
-  // Drop leaked planning / instruction rehearsal before the real answer
   const dasarIdx = text.search(/Dasar data\s*:/i);
-  if (dasarIdx > 0) {
-    text = text.slice(dasarIdx);
-  }
+  if (dasarIdx > 0) text = text.slice(dasarIdx);
 
-  const leakPatterns = [
-    /^We need to follow[\s\S]*?(?=Dasar data\s*:)/i,
-    /^Let's (craft|do|start|write)[\s\S]*?(?=Dasar data\s*:)/i,
-    /^I (need|will|should)[\s\S]*?(?=Dasar data\s*:)/i,
-    /^The (user|instructions?)[\s\S]*?(?=Dasar data\s*:)/i,
-  ];
-  for (const pattern of leakPatterns) {
-    text = text.replace(pattern, '');
-  }
+  // Buang blok planning berbahasa Inggris di depan
+  text = text.replace(
+    /^(?:We need to|Let's|I need to|The user|Follow(?:ing)? instructions|Scope mode|INSTRUKSI OUTPUT)[\s\S]*?(?=Dasar data\s*:)/i,
+    '',
+  );
 
-  // If still mostly meta-talk without Dasar data, keep only bullet-looking lines
-  if (!/Dasar data\s*:/i.test(text) && /we need to|let's craft|follow instructions/i.test(text)) {
+  // Jika masih penuh meta-bahasa Inggris tanpa Dasar data, ambil bullet saja
+  const looksLikePlanning =
+    /we need to|let's craft|follow instructions|temuan,\s*angka,\s*aksi/i.test(text) &&
+    !/^Dasar data\s*:/im.test(text.trim());
+
+  if (looksLikePlanning) {
     const bullets = text
       .split('\n')
       .map((line) => line.trim())
-      .filter((line) => line.startsWith('- ') || line.startsWith('• '));
+      .filter((line) => /^[-•]\s+/.test(line))
+      .map((line) => line.replace(/^[•]\s+/, '- '));
     if (bullets.length > 0) {
-      text = ['Dasar data: filter aktif dashboard', ...bullets].join('\n');
+      text = ['Dasar data: filter aktif dashboard', ...bullets.slice(0, 5)].join('\n');
     }
   }
 
-  return text.replace(/\n{3,}/g, '\n\n').trim();
+  // Rapikan bullet
+  text = text
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line, idx, arr) => !(line === '' && arr[idx - 1] === ''))
+    .join('\n')
+    .trim();
+
+  return text;
 }
 
 function buildPrompt({
@@ -243,15 +258,25 @@ function buildPrompt({
 }) {
   const compactContext = JSON.stringify(context ?? {}).slice(0, MAX_CONTEXT_CHARS);
   const compactHistory = JSON.stringify(history).slice(0, MAX_HISTORY_CHARS);
+  const modeLabel =
+    scopeMode === 'agent' ? 'satu agent' : scopeMode === 'tl' ? 'tim TL' : 'BPO / filter';
+  const intentLabel =
+    intent === 'coaching'
+      ? 'coaching'
+      : intent === 'detail'
+        ? 'detail'
+        : intent === 'compare'
+          ? 'perbandingan periode'
+          : 'ringkasan';
 
   return [
-    `Scope mode: ${scopeMode}`,
-    `Intent: ${intent}`,
-    'CONTEXT:',
+    `Mode: ${modeLabel}`,
+    `Jenis jawaban: ${intentLabel}`,
+    'DATA:',
     compactContext,
-    'HISTORY:',
+    'RIWAYAT:',
     compactHistory,
-    'INSTRUKSI OUTPUT: langsung tulis jawaban final saja. Jangan tulis rencana/reasoning.',
-    `QUESTION: ${message}`,
+    'Aturan: jawab langsung Bahasa Indonesia saja. Mulai dari "Dasar data:". Maksimal 5 poin "- ".',
+    `Pertanyaan: ${message}`,
   ].join('\n');
 }
