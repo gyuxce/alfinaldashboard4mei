@@ -277,7 +277,12 @@ export function KpiAiBot({
         throw new Error(payload?.error || 'Ask KPI gagal merespons.');
       }
 
-      const suffix = payload?.usedFallback ? '\n\n(Catatan: memakai model fallback Ultra.)' : '';
+      const suffix =
+        payload?.source === 'local' || payload?.source === 'local-fallback'
+          ? ''
+          : payload?.usedFallback
+            ? '\n\n(Catatan: memakai model cadangan Ultra.)'
+            : '';
       const rawAnswer = `${payload.answer || 'Tidak ada jawaban.'}${suffix}`;
       setMessages((prev) => [
         ...prev,
