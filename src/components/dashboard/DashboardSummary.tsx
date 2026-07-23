@@ -6,6 +6,7 @@ import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
 import { DashboardAgentTable } from "./DashboardAgentTable";
 import { EmptyState } from "../ui/EmptyState";
+import { SummaryWidgets } from "./SummaryWidgets";
 
 interface Props {
   data: AgentKPI[];
@@ -17,7 +18,7 @@ interface Props {
 export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const [search, setSearch] = useState("");
   const [isRulesOpen, setIsRulesOpen] = useState(false);
-  const { startDate, endDate, comparisonMode } = useStore();
+  const { startDate, endDate, comparisonMode, selectedTL, setSelectedTL } = useStore();
 
   const tableData = useMemo(() => {
     return data.filter(
@@ -308,6 +309,24 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
               kpiTheme="neutral"
             />
           </div>
+
+          <SummaryWidgets
+            data={data}
+            metricFn={(agent) =>
+              agent.manDays > 0
+                ? { value: agent.productivityAverage, count: agent.manDays }
+                : null
+            }
+            formatFn={(val) => formatNum(val, 0)}
+            activeTlFilter={
+              selectedTL && selectedTL !== "All TL" && selectedTL !== "All Team Leaders"
+                ? selectedTL
+                : null
+            }
+            onTlClick={(tl) => setSelectedTL(tl || "All TL")}
+            kpiType="productivity"
+            minAgentCount={1}
+          />
 
           <KpiRulesPanel
             isOpen={isRulesOpen}

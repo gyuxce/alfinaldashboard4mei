@@ -308,6 +308,129 @@ export const ProductivityDetail: React.FC<{
         </div>
       </div>
 
+      {/* Executive widgets: totals, over/under, BPO & TL */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="bg-card border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Total Chat</div>
+          <div className="text-2xl font-black text-text-primary">{formatNum(totalChat, 0)}</div>
+          <div className="text-[10px] text-text-muted mt-1">{formatNum(totalManDays, 0)} man-days</div>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Avg / Man-Day</div>
+          <div className={`text-2xl font-black ${getKpiColor(totalAvg, "productivity")}`}>{formatNum(totalAvg, 0)}</div>
+          <div className="text-[10px] text-text-muted mt-1">{formatNum(quotaAchievement, 1)}% of quota</div>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Total Gap</div>
+          <div className={`text-2xl font-black ${totalGap >= 0 ? "text-success" : "text-danger"}`}>
+            {totalGap >= 0 ? "+" : ""}{formatNum(totalGap, 0)}
+          </div>
+          <div className="text-[10px] text-text-muted mt-1">vs target ({formatNum(totalQuota, 0)})</div>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Active Agents</div>
+          <div className="text-2xl font-black text-text-primary">{formatNum(activeAgents, 0)}</div>
+          <div className="text-[10px] text-text-muted mt-1">with productivity</div>
+        </div>
+        <div className="bg-card border border-success/30 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] border-t-[3px] border-t-success">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Over Target</div>
+          <div className="text-2xl font-black text-success">{formatNum(overTarget, 0)}</div>
+          <div className="text-[10px] text-text-muted mt-1">avg ≥ 100 / day</div>
+        </div>
+        <div className="bg-card border border-danger/30 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] border-t-[3px] border-t-danger">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Under Target</div>
+          <div className="text-2xl font-black text-danger">{formatNum(underTarget, 0)}</div>
+          <div className="text-[10px] text-text-muted mt-1">avg &gt; 0 &amp; &lt; 70 / day</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-surface-muted text-[11px] font-bold uppercase tracking-widest text-text-secondary">
+            BPO Performance (Avg / Man-Day)
+          </div>
+          <div className="divide-y divide-border">
+            {[...bpoList].sort((a, b) => b.avg - a.avg).map((b) => (
+              <div key={b.bpo} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-text-primary truncate uppercase">{b.bpo}</div>
+                  <div className="text-[10px] text-text-muted">
+                    Gap {b.gap >= 0 ? "+" : ""}{formatNum(b.gap, 0)} · {formatNum(b.achievement, 1)}% quota
+                  </div>
+                </div>
+                <div className={`text-base font-black shrink-0 ${getKpiColor(b.avg, "productivity")}`}>
+                  {formatNum(b.avg, 0)}
+                </div>
+              </div>
+            ))}
+            {bpoList.length === 0 && (
+              <div className="px-4 py-6 text-sm text-text-muted text-center">No BPO data</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-text-secondary">
+              Team Leader Ranking (Avg / Man-Day)
+            </span>
+            <span className="text-[10px] text-text-muted">klik untuk filter</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+            <div className="p-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-success mb-2">Top TL</div>
+              <div className="flex flex-col gap-1">
+                {[...tlList].sort((a, b) => b.avg - a.avg).slice(0, 5).map((t, idx) => {
+                  const isActive = filterTL === t.tl;
+                  return (
+                    <button
+                      key={t.tl}
+                      type="button"
+                      onClick={() => setFilterTL(isActive ? null : t.tl)}
+                      className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${isActive ? "bg-primary-soft/40 ring-1 ring-primary/30" : "hover:bg-surface-muted"}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center shrink-0 ${idx === 0 ? "bg-success-soft text-success font-bold" : "bg-surface-muted text-text-secondary"}`}>
+                          {idx + 1}
+                        </span>
+                        <span className="text-xs font-semibold text-text-primary truncate" title={t.tl}>{t.tl}</span>
+                      </div>
+                      <span className={`text-xs font-bold shrink-0 ${getKpiColor(t.avg, "productivity")}`}>{formatNum(t.avg, 0)}</span>
+                    </button>
+                  );
+                })}
+                {tlList.length === 0 && <div className="text-xs text-text-muted py-2">No TL data</div>}
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-danger mb-2">Underperform TL</div>
+              <div className="flex flex-col gap-1">
+                {[...tlList].sort((a, b) => a.avg - b.avg).slice(0, 5).map((t, idx) => {
+                  const isActive = filterTL === t.tl;
+                  return (
+                    <button
+                      key={`under-${t.tl}`}
+                      type="button"
+                      onClick={() => setFilterTL(isActive ? null : t.tl)}
+                      className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${isActive ? "bg-primary-soft/40 ring-1 ring-primary/30" : "hover:bg-surface-muted"}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center shrink-0 ${idx === 0 ? "bg-danger-soft text-danger font-bold" : "bg-surface-muted text-text-secondary"}`}>
+                          {idx + 1}
+                        </span>
+                        <span className="text-xs font-semibold text-text-primary truncate" title={t.tl}>{t.tl}</span>
+                      </div>
+                      <span className={`text-xs font-bold shrink-0 ${getKpiColor(t.avg, "productivity")}`}>{formatNum(t.avg, 0)}</span>
+                    </button>
+                  );
+                })}
+                {tlList.length === 0 && <div className="text-xs text-text-muted py-2">No TL data</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* HOURLY PRODUCTIVITY CHART */}
       <div className="bg-card border border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl p-4 flex flex-col gap-4">
         <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
