@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { AgentKPI } from "../../lib/dataProcessor";
-import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
+import { AgentKPI, normalizeDateStr } from "../../lib/dataProcessor";
+import { formatNum, getKpiColor } from "../../lib/utils";
 import { useStore } from "../../store";
 import {
   Search,
@@ -48,17 +48,25 @@ export const ProductivityDetail: React.FC<{
     });
   }, [data, search, filterTL]);
 
+  // One column per calendar day (normDate), preferring schedule date labels
   const uniqueDates = useMemo(() => {
-    const dates = new Set<string>();
-    filteredData.forEach((a) =>
-      a.dailyHistory?.productivity?.forEach((h) => dates.add(h.date)),
-    );
-    return Array.from(dates).sort(
-      (a, b) => parseDateForSort(a) - parseDateForSort(b),
-    );
-  }, [filteredData]);
+    const byNorm = new Map<string, string>();
 
-  const uniqueDateSet = useMemo(() => new Set(uniqueDates), [uniqueDates]);
+    filteredData.forEach((a) => {
+      a.dailyHistory?.schedule?.forEach((s) => {
+        const nd = s.normDate || normalizeDateStr(s.date);
+        if (nd && !byNorm.has(nd)) byNorm.set(nd, s.date);
+      });
+      a.dailyHistory?.productivity?.forEach((h) => {
+        const nd = normalizeDateStr(h.date);
+        if (nd && !byNorm.has(nd)) byNorm.set(nd, h.date);
+      });
+    });
+
+    return Array.from(byNorm.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, date]) => date);
+  }, [filteredData]);
 
   const tableData = useMemo(() => {
     let sorted = [...filteredData];
@@ -67,19 +75,11 @@ export const ProductivityDetail: React.FC<{
         let aVal: any = 0;
         let bVal: any = 0;
 
-        const getLocalGap = (agent: AgentKPI) => {
-          const localManDays = agent.dailyHistory?.schedule?.filter(
-            (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
-          ).length || 0;
-          return agent.productivityTotal - (localManDays * 100);
-        };
+        const getLocalGap = (agent: AgentKPI) =>
+          agent.productivityTotal - agent.manDays * 100;
 
-        const getLocalAverage = (agent: AgentKPI) => {
-          const localManDays = agent.dailyHistory?.schedule?.filter(
-            (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
-          ).length || 0;
-          return localManDays > 0 ? agent.productivityTotal / localManDays : 0;
-        };
+        const getLocalAverage = (agent: AgentKPI) =>
+          agent.manDays > 0 ? agent.productivityTotal / agent.manDays : 0;
 
         switch (sortConfig.key) {
           case 'name':
@@ -110,7 +110,7 @@ export const ProductivityDetail: React.FC<{
       });
     }
     return sorted;
-  }, [filteredData, sortConfig, uniqueDateSet]);
+  }, [filteredData, sortConfig]);
 
   // --- CUSTOM BENTO DASHBOARD WIDGETS ---
   const {
@@ -146,10 +146,7 @@ export const ProductivityDetail: React.FC<{
 
     filteredForWidgets.forEach((agent) => {
       sumChat += agent.productivityTotal;
-      const localManDays =
-        agent.dailyHistory?.schedule?.filter(
-          (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
-        ).length || 0;
+      const localManDays = agent.manDays;
       sumManDays += localManDays;
       const localTargetQuota = localManDays * 100;
       sumQuota += localTargetQuota;
@@ -177,43 +174,44 @@ export const ProductivityDetail: React.FC<{
       tlStats[tl].gap += localGap;
     });
 
-    const avg = sumManDays > 0 ? sumChat / sumManDays : 0;
-    const achievement = sumQuota > 0 ? (sumChat / sumQuota) * 100 : 0;
-
     const bpoArr = Object.entries(bpoStats)
-      .map(([bpo, stat]) => ({
+      .map(([bpo, s]) => ({
         bpo,
-        avg: stat.mdays > 0 ? stat.sum / stat.mdays : 0,
-        gap: stat.gap,
-        achievement: stat.quota > 0 ? (stat.sum / stat.quota) * 100 : 0,
+        avg: s.mdays > 0 ? s.sum / s.mdays : 0,
+        gap: s.gap,
+        quota: s.quota,
+        sum: s.sum,
+        achievement: s.quota > 0 ? (s.sum / s.quota) * 100 : 0,
       }))
       .filter((x) => x.bpo !== "-");
     bpoArr.sort((a, b) => b.avg - a.avg);
 
     const tlArr = Object.entries(tlStats)
-      .map(([tl, stat]) => ({
+      .map(([tl, s]) => ({
         tl,
-        avg: stat.mdays > 0 ? stat.sum / stat.mdays : 0,
-        gap: stat.gap,
-        achievement: stat.quota > 0 ? (stat.sum / stat.quota) * 100 : 0,
+        avg: s.mdays > 0 ? s.sum / s.mdays : 0,
+        gap: s.gap,
+        quota: s.quota,
+        sum: s.sum,
+        achievement: s.quota > 0 ? (s.sum / s.quota) * 100 : 0,
       }))
       .filter((x) => x.tl !== "-");
-    tlArr.sort((a, b) => b.gap - a.gap); // Sort by gap to easily see plus/minus
+    tlArr.sort((a, b) => b.gap - a.gap);
 
     return {
       totalChat: sumChat,
-      totalAvg: avg,
+      totalAvg: sumManDays > 0 ? sumChat / sumManDays : 0,
       totalManDays: sumManDays,
       activeAgents: filteredForWidgets.length,
       overTarget,
       underTarget,
       totalQuota: sumQuota,
-      quotaAchievement: achievement,
+      quotaAchievement: sumQuota > 0 ? (sumChat / sumQuota) * 100 : 0,
       totalGap: sumGap,
       bpoList: bpoArr,
       tlList: tlArr,
     };
-  }, [data, uniqueDateSet]);
+  }, [data]);
 
   const hourlyDataWow = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -253,7 +251,7 @@ export const ProductivityDetail: React.FC<{
       tableData.forEach((agent) => {
         const hourlyCounts = agent.hourlyCategoryCounts?.[hourIndex] || {};
         Object.entries(hourlyCounts).forEach(([category, count]) => {
-          categoryCounts[category] = (categoryCounts[category] || 0) + count;
+          categoryCounts[category] = (categoryCounts[category] || 0) + Number(count);
         });
       });
 
@@ -512,10 +510,7 @@ export const ProductivityDetail: React.FC<{
           <tbody className="">
             {tableData.map((agent, idx) => {
               const displayName = agent.name || agent.csId;
-              const localManDays =
-                agent.dailyHistory?.schedule?.filter(
-                  (sch) => uniqueDateSet.has(sch.date) && sch.isManDay,
-                ).length || 0;
+              const localManDays = agent.manDays;
               const localTargetQuota = localManDays * 100;
               const localGap = agent.productivityTotal - localTargetQuota;
               const localAvg =
@@ -547,11 +542,16 @@ export const ProductivityDetail: React.FC<{
                     {agent.teamLeader || "-"}
                   </td>
                   {uniqueDates.map((date) => {
+                    const dateNorm = normalizeDateStr(date);
                     const daily = agent.dailyHistory?.productivity?.find(
-                      (h) => h.date === date,
+                      (h) =>
+                        h.date === date ||
+                        normalizeDateStr(h.date) === dateNorm,
                     );
                     const sched = agent.dailyHistory?.schedule?.find(
-                      (h) => h.date === date,
+                      (h) =>
+                        h.date === date ||
+                        (dateNorm != null && h.normDate === dateNorm),
                     );
                     const status = sched?.status?.toUpperCase() || "";
 

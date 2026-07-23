@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Search } from 'lucide-react';
-import { AgentKPI } from '../../lib/dataProcessor';
+import { AgentKPI, normalizeDateStr } from '../../lib/dataProcessor';
 import { useStore } from '../../store';
-import { parseDateForSort } from '../../lib/utils';
 import { EmptyState } from '../ui/EmptyState';
 
 export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
@@ -11,15 +10,22 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
   const tableData = data.filter(a => a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase()));
 
-  // Collect unique dates from schedule history
-  const uniqueDates = Array.from(new Set(data.flatMap(d => d.dailyHistory.schedule.map(x => x.date)))).sort((a: string, b: string) => {
-     return parseDateForSort(a) - parseDateForSort(b);
+  // One column per calendar day (avoid duplicate labels like 1/7/2026 vs 01/07/2026)
+  const byNorm = new Map<string, string>();
+  data.forEach((d) => {
+    d.dailyHistory.schedule.forEach((x) => {
+      const nd = x.normDate || normalizeDateStr(x.date);
+      if (nd && !byNorm.has(nd)) byNorm.set(nd, x.date);
+    });
   });
+  const uniqueDates = Array.from(byNorm.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([, date]) => date);
 
   const getBackgroundColor = (status: string) => {
     const s = status.toUpperCase();
     if (s === 'S') return 'text-danger font-bold'; // Sakit
-    if (!isNaN(parseFloat(s.replace(',','.'))) && s !== '') return 'text-success font-bold'; // Shift
+    if (/^\d+([.,]\d+)?$/.test(s) || /^\d{1,2}:\d{2}/.test(s)) return 'text-success font-bold'; // Shift
     if (s === 'OFF' || s === 'C') return 'text-text-muted'; // Cuti / OFF
     if (s === 'PULLOUT') return 'text-text-muted italic'; // Pullout
     return 'text-text-primary';
@@ -95,7 +101,12 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                   
                   {uniqueDates.map(date => {
-                    const sched = agent.dailyHistory.schedule.find(s => s.date === date);
+                    const dateNorm = normalizeDateStr(date);
+                    const sched = agent.dailyHistory.schedule.find(
+                      (s) =>
+                        s.date === date ||
+                        (dateNorm != null && s.normDate === dateNorm),
+                    );
                     const status = sched ? sched.status : '-';
                     const bgClass = getBackgroundColor(status);
                     
