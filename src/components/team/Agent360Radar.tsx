@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
-import { X, User, ClipboardCheck } from 'lucide-react';
+import { X, User, ClipboardCheck, Users } from 'lucide-react';
 import { calculateAgentCompositeScore } from '../../lib/kpiScoring';
 import {
   Radar,
@@ -15,74 +15,137 @@ import {
 
 interface Agent360RadarProps {
   agent: AgentKPI;
+  peers?: AgentKPI[];
   onClose: () => void;
 }
 
-export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) => {
+function metricBundle(a: AgentKPI) {
+  const prod = a.targetQuota > 0 ? (a.productivityTotal / a.targetQuota) * 100 : null;
+  const qa = a.qaScoreCount > 0 ? (a.qaScoreSum / a.qaScoreCount) : null;
+  const csatOfficial = a.csatAsli;
+  const csatSc = a.csatScFair;
+  const csat = csatOfficial !== null && csatOfficial !== undefined
+    ? (csatOfficial / 5) * 100
+    : csatSc;
+  const sla1m = a.sla1m;
+  const sla3m = a.sla3m;
+  const sla = sla1m !== null && sla1m !== undefined ? sla1m : sla3m;
+  return {
+    prod,
+    attendance: a.attendanceDuty > 0 ? a.attendanceScore : null,
+    csat,
+    csatDisplay: csatOfficial !== null && csatOfficial !== undefined ? csatOfficial : csatSc,
+    csatSuffix: csatOfficial !== null && csatOfficial !== undefined ? '' : '%',
+    qa,
+    sla,
+    whu: a.whu,
+  };
+}
+
+function avgNullable(values: Array<number | null | undefined>) {
+  const nums = values.filter((v): v is number => v !== null && v !== undefined && !Number.isNaN(v));
+  if (!nums.length) return null;
+  return nums.reduce((s, v) => s + v, 0) / nums.length;
+}
+
+export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, peers = [], onClose }) => {
+  const agentMetrics = useMemo(() => metricBundle(agent), [agent]);
+
+  const tlPeers = useMemo(() => {
+    const tl = (agent.teamLeader || '').trim();
+    if (!tl || tl === '-') return [];
+    return peers.filter(
+      (p) => p.csId !== agent.csId && (p.teamLeader || '').trim().toLowerCase() === tl.toLowerCase(),
+    );
+  }, [peers, agent]);
+
+  const tlAvg = useMemo(() => {
+    const bundles = tlPeers.map(metricBundle);
+    return {
+      prod: avgNullable(bundles.map((b) => b.prod)),
+      attendance: avgNullable(bundles.map((b) => b.attendance)),
+      csat: avgNullable(bundles.map((b) => b.csat)),
+      qa: avgNullable(bundles.map((b) => b.qa)),
+      sla: avgNullable(bundles.map((b) => b.sla)),
+      whu: avgNullable(bundles.map((b) => b.whu)),
+      peerCount: tlPeers.length,
+    };
+  }, [tlPeers]);
+
   const radarData = useMemo(() => {
-    // Productivity
-    const prodScore = agent.targetQuota > 0 ? (agent.productivityTotal / agent.targetQuota) * 100 : 0;
-    
-    // QA (qaScoreSum is already in 0-100 range)
-    const qaScore = agent.qaScoreCount > 0 ? (agent.qaScoreSum / agent.qaScoreCount) : 0;
+    const prodScore = agentMetrics.prod || 0;
+    const qaScore = agentMetrics.qa || 0;
+    const csatRadar = agentMetrics.csat || 0;
+    const finalSla = agentMetrics.sla || 0;
+    const whuScore = agentMetrics.whu || 0;
 
-    // CSAT
-    const csatOfficial = agent.csatAsli || 0; // max 5
-    const csatSc = agent.csatScFair || 0; // max 100
-    
-    // Scale csatOfficial to 100 if it exists
-    const csatRadar = csatOfficial > 0 ? (csatOfficial / 5) * 100 : csatSc;
-    const origCsat = csatOfficial > 0 ? csatOfficial : csatSc;
-    const csatSuffix = csatOfficial > 0 ? '' : '%';
-
-    // SLA
-    const sla1m = agent.sla1m || 0;
-    const sla3m = agent.sla3m || 0;
-    const finalSla = sla1m > 0 ? sla1m : sla3m;
-    
     return [
       {
         subject: 'Productivity',
-        A: Math.min(100, Math.round(prodScore)), // Cap at 100 for radar visual
+        A: Math.min(100, Math.round(prodScore)),
         fullMark: 100,
         original: prodScore,
-        suffix: '%'
+        suffix: '%',
+        tlAvg: tlAvg.prod,
       },
       {
         subject: 'Attendance',
-        A: Math.round(agent.attendanceScore || 0),
+        A: Math.round(agentMetrics.attendance || 0),
         fullMark: 100,
-        original: agent.attendanceScore || 0,
-        suffix: '%'
+        original: agentMetrics.attendance || 0,
+        suffix: '%',
+        tlAvg: tlAvg.attendance,
       },
       {
         subject: 'CSAT',
         A: Math.round(csatRadar),
         fullMark: 100,
-        original: origCsat,
-        suffix: csatSuffix
+        original: agentMetrics.csatDisplay || 0,
+        suffix: agentMetrics.csatSuffix,
+        tlAvg: tlAvg.csat,
       },
       {
         subject: 'QA',
         A: Math.round(qaScore),
         fullMark: 100,
         original: qaScore,
-        suffix: '%'
+        suffix: '%',
+        tlAvg: tlAvg.qa,
       },
       {
         subject: 'SLA',
         A: Math.round(finalSla),
         fullMark: 100,
         original: finalSla,
-        suffix: '%'
-      }
+        suffix: '%',
+        tlAvg: tlAvg.sla,
+      },
+      {
+        subject: 'WHU',
+        A: Math.round(whuScore),
+        fullMark: 100,
+        original: whuScore,
+        suffix: '%',
+        tlAvg: tlAvg.whu,
+      },
     ];
-  }, [agent]);
+  }, [agentMetrics, tlAvg]);
 
   const avgScore = useMemo(() => {
     const sum = radarData.reduce((acc, curr) => acc + curr.A, 0);
     return sum / radarData.length;
   }, [radarData]);
+
+  const peerCompareRows = useMemo(() => {
+    return [
+      { label: 'Productivity %', agent: agentMetrics.prod, tl: tlAvg.prod, suffix: '%' },
+      { label: 'Attendance %', agent: agentMetrics.attendance, tl: tlAvg.attendance, suffix: '%' },
+      { label: 'CSAT (radar scale)', agent: agentMetrics.csat, tl: tlAvg.csat, suffix: '%' },
+      { label: 'QA %', agent: agentMetrics.qa, tl: tlAvg.qa, suffix: '%' },
+      { label: 'SLA %', agent: agentMetrics.sla, tl: tlAvg.sla, suffix: '%' },
+      { label: 'WHU %', agent: agentMetrics.whu, tl: tlAvg.whu, suffix: '%' },
+    ];
+  }, [agentMetrics, tlAvg]);
 
   const auditRows = useMemo(() => {
     const qaAvg = agent.qaScoreCount > 0 ? agent.qaScoreSum / agent.qaScoreCount : null;
@@ -131,6 +194,14 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
         status: agent.sla1mCount > 0 || agent.sla3mCount > 0 ? 'Ready' : 'No SLA sample',
       },
       {
+        label: 'WHU',
+        source: 'Productivity / WHU sheet',
+        formula: 'Average WHU %',
+        raw: agent.whu !== null ? `${formatNum(agent.whu, 1)}%` : 'no sample',
+        result: agent.whu !== null ? `${formatNum(agent.whu, 1)}%` : '-',
+        status: agent.whu !== null ? 'Ready' : 'No WHU data',
+      },
+      {
         label: 'QA Score',
         source: 'QA score sheet',
         formula: 'Total QA score / QA count',
@@ -157,7 +228,6 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
     ];
   }, [agent]);
 
-  // Prevent background scrolling when modal is open
   React.useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -167,13 +237,11 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
       
-      {/* Modal */}
       <div className="relative w-full max-w-4xl max-h-[90vh] bg-surface border border-border rounded-2xl shadow-xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between p-4 border-b border-border bg-card">
           <div className="flex items-center gap-3">
@@ -182,7 +250,11 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
              </div>
              <div>
                 <h3 className="font-bold text-text-primary text-base leading-tight">Ultimate Agent 360</h3>
-                <p className="text-xs text-text-secondary mt-0.5">{agent.name || agent.csId}</p>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {agent.name || agent.csId}
+                  {agent.teamLeader ? ` · TL ${agent.teamLeader}` : ''}
+                  {agent.bpo ? ` · ${agent.bpo}` : ''}
+                </p>
              </div>
           </div>
           <button 
@@ -231,7 +303,7 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
              </ResponsiveContainer>
            </div>
            
-           <div className="grid grid-cols-2 md:grid-cols-5 w-full gap-2 mt-2">
+           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full gap-2 mt-2">
               {radarData.map(d => (
                  <div key={d.subject} className="bg-card border border-border rounded-xl p-3 flex flex-col items-center justify-center gap-1">
                     <span className="text-[10px] uppercase font-bold text-text-muted text-center leading-tight h-6 flex items-center">{d.subject}</span>
@@ -242,6 +314,56 @@ export const Agent360Radar: React.FC<Agent360RadarProps> = ({ agent, onClose }) 
 
            <div className="mt-4 flex items-center justify-center p-3 bg-primary/5 text-primary rounded-xl w-full border border-primary/10">
               <span className="text-sm font-medium">Overall Balance Score: <strong className="font-black ml-1">{formatNum(avgScore, 1)}%</strong></span>
+           </div>
+
+           <div className="mt-4 w-full rounded-xl border border-border bg-card overflow-hidden">
+             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+               <Users className="h-4 w-4 text-primary" />
+               <div>
+                 <h4 className="text-sm font-bold text-text-primary">Peer Compare vs TL Avg</h4>
+                 <p className="text-[10px] text-text-muted mt-0.5">
+                   {tlAvg.peerCount > 0
+                     ? `Rata-rata ${tlAvg.peerCount} peer di TL ${agent.teamLeader || '-'}`
+                     : 'Belum ada peer TL lain di filter aktif untuk dibandingkan'}
+                 </p>
+               </div>
+             </div>
+             <div className="overflow-x-auto">
+               <table className="w-full text-left text-[11px]">
+                 <thead className="bg-surface text-text-muted">
+                   <tr>
+                     <th className="px-3 py-2 font-bold uppercase tracking-wide">KPI</th>
+                     <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Agent</th>
+                     <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">TL Avg</th>
+                     <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Delta</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {peerCompareRows.map((row) => {
+                     const delta =
+                       row.agent !== null && row.agent !== undefined && row.tl !== null && row.tl !== undefined
+                         ? row.agent - row.tl
+                         : null;
+                     return (
+                       <tr key={row.label} className="border-t border-border/70">
+                         <td className="px-3 py-2 font-semibold text-text-primary">{row.label}</td>
+                         <td className="px-3 py-2 text-center font-black text-text-primary">
+                           {row.agent !== null && row.agent !== undefined ? `${formatNum(row.agent, 1)}${row.suffix}` : '-'}
+                         </td>
+                         <td className="px-3 py-2 text-center font-semibold text-text-secondary">
+                           {row.tl !== null && row.tl !== undefined ? `${formatNum(row.tl, 1)}${row.suffix}` : '-'}
+                         </td>
+                         <td className={`px-3 py-2 text-center font-bold ${
+                           delta === null ? 'text-text-muted' : delta >= 0 ? 'text-success' : 'text-danger'
+                         }`}>
+                           {delta === null ? '-' : `${delta >= 0 ? '+' : ''}${formatNum(delta, 1)}${row.suffix}`}
+                         </td>
+                       </tr>
+                     );
+                   })}
+                 </tbody>
+               </table>
+             </div>
            </div>
 
            <div className="mt-4 w-full rounded-xl border border-border bg-card overflow-hidden">

@@ -82,6 +82,12 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
     return { current: calc(data), previous: calc(previousData) };
   }, [data, previousData]);
 
+  const underWhuAgents = useMemo(() => {
+    return data
+      .filter((a) => a.whu !== null && (a.whu as number) < 96)
+      .sort((a, b) => (a.whu || 0) - (b.whu || 0));
+  }, [data]);
+
   const uniqueDates = useMemo(() => {
     const dates = new Set<string>();
     tableData.forEach(a => a.dailyHistory?.whu?.forEach(h => dates.add(h.date)));
@@ -128,6 +134,47 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
           </div>
         </div>
       </div>
+
+      {underWhuAgents.length > 0 && (
+        <div className="bg-card border border-danger/30 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-danger/5">
+            <div className="text-sm font-bold text-danger">Exception: WHU &lt; 96%</div>
+            <div className="text-xs text-text-muted mt-0.5">{underWhuAgents.length} agent di bawah target</div>
+          </div>
+          <div className="max-h-[200px] overflow-auto">
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-surface text-text-muted sticky top-0">
+                <tr>
+                  <th className="p-2 w-10 text-center">#</th>
+                  <th className="p-2">Agent</th>
+                  <th className="p-2">BPO</th>
+                  <th className="p-2">TL</th>
+                  <th className="p-2 text-center">WHU</th>
+                </tr>
+              </thead>
+              <tbody>
+                {underWhuAgents.map((a, idx) => (
+                  <tr key={a.csId} className="border-b border-border hover:bg-surface-muted">
+                    <td className="p-2 text-center text-text-muted">{idx + 1}</td>
+                    <td className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => useStore.getState().setSelectedAgentFor360(a.csId)}
+                        className="font-semibold text-kpi-neutral-text hover:underline"
+                      >
+                        {a.name || a.csId}
+                      </button>
+                    </td>
+                    <td className="p-2 uppercase text-text-secondary">{a.bpo || '-'}</td>
+                    <td className="p-2 text-text-secondary">{a.teamLeader || '-'}</td>
+                    <td className="p-2 text-center font-bold text-danger">{formatNum(a.whu, 1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">

@@ -917,7 +917,16 @@ export default function App() {
 
         <div className="w-full pb-8">
           <React.Suspense fallback={<TabLoading />}>
-            {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+            {activeTab === 'summary' && (
+              <DashboardSummary
+                data={kpiData}
+                previousData={previousKpiData}
+                previousData2={previousKpiData2}
+                previousData3={previousKpiData3}
+                dataQuality={dataQuality}
+                onOpenFiles={() => setActiveTab('files')}
+              />
+            )}
             {activeTab === 'leaderboard' && <Leaderboard />}
             {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
@@ -953,6 +962,7 @@ export default function App() {
         <React.Suspense fallback={null}>
           <Agent360Radar
              agent={agent360Data}
+             peers={kpiData}
              onClose={() => setSelectedAgentFor360(null)}
           />
         </React.Suspense>

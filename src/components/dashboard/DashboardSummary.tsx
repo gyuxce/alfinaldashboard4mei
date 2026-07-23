@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
-import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
+import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown, AlertTriangle } from "lucide-react";
 import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
 import { DashboardAgentTable } from "./DashboardAgentTable";
@@ -13,9 +13,23 @@ interface Props {
   previousData?: AgentKPI[];
   previousData2?: AgentKPI[];
   previousData3?: AgentKPI[];
+  dataQuality?: {
+    status: 'ok' | 'warning' | 'error';
+    label: string;
+    detail: string;
+    count: number;
+  };
+  onOpenFiles?: () => void;
 }
 
-export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
+export const DashboardSummary: React.FC<Props> = ({
+  data,
+  previousData = [],
+  previousData2 = [],
+  previousData3 = [],
+  dataQuality,
+  onOpenFiles,
+}) => {
   const [search, setSearch] = useState("");
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const { startDate, endDate, comparisonMode, selectedTL, setSelectedTL } = useStore();
@@ -232,7 +246,40 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
 
       {data.length > 0 && (
         <>
-
+          {dataQuality && dataQuality.status !== 'ok' && (
+            <div
+              className={`rounded-xl border px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                dataQuality.status === 'error'
+                  ? 'border-danger/30 bg-danger/5'
+                  : 'border-warning/30 bg-warning/5'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle
+                  className={`w-4 h-4 mt-0.5 shrink-0 ${
+                    dataQuality.status === 'error' ? 'text-danger' : 'text-warning'
+                  }`}
+                />
+                <div>
+                  <div className={`text-sm font-bold ${dataQuality.status === 'error' ? 'text-danger' : 'text-warning'}`}>
+                    Data Quality: {dataQuality.label}
+                  </div>
+                  <div className="text-xs text-text-muted mt-0.5">
+                    {dataQuality.detail || 'Ada indikasi data belum lengkap. Cek File Center sebelum presentasi ke atasan.'}
+                  </div>
+                </div>
+              </div>
+              {onOpenFiles && (
+                <button
+                  type="button"
+                  onClick={onOpenFiles}
+                  className="shrink-0 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-surface-muted"
+                >
+                  Buka File Center
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <StatCard
