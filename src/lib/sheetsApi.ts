@@ -1,3 +1,5 @@
+import { normalizeDateStr } from './dataProcessor';
+
 // Config (dari env variables)
 const API_KEY = import.meta.env.VITE_SHEETS_API_KEY;
 const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
@@ -264,12 +266,26 @@ function mergeScheduleSheetData(previous: SheetData, current: SheetData): SheetD
   const previousHeader = previous[0] || [];
   const currentHeader = current[0] || [];
   const baseHeader = currentHeader.length >= 5 ? currentHeader.slice(0, 5) : previousHeader.slice(0, 5);
-  const dateHeaders: string[] = [];
 
-  [...previousHeader.slice(5), ...currentHeader.slice(5)].forEach(header => {
+  // Dedupe date columns by normalized calendar day to avoid double-counting man-days
+  // when the same day appears as "1/7/2026" and "01/07/2026".
+  const dateHeaders: string[] = [];
+  const dateNormToIndex = new Map<string, number>();
+
+  const addDateHeader = (header: string) => {
     const date = String(header || '').trim();
-    if (date && !dateHeaders.includes(date)) dateHeaders.push(date);
-  });
+    if (!date) return;
+    const norm = normalizeDateStr(date);
+    if (norm) {
+      if (dateNormToIndex.has(norm)) return;
+      dateNormToIndex.set(norm, dateHeaders.length);
+      dateHeaders.push(date);
+      return;
+    }
+    if (!dateHeaders.includes(date)) dateHeaders.push(date);
+  };
+
+  [...previousHeader.slice(5), ...currentHeader.slice(5)].forEach(addDateHeader);
 
   const rowsById = new Map<string, string[]>();
 
@@ -292,7 +308,15 @@ function mergeScheduleSheetData(previous: SheetData, current: SheetData): SheetD
 
       headerDates.forEach((date, idx) => {
         if (!date) return;
-        const targetIndex = baseHeader.length + dateHeaders.indexOf(date);
+        const norm = normalizeDateStr(date);
+        let targetIndex = -1;
+        if (norm && dateNormToIndex.has(norm)) {
+          targetIndex = baseHeader.length + (dateNormToIndex.get(norm) as number);
+        } else {
+          const fallbackIdx = dateHeaders.indexOf(date);
+          if (fallbackIdx >= 0) targetIndex = baseHeader.length + fallbackIdx;
+        }
+        if (targetIndex < 0) return;
         const value = row[idx + 5];
         if (value !== undefined && value !== '') mergedRow[targetIndex] = value;
       });

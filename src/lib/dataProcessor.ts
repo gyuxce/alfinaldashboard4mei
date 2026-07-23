@@ -299,11 +299,11 @@ export function normalizeDateStr(raw: string): string | null {
       }
     }
 
-    // Fallback to JS Date parser
+    // Fallback to JS Date parser (use local Y-M-D to avoid UTC off-by-one)
     if (!result) {
       const dObj = new Date(clean);
       if (!isNaN(dObj.getTime())) {
-        result = dObj.toISOString().split("T")[0];
+        result = formatDateLocalYmd(dObj);
       }
     }
   }
@@ -312,12 +312,38 @@ export function normalizeDateStr(raw: string): string | null {
   if (!result) {
     const dObj2 = new Date(rawKey);
     if (!isNaN(dObj2.getTime())) {
-      result = dObj2.toISOString().split("T")[0];
+      result = formatDateLocalYmd(dObj2);
     }
   }
 
   dateStrCache.set(rawKey, result);
   return result;
+}
+
+function formatDateLocalYmd(dObj: Date): string {
+  return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(dObj.getDate()).padStart(2, "0")}`;
+}
+
+/** Shift duty / man-day: numeric shift code, HH:MM time, or S (sakit). */
+export function isScheduleManDay(statusRaw: string): boolean {
+  const status = String(statusRaw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  if (!status) return false;
+  if (status === "S") return true;
+  if (status === "OFF" || status === "C" || status === "PULLOUT") return false;
+  // Pure shift number: 7, 14, 22, 8.0, etc.
+  if (/^\d+([.,]\d+)?$/.test(status)) return true;
+  // Time-format shift: 07:00, 22:00
+  if (/^\d{1,2}:\d{2}/.test(status)) return true;
+  return false;
+}
+
+export function normalizeScheduleStatus(statusRaw: string): string {
+  const status = String(statusRaw || "").trim().toUpperCase();
+  if (status.replace(/\s+/g, "") === "PULLOUT") return "PULLOUT";
+  return status;
 }
 
 function findDateColumnIndex(data: any[][], startRow: number = 0) {
@@ -366,8 +392,10 @@ export const processKPIs = (
   };
 
   const subtractOneDay = (dStr: string) => {
-    const d = new Date(dStr);
-    d.setDate(d.getDate() - 1);
+    const parts = dStr.split("-").map((p) => parseInt(p, 10));
+    if (parts.length !== 3 || parts.some((n) => isNaN(n))) return dStr;
+    const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    d.setUTCDate(d.getUTCDate() - 1);
     return d.toISOString().split("T")[0];
   };
 
@@ -483,7 +511,8 @@ export const processKPIs = (
       if (!hd) continue;
 
       const normDate = normalizeDateStr(hd);
-      if (normDate && !isWithin(normDate)) continue; // Filter by date range
+      // Skip non-date headers and out-of-range dates (avoids ±1 man-day drift)
+      if (!normDate || !isWithin(normDate)) continue;
 
       for (let r = 1; r < schedData.length; r++) {
         const row = schedData[r];
@@ -501,34 +530,31 @@ export const processKPIs = (
         if (schedBPO && !agent.bpo) agent.bpo = schedBPO;
 
         const statusRaw = String(row[c] || "").trim();
-        const status = statusRaw.toUpperCase();
-        const isNumber =
-          !isNaN(parseFloat(status.replace(",", "."))) && status !== "";
-        // Normalize PULL OUT
-        const normalizedStatus =
-          status.replace(/\s+/g, "") === "PULLOUT" ? "PULLOUT" : status;
+        if (!statusRaw) continue;
 
-        let isManDay = false; // ManDay = Duty
+        const normalizedStatus = normalizeScheduleStatus(statusRaw);
+        const isManDay = isScheduleManDay(statusRaw);
+        // Presence = on-shift number/time (not sick) or pullout
+        const isPresence =
+          normalizedStatus === "PULLOUT" ||
+          (isManDay && normalizedStatus !== "S");
 
-        // DUTY = Angka or S
-        if (status === "S" || isNumber) {
-          isManDay = true;
-        }
-
+        // Dedupe by calendar day (normDate), not raw header string —
+        // "1/7/2026" vs "01/07/2026" must count as one man-day.
         const existingSched = agent.dailyHistory.schedule.find(
-          (s) => s.date === hd,
+          (s) => s.normDate === normDate || s.date === hd,
         );
+
         if (!existingSched) {
           agent.attendanceTotalDays += 1;
 
           if (isManDay || normalizedStatus === "PULLOUT")
             agent.attendanceDuty += 1;
-          if (isNumber || normalizedStatus === "PULLOUT")
-            agent.attendancePresence += 1;
+          if (isPresence) agent.attendancePresence += 1;
 
-          if (status === "OFF") agent.attendanceOff += 1;
-          if (status === "S") agent.attendanceS += 1;
-          if (status === "C") agent.attendanceC += 1;
+          if (normalizedStatus === "OFF") agent.attendanceOff += 1;
+          if (normalizedStatus === "S") agent.attendanceS += 1;
+          if (normalizedStatus === "C") agent.attendanceC += 1;
           if (normalizedStatus === "PULLOUT") agent.attendancePullout += 1;
 
           agent.dailyHistory.schedule.push({
@@ -541,6 +567,24 @@ export const processKPIs = (
           if (isManDay) {
             agent.manDays += 1;
           }
+          continue;
+        }
+
+        // Duplicate header for same calendar day: upgrade non-duty → duty
+        if (isManDay && !existingSched.isManDay) {
+          const prev = existingSched.status;
+          const prevWasDuty = prev === "PULLOUT";
+
+          existingSched.status = normalizedStatus;
+          existingSched.isManDay = true;
+          existingSched.date = hd;
+
+          agent.manDays += 1;
+          if (!prevWasDuty) agent.attendanceDuty += 1;
+          if (isPresence) agent.attendancePresence += 1;
+          if (normalizedStatus === "S") agent.attendanceS += 1;
+          if (prev === "OFF") agent.attendanceOff = Math.max(0, agent.attendanceOff - 1);
+          if (prev === "C") agent.attendanceC = Math.max(0, agent.attendanceC - 1);
         }
       }
     }
