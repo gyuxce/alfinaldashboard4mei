@@ -1,3 +1,5 @@
+import { buildLocalKpiAnswer, isBadModelAnswer } from './askKpiLocalAnswer';
+
 type ChatIntent = 'summary' | 'detail' | 'coaching' | 'compare';
 type BotScope = 'agent' | 'tl' | 'bpo';
 
@@ -51,13 +53,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const primaryKey = process.env.OPENROUTER_API_KEY;
-  if (!primaryKey) {
-    return res.status(500).json({
-      error: 'OPENROUTER_API_KEY belum diset. Isi di Vercel Environment Variables.',
-    });
-  }
-
   const message = String(req.body?.message || '').trim().slice(0, MAX_MESSAGE_LENGTH);
   if (!message) {
     return res.status(400).json({ error: 'Pertanyaan kosong.' });
@@ -75,7 +70,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const baseUrl = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
   const primaryModel = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
   const fallbackModel = process.env.OPENROUTER_MODEL_FALLBACK || DEFAULT_FALLBACK_MODEL;
-  const fallbackKey = process.env.OPENROUTER_API_KEY_FALLBACK || primaryKey;
 
   const prompt = buildPrompt({
     message,
@@ -84,6 +78,37 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     scopeMode: req.body?.scopeMode || 'agent',
     history,
   });
+
+  const intent = req.body?.intent || 'summary';
+  const scopeMode = req.body?.scopeMode || 'agent';
+  const localAnswer = buildLocalKpiAnswer(
+    (req.body?.context || {}) as Parameters<typeof buildLocalKpiAnswer>[0],
+    intent,
+    scopeMode,
+  );
+
+  // Default: jawaban lokal ID (andal). LLM hanya jika ASK_KPI_USE_LLM=true dan jawabannya valid.
+  const useLlm = process.env.ASK_KPI_USE_LLM === 'true';
+
+  if (!useLlm) {
+    return res.status(200).json({
+      answer: localAnswer,
+      source: 'local',
+      version: 'ask-kpi-v2',
+    });
+  }
+
+  const primaryKey = process.env.OPENROUTER_API_KEY;
+  if (!primaryKey) {
+    return res.status(200).json({
+      answer: localAnswer,
+      source: 'local-fallback',
+      version: 'ask-kpi-v2',
+      note: 'OPENROUTER_API_KEY belum diset; menampilkan ringkasan otomatis.',
+    });
+  }
+
+  const fallbackKey = process.env.OPENROUTER_API_KEY_FALLBACK || primaryKey;
 
   const attempts: Array<{ model: string; apiKey: string; label: string }> = [
     { model: primaryModel, apiKey: primaryKey, label: 'primary' },
@@ -104,10 +129,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
 
       if ('answer' in result && result.ok) {
+        const finalAnswer = isBadModelAnswer(result.answer) ? localAnswer : result.answer;
         return res.status(200).json({
-          answer: result.answer,
+          answer: finalAnswer,
           model: attempt.model,
           usedFallback: attempt.label === 'fallback',
+          source: isBadModelAnswer(result.answer) ? 'local-fallback' : 'llm',
+          version: 'ask-kpi-v2',
         });
       }
 
@@ -119,7 +147,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         fail.status === 503 ||
         fail.status === 404;
       if (!retryable) {
-        return res.status(fail.status).json({ error: fail.error });
+        return res.status(200).json({
+          answer: localAnswer,
+          source: 'local-fallback',
+          version: 'ask-kpi-v2',
+          note: fail.error,
+        });
       }
     } catch (error) {
       lastError =
@@ -129,8 +162,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
   }
 
-  return res.status(502).json({
-    error: `${lastError} (model utama dan cadangan gagal). Tunggu 1-2 menit lalu coba lagi.`,
+  return res.status(200).json({
+    answer: localAnswer,
+    source: 'local-fallback',
+    version: 'ask-kpi-v2',
+    note: 'Model AI gagal; menampilkan ringkasan otomatis dari data dashboard.',
   });
 }
 
