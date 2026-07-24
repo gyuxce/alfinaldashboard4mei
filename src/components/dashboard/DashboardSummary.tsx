@@ -1,46 +1,23 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
-import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown, AlertTriangle } from "lucide-react";
+import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
 import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
 import { DashboardAgentTable } from "./DashboardAgentTable";
 import { EmptyState } from "../ui/EmptyState";
-import { SummaryWidgets } from "./SummaryWidgets";
 
 interface Props {
   data: AgentKPI[];
   previousData?: AgentKPI[];
   previousData2?: AgentKPI[];
   previousData3?: AgentKPI[];
-  dataQuality?: {
-    status: 'ok' | 'warning' | 'error';
-    label: string;
-    detail: string;
-    count: number;
-    syncIsStale?: boolean;
-    missingProductivity?: number;
-    missingSchedule?: number;
-    byTl?: Array<{
-      tl: string;
-      missingProductivity: number;
-      missingSchedule: number;
-    }>;
-  };
-  onOpenFiles?: () => void;
 }
 
-export const DashboardSummary: React.FC<Props> = ({
-  data,
-  previousData = [],
-  previousData2 = [],
-  previousData3 = [],
-  dataQuality,
-  onOpenFiles,
-}) => {
+export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const [search, setSearch] = useState("");
   const [isRulesOpen, setIsRulesOpen] = useState(false);
-  const { startDate, endDate, comparisonMode, selectedTL, setSelectedTL } = useStore();
+  const { startDate, endDate, comparisonMode } = useStore();
 
   const tableData = useMemo(() => {
     return data.filter(
@@ -254,79 +231,7 @@ export const DashboardSummary: React.FC<Props> = ({
 
       {data.length > 0 && (
         <>
-          {dataQuality && dataQuality.status !== 'ok' && (
-            <div
-              className={`rounded-xl border px-4 py-3 flex flex-col gap-3 ${
-                dataQuality.status === 'error'
-                  ? 'border-danger/30 bg-danger/5'
-                  : 'border-warning/30 bg-warning/5'
-              }`}
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle
-                    className={`w-4 h-4 mt-0.5 shrink-0 ${
-                      dataQuality.status === 'error' ? 'text-danger' : 'text-warning'
-                    }`}
-                  />
-                  <div>
-                    <div className={`text-sm font-bold ${dataQuality.status === 'error' ? 'text-danger' : 'text-warning'}`}>
-                      Data Quality: {dataQuality.label}
-                    </div>
-                    <div className="text-xs text-text-muted mt-0.5">
-                      {dataQuality.detail || 'Ada indikasi data belum lengkap. Cek File Center sebelum presentasi ke atasan.'}
-                    </div>
-                    {dataQuality.syncIsStale && (
-                      <div className="text-[11px] text-warning font-semibold mt-1">
-                        Sync stale — refresh data sebelum presentasi.
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {onOpenFiles && (
-                  <button
-                    type="button"
-                    onClick={onOpenFiles}
-                    className="shrink-0 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-surface-muted"
-                  >
-                    Buka File Center
-                  </button>
-                )}
-              </div>
 
-              {dataQuality.byTl && dataQuality.byTl.length > 0 && (
-                <div className="overflow-x-auto rounded-lg border border-border/70 bg-card/80">
-                  <table className="w-full text-left text-[11px]">
-                    <thead className="bg-surface text-text-muted">
-                      <tr>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wide">Team Leader</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Missing Productivity</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Missing Schedule</th>
-                        <th className="px-3 py-2 font-bold uppercase tracking-wide text-center">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dataQuality.byTl.map((row) => {
-                        const total = row.missingProductivity + row.missingSchedule;
-                        return (
-                          <tr key={row.tl} className="border-t border-border/60">
-                            <td className="px-3 py-2 font-semibold text-text-primary">{row.tl}</td>
-                            <td className={`px-3 py-2 text-center font-bold ${row.missingProductivity > 0 ? 'text-warning' : 'text-text-muted'}`}>
-                              {row.missingProductivity || '—'}
-                            </td>
-                            <td className={`px-3 py-2 text-center font-bold ${row.missingSchedule > 0 ? 'text-warning' : 'text-text-muted'}`}>
-                              {row.missingSchedule || '—'}
-                            </td>
-                            <td className="px-3 py-2 text-center font-black text-text-primary">{total}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <StatCard
@@ -403,25 +308,6 @@ export const DashboardSummary: React.FC<Props> = ({
               kpiTheme="neutral"
             />
           </div>
-
-          <SummaryWidgets
-            data={data}
-            metricFn={(agent) =>
-              agent.manDays > 0
-                ? { value: agent.gap, count: 1 }
-                : null
-            }
-            formatFn={(val) => `${val >= 0 ? "+" : ""}${formatNum(val, 0)}`}
-            activeTlFilter={
-              selectedTL && selectedTL !== "All TL" && selectedTL !== "All Team Leaders"
-                ? selectedTL
-                : null
-            }
-            onTlClick={(tl) => setSelectedTL(tl || "All TL")}
-            kpiType="productivity"
-            minAgentCount={1}
-            overallLabel="Overall Gap (+/-)"
-          />
 
           <KpiRulesPanel
             isOpen={isRulesOpen}

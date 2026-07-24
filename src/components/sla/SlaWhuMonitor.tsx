@@ -5,15 +5,12 @@ import { Search } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
-import { PeriodDelta } from '../ui/PeriodDelta';
 
-export const SlaWhuMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] }> = ({ data, previousData = [] }) => {
+export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'1m' | '3m'>('1m');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
-  const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
-  const comparisonMode = useStore(state => state.comparisonMode);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -76,28 +73,10 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
-  const teamSla = useMemo(() => {
-    const calc = (dataset: AgentKPI[]) => {
-      let sum = 0;
-      let count = 0;
-      let under = 0;
-      dataset.forEach((a) => {
-        const val = viewMode === '1m' ? a.sla1m : a.sla3m;
-        if (val !== null && val !== undefined) {
-          sum += val;
-          count += 1;
-          if (val < (viewMode === '1m' ? 92 : 96)) under += 1;
-        }
-      });
-      return { avg: count > 0 ? sum / count : 0, count, under };
-    };
-    return { current: calc(data), previous: calc(previousData) };
-  }, [data, previousData, viewMode]);
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold text-text-primary">SLA Monitor</h1>
           <div className="inline-flex bg-surface-muted p-1 rounded-lg w-max gap-1">
             <button
@@ -122,36 +101,6 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI
             >
               SLA 3m
             </button>
-          </div>
-          <div className="rounded-xl border border-border bg-card px-4 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Team Avg {viewMode === '1m' ? '1m' : '3m'}</div>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-xl font-black ${getKpiColor(teamSla.current.avg, viewMode === '1m' ? 'sla1m' : 'sla3m')}`}>
-                {formatNum(teamSla.current.avg, 1)}%
-              </span>
-              {isComparisonEnabled && previousData.length > 0 && (
-                <PeriodDelta
-                  current={teamSla.current.avg}
-                  previous={teamSla.previous.avg}
-                  suffix="%"
-                  label={comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW'}
-                />
-              )}
-            </div>
-            <div className="text-[10px] text-text-muted mt-0.5">
-              {formatNum(teamSla.current.under, 0)} agent under target
-              {isComparisonEnabled && previousData.length > 0 && (
-                <span className="ml-2">
-                  <PeriodDelta
-                    current={teamSla.current.under}
-                    previous={teamSla.previous.under}
-                    digits={0}
-                    lowerIsBetter
-                    label={comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW'}
-                  />
-                </span>
-              )}
-            </div>
           </div>
         </div>
         

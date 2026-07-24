@@ -2,15 +2,12 @@ import React from "react";
 import { AgentKPI } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor } from "../../lib/utils";
 import { EmptyState } from "../ui/EmptyState";
-import { useStore } from "../../store";
 
 interface DashboardAgentTableProps {
   tableData: AgentKPI[];
 }
 
 export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableData }) => {
-  const setSelectedAgentFor360 = useStore((s) => s.setSelectedAgentFor360);
-
   return (
     <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden mt-6">
       <div className="p-3 border-b border-border">
@@ -55,13 +52,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                   {i + 1}
                 </td>
                 <td className="p-2 font-medium text-text-primary md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted min-w-[220px] max-w-[220px] truncate">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAgentFor360(agent.csId)}
-                    className="text-kpi-neutral-text hover:underline font-semibold text-left"
-                  >
-                    {agent.name || agent.csId}
-                  </button>
+                  {agent.name || agent.csId}
                   <div className="text-[9px] text-text-muted font-normal">
                     {agent.csId}
                   </div>

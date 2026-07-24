@@ -6,22 +6,19 @@ import { useStore } from '../../store';
 
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
-import { PeriodDelta } from '../ui/PeriodDelta';
 
 const isQaDefect = (entry: QAEntry) => {
   const level = (entry.mistakeLevel || '').toUpperCase();
   return level.includes('LOW') || level.includes('MEDIUM') || level.includes('HIGH') || level.includes('VERY HIGH');
 };
 
-export const QaAgent360: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] }> = ({ data, previousData = [] }) => {
+export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
   const [filterTL, setFilterTL] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<{agent: AgentKPI, date?: string, type?: 'all' | 'defects' | 'no_mistake'} | null>(null);
   const [viewMode, setViewMode] = useState<'performance' | 'defect'>('performance');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
-  const comparisonMode = useStore(state => state.comparisonMode);
   
   const [perfSortConfig, setPerfSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [defectSortConfig, setDefectSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -123,25 +120,6 @@ export const QaAgent360: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
     }).sort((a, b) => b.totalDefect - a.totalDefect);
   }, [tableData]);
 
-  const qaSummary = useMemo(() => {
-    const calc = (dataset: AgentKPI[]) => {
-      let scoreSum = 0;
-      let scoreCount = 0;
-      let defects = 0;
-      dataset.forEach((a) => {
-        scoreSum += a.qaScoreSum || 0;
-        scoreCount += a.qaScoreCount || 0;
-        defects += (a.qaHistory || []).filter(isQaDefect).length;
-      });
-      return {
-        // qaScoreSum/Count already store percentage points (e.g. 95.8), do not *100
-        avg: scoreCount > 0 ? scoreSum / scoreCount : 0,
-        defects,
-      };
-    };
-    return { current: calc(data), previous: calc(previousData) };
-  }, [data, previousData]);
-
   const sortedPerformanceData = useMemo(() => {
     let sortable = [...defectData];
     if (perfSortConfig) {
@@ -164,8 +142,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
             break;
           case 'average':
           default:
-            aVal = a.qaScoreCount > 0 ? a.qaScoreSum / a.qaScoreCount : -1;
-            bVal = b.qaScoreCount > 0 ? b.qaScoreSum / b.qaScoreCount : -1;
+            aVal = a.qaScoreCount > 0 ? (a.qaScoreSum / a.qaScoreCount) * 100 : -1;
+            bVal = b.qaScoreCount > 0 ? (b.qaScoreSum / b.qaScoreCount) * 100 : -1;
             break;
         }
 
@@ -236,7 +214,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
   return (
     <div className="flex flex-col gap-4 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold text-text-primary">QA Agent 360</h1>
           
           <div className="flex overflow-x-auto no-scrollbar bg-surface-muted p-1 rounded-lg w-full md:w-max gap-1">
@@ -264,40 +242,6 @@ export const QaAgent360: React.FC<{ data: AgentKPI[]; previousData?: AgentKPI[] 
                 <AlertCircle className="w-3.5 h-3.5" />
                 Defect Analysis
              </button>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card px-4 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex gap-4">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Team QA Avg</div>
-              <div className="flex items-baseline gap-2">
-                <span className={`text-lg font-black ${getKpiColor(qaSummary.current.avg, 'qa')}`}>
-                  {formatNum(qaSummary.current.avg, 1)}%
-                </span>
-                {isComparisonEnabled && previousData.length > 0 && (
-                  <PeriodDelta
-                    current={qaSummary.current.avg}
-                    previous={qaSummary.previous.avg}
-                    suffix="%"
-                    label={comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW'}
-                  />
-                )}
-              </div>
-            </div>
-            <div className="border-l border-border pl-4">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Defects</div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-black text-danger">{formatNum(qaSummary.current.defects, 0)}</span>
-                {isComparisonEnabled && previousData.length > 0 && (
-                  <PeriodDelta
-                    current={qaSummary.current.defects}
-                    previous={qaSummary.previous.defects}
-                    digits={0}
-                    lowerIsBetter
-                    label={comparisonMode === 'mom' ? 'vs MoM' : 'vs WoW'}
-                  />
-                )}
-              </div>
-            </div>
           </div>
         </div>
         
