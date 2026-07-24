@@ -54,10 +54,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
             aVal = a.csatAsli || 0;
             bVal = b.csatAsli || 0;
             break;
-          case 'respondents':
-            aVal = a.csatRespondents || 0;
-            bVal = b.csatRespondents || 0;
-            break;
         }
 
         if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -76,28 +72,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
        }
     });
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
-  }, [tableData]);
-
-  const officialSummary = useMemo(() => {
-    const aggregate = getOfficialCsatAggregate(tableData);
-    const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    tableData.forEach((a) => {
-      counts[1] += a.csat1Count || 0;
-      counts[2] += a.csat2Count || 0;
-      counts[3] += a.csat3Count || 0;
-      counts[4] += a.csat4Count || 0;
-      counts[5] += a.csat5Count || 0;
-    });
-    const respondents = aggregate.respondents;
-    const pct = (n: number) => (respondents > 0 ? (n / respondents) * 100 : 0);
-    return {
-      score: aggregate.score,
-      respondents,
-      counts,
-      pct,
-      bad: counts[1] + counts[2],
-      good: counts[4] + counts[5],
-    };
   }, [tableData]);
 
   return (
@@ -123,53 +97,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="p-4 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-text-primary">Official Score Distribution</h2>
-            <p className="text-xs text-text-muted mt-1">Responden & pecahan score 1–5 (filter aktif ikut terhitung)</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="text-right">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Official Avg</div>
-              <div className={`text-xl font-black ${getKpiColor(officialSummary.score, 'csatOfficial')}`}>
-                {officialSummary.score !== null ? formatNum(officialSummary.score) : '-'}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Respondents</div>
-              <div className="text-xl font-black text-text-primary">{formatNum(officialSummary.respondents, 0)}</div>
-            </div>
-          </div>
-        </div>
-        <div className="p-4 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-          {([
-            { key: 'all', label: 'All Ratings', value: officialSummary.respondents, tone: 'neutral' as const },
-            { key: 'bad', label: 'Bad (1+2)', value: officialSummary.bad, tone: 'bad' as const },
-            { key: '1', label: 'Score 1', value: officialSummary.counts[1], tone: 'bad' as const },
-            { key: '2', label: 'Score 2', value: officialSummary.counts[2], tone: 'bad' as const },
-            { key: '3', label: 'Score 3', value: officialSummary.counts[3], tone: 'mid' as const },
-            { key: '4', label: 'Score 4', value: officialSummary.counts[4], tone: 'good' as const },
-            { key: '5', label: 'Score 5', value: officialSummary.counts[5], tone: 'good' as const },
-            { key: 'good', label: 'Good (4+5)', value: officialSummary.good, tone: 'good' as const },
-          ]).map((card) => {
-            const pct = officialSummary.respondents > 0 ? (card.value / officialSummary.respondents) * 100 : 0;
-            const toneClass =
-              card.tone === 'good' ? 'text-success' :
-              card.tone === 'bad' ? 'text-danger' :
-              card.tone === 'mid' ? 'text-warning' :
-              'text-text-primary';
-            return (
-              <div key={card.key} className="rounded-xl border border-border bg-surface/40 p-3 text-center">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">{card.label}</div>
-                <div className={`text-xl font-black ${toneClass}`}>{formatNum(card.value, 0)}</div>
-                <div className="text-[10px] text-text-muted mt-0.5">{formatNum(pct, 1)}%</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {isComparisonEnabled && (
         <WoWChartPanel 
           data={data} 
@@ -190,12 +117,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                 {uniqueDates.map(date => (
                   <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface ">{date}</th>
                 ))}
-                <SortableHeader label="Respondents" sortKey="respondents" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative" />
-                <th className="p-2 font-bold text-center text-danger bg-surface">S1</th>
-                <th className="p-2 font-bold text-center text-danger bg-surface">S2</th>
-                <th className="p-2 font-bold text-center text-warning bg-surface">S3</th>
-                <th className="p-2 font-bold text-center text-success bg-surface">S4</th>
-                <th className="p-2 font-bold text-center text-success bg-surface">S5</th>
                 <SortableHeader label="Official CSAT (Avg)" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
               </tr>
             </thead>
@@ -238,14 +159,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                         </td>
                       );
                     })}
-                    <td className="p-2 text-center font-bold text-text-secondary z-10">
-                      {formatNum(agent.csatRespondents || 0, 0)}
-                    </td>
-                    <td className="p-2 text-center font-medium text-danger z-10">{formatNum(agent.csat1Count || 0, 0)}</td>
-                    <td className="p-2 text-center font-medium text-danger z-10">{formatNum(agent.csat2Count || 0, 0)}</td>
-                    <td className="p-2 text-center font-medium text-warning z-10">{formatNum(agent.csat3Count || 0, 0)}</td>
-                    <td className="p-2 text-center font-medium text-success z-10">{formatNum(agent.csat4Count || 0, 0)}</td>
-                    <td className="p-2 text-center font-medium text-success z-10">{formatNum(agent.csat5Count || 0, 0)}</td>
                     <td className="p-2 text-center font-bold border-border z-10 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                       <span className={`font-bold text-[11px] ${getKpiColor(agent.csatAsli, 'csatOfficial')}`}>
                         {agent.csatAsli !== null ? formatNum(agent.csatAsli) : '-'}
@@ -256,7 +169,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
               })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={11 + uniqueDates.length} className="p-4 z-10">
+                  <td colSpan={5 + uniqueDates.length} className="p-4 z-10">
                     <EmptyState
                       title="Tidak ada data CSAT official"
                       description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search, filter Team Leader, atau range tanggal."
