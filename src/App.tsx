@@ -26,13 +26,11 @@ import {
   FileText,
   Check,
   AlertTriangle,
-  Bot
 } from 'lucide-react';
 
 import { cn } from './lib/utils';
 
 import { SearchableSelect } from './components/ui/SearchableSelect';
-import { KpiAiBot } from './components/ai/KpiAiBot';
 
 const FileCenter = React.lazy(() => import('./components/dashboard/FileCenter').then(module => ({ default: module.FileCenter })));
 const DashboardSummary = React.lazy(() => import('./components/dashboard/DashboardSummary').then(module => ({ default: module.DashboardSummary })));
@@ -264,7 +262,6 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const [askKpiOpen, setAskKpiOpen] = useState(false);
   const hasAutoFetchedSheetsRef = useRef(false);
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -484,19 +481,6 @@ export default function App() {
     };
   }, [rawData, previousRawData, previousRawData2, previousRawData3, baseTlList, selectedBpo, selectedTL, selectedGlobalAgent]);
 
-  const aiBotFilters = useMemo(() => ({
-    bpo: selectedBpo || 'All BPO',
-    teamLeader: selectedTL || 'All TL',
-    agent: selectedGlobalAgent || 'All Agents',
-    startDate: startDate || '',
-    endDate: endDate || '',
-    comparison: isComparisonEnabled
-      ? comparisonMode === 'mom'
-        ? 'Month over Month'
-        : 'Week over Week / previous period'
-      : 'Off',
-  }), [comparisonMode, endDate, isComparisonEnabled, selectedBpo, selectedGlobalAgent, selectedTL, startDate]);
-
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
@@ -689,24 +673,6 @@ export default function App() {
             )
           })}
         </nav>
-        <div className={cn('border-t border-sidebar-border', isSidebarMinimized ? 'md:px-2 md:py-2' : 'px-3 py-2')}>
-          <button
-            type="button"
-            onClick={() => {
-              setAskKpiOpen(true);
-              setIsSidebarOpen(false);
-            }}
-            className={cn(
-              'w-full flex items-center rounded-lg text-[12px] font-bold text-white transition-colors',
-              'bg-[#0D9488] hover:bg-[#0F766E]',
-              isSidebarMinimized ? 'md:justify-center md:px-2 md:py-2' : 'gap-2 px-3 py-2',
-            )}
-            title="Ask KPI"
-          >
-            <Bot className="w-4 h-4 shrink-0" />
-            <span className={cn('whitespace-nowrap', isSidebarMinimized ? 'md:hidden' : '')}>Ask KPI</span>
-          </button>
-        </div>
         <div className={cn("py-3 bg-black/5 dark:bg-black/40 text-[10px] text-text-muted border-t border-sidebar-border flex items-center transition-colors duration-300 overflow-hidden", isSidebarMinimized ? "md:flex-col md:px-2 md:gap-3 md:justify-center" : "justify-between px-4")}>
           <span className={cn("flex items-center text-sidebar-text transition-all duration-300 whitespace-nowrap", isSidebarMinimized ? "md:opacity-0 md:w-0 md:hidden" : "opacity-100")}>
             System Status: 
@@ -1022,17 +988,6 @@ export default function App() {
           />
         </React.Suspense>
       )}
-
-      <KpiAiBot
-        data={kpiData}
-        previousData={previousKpiData}
-        activeTab={activeTab}
-        filters={aiBotFilters}
-        onOpenFilters={() => setIsMobileFilterOpen(true)}
-        open={askKpiOpen}
-        onOpenChange={setAskKpiOpen}
-        showFloatingTrigger={false}
-      />
     </div>
   );
 }

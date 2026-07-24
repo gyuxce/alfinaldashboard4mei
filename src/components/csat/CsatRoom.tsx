@@ -436,8 +436,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   }, [tableData]);
 
   return (
-    <div className="flex flex-col gap-6 md:gap-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
         <div className="flex flex-col xl:flex-row xl:items-center gap-4 w-full overflow-hidden">
           <h1 className="text-lg font-bold text-text-primary whitespace-nowrap shrink-0">CSAT Room (Surveys)</h1>
           <div className="flex flex-col md:flex-row gap-2 xl:gap-4 w-full overflow-hidden">
@@ -557,14 +557,14 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="px-4 py-3 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-bold text-text-primary">Keadilan Takeout (% Takeout)</h2>
+            <h2 className="text-sm font-bold text-text-primary">Takeout Fairness (% Takeout)</h2>
             <p className="text-xs text-text-muted mt-0.5">
-              Persentase tiket takeout dari total tiket CSAT SC per agent / TL — cek apakah takeout merata
+              % tiket takeout dari total tiket CSAT SC per agent / TL — untuk cek apakah takeout merata
             </p>
           </div>
           <div className="text-right">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-text-muted">Takeout Tim %</div>
-            <div className="text-lg font-black text-text-primary tabular-nums">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Team Takeout %</div>
+            <div className="text-lg font-black text-text-primary">
               {formatNum(takeoutFairness.teamPct, 1)}%
               <span className="text-[11px] font-medium text-text-muted ml-2">
                 ({formatNum(takeoutFairness.teamTakeout, 0)} / {formatNum(takeoutFairness.teamTotal, 0)})
@@ -572,69 +572,69 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 p-5 lg:p-6">
-          <div className="max-h-[340px] overflow-auto rounded-xl border border-border bg-card shadow-sm">
-            <div className="sticky top-0 z-10 px-4 py-2.5 bg-surface text-[11px] font-bold uppercase tracking-wide text-text-secondary border-b border-border">
-              Takeout tertinggi — Agent
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-border">
+          <div className="max-h-[280px] overflow-auto">
+            <div className="sticky top-0 px-3 py-2 bg-surface text-[10px] font-bold uppercase tracking-widest text-text-secondary border-b border-border">
+              Highest Takeout % — Agent
             </div>
-            <table className="w-full text-left text-sm tabular-nums">
+            <table className="w-full text-left text-[10px]">
               <thead className="bg-surface-muted text-text-muted">
                 <tr>
-                  <th className="px-5 py-3.5 w-10 text-center font-semibold">#</th>
-                  <th className="px-5 py-3.5 font-semibold min-w-[9rem]">Agent</th>
-                  <th className="px-5 py-3.5 font-semibold min-w-[6rem]">TL</th>
-                  <th className="px-5 py-3.5 text-center font-semibold">Takeout</th>
-                  <th className="px-5 py-3.5 text-center font-semibold">Total</th>
-                  <th className="px-5 py-3.5 text-center font-semibold min-w-[4rem]">%</th>
+                  <th className="p-2 w-10 text-center">#</th>
+                  <th className="p-2">Agent</th>
+                  <th className="p-2">TL</th>
+                  <th className="p-2 text-center">Takeout</th>
+                  <th className="p-2 text-center">Total</th>
+                  <th className="p-2 text-center">%</th>
                 </tr>
               </thead>
               <tbody>
                 {takeoutFairness.agentRows.slice(0, 15).map((r, idx) => (
-                  <tr key={r.csId} className="border-b border-border/70 hover:bg-surface-muted/60">
-                    <td className="px-5 py-3.5 text-center text-text-muted">{idx + 1}</td>
-                    <td className="px-5 py-3.5 font-semibold text-text-primary truncate max-w-[11rem]" title={r.name}>{r.name}</td>
-                    <td className="px-5 py-3.5 text-text-secondary truncate max-w-[9rem]" title={r.tl}>{r.tl}</td>
-                    <td className="px-5 py-3.5 text-center">{formatNum(r.takeout, 0)}</td>
-                    <td className="px-5 py-3.5 text-center">{formatNum(r.total, 0)}</td>
-                    <td className={`px-5 py-3.5 text-center font-bold ${r.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
+                  <tr key={r.csId} className="border-b border-border hover:bg-surface-muted">
+                    <td className="p-2 text-center text-text-muted">{idx + 1}</td>
+                    <td className="p-2 font-semibold text-text-primary truncate max-w-[160px]" title={r.name}>{r.name}</td>
+                    <td className="p-2 text-text-secondary truncate max-w-[100px]" title={r.tl}>{r.tl}</td>
+                    <td className="p-2 text-center">{formatNum(r.takeout, 0)}</td>
+                    <td className="p-2 text-center">{formatNum(r.total, 0)}</td>
+                    <td className={`p-2 text-center font-bold ${r.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
                       {formatNum(r.pct, 1)}%
                     </td>
                   </tr>
                 ))}
                 {takeoutFairness.agentRows.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-text-muted">Belum ada data tiket</td></tr>
+                  <tr><td colSpan={6} className="p-6 text-center text-text-muted">No ticket data</td></tr>
                 )}
               </tbody>
             </table>
           </div>
-          <div className="max-h-[340px] overflow-auto rounded-xl border border-border bg-card shadow-sm">
-            <div className="sticky top-0 z-10 px-4 py-2.5 bg-surface text-[11px] font-bold uppercase tracking-wide text-text-secondary border-b border-border">
-              Takeout tertinggi — Team Leader
+          <div className="max-h-[280px] overflow-auto">
+            <div className="sticky top-0 px-3 py-2 bg-surface text-[10px] font-bold uppercase tracking-widest text-text-secondary border-b border-border">
+              Highest Takeout % — Team Leader
             </div>
-            <table className="w-full text-left text-sm tabular-nums">
+            <table className="w-full text-left text-[10px]">
               <thead className="bg-surface-muted text-text-muted">
                 <tr>
-                  <th className="px-5 py-3.5 w-10 text-center font-semibold">#</th>
-                  <th className="px-5 py-3.5 font-semibold min-w-[9rem]">Team Leader</th>
-                  <th className="px-5 py-3.5 text-center font-semibold">Takeout</th>
-                  <th className="px-5 py-3.5 text-center font-semibold">Total</th>
-                  <th className="px-5 py-3.5 text-center font-semibold min-w-[4rem]">%</th>
+                  <th className="p-2 w-10 text-center">#</th>
+                  <th className="p-2">Team Leader</th>
+                  <th className="p-2 text-center">Takeout</th>
+                  <th className="p-2 text-center">Total</th>
+                  <th className="p-2 text-center">%</th>
                 </tr>
               </thead>
               <tbody>
                 {takeoutFairness.tlRows.slice(0, 15).map((r, idx) => (
-                  <tr key={r.tl} className="border-b border-border/70 hover:bg-surface-muted/60">
-                    <td className="px-5 py-3.5 text-center text-text-muted">{idx + 1}</td>
-                    <td className="px-5 py-3.5 font-semibold text-text-primary truncate max-w-[13rem]" title={r.tl}>{r.tl}</td>
-                    <td className="px-5 py-3.5 text-center">{formatNum(r.takeout, 0)}</td>
-                    <td className="px-5 py-3.5 text-center">{formatNum(r.total, 0)}</td>
-                    <td className={`px-5 py-3.5 text-center font-bold ${r.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
+                  <tr key={r.tl} className="border-b border-border hover:bg-surface-muted">
+                    <td className="p-2 text-center text-text-muted">{idx + 1}</td>
+                    <td className="p-2 font-semibold text-text-primary truncate max-w-[180px]" title={r.tl}>{r.tl}</td>
+                    <td className="p-2 text-center">{formatNum(r.takeout, 0)}</td>
+                    <td className="p-2 text-center">{formatNum(r.total, 0)}</td>
+                    <td className={`p-2 text-center font-bold ${r.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
                       {formatNum(r.pct, 1)}%
                     </td>
                   </tr>
                 ))}
                 {takeoutFairness.tlRows.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-text-muted">Belum ada data TL</td></tr>
+                  <tr><td colSpan={5} className="p-6 text-center text-text-muted">No TL data</td></tr>
                 )}
               </tbody>
             </table>
@@ -646,29 +646,29 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
         <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
           <div className="p-4 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-4">
              <div>
-               <h2 className="text-sm font-bold text-text-primary">Distribusi Skor Global</h2>
-               <p className="text-xs text-text-muted mt-1">{totalScoreRows} total tiket diproses</p>
+               <h2 className="text-sm font-bold text-text-primary">Global Score Distribution</h2>
+               <p className="text-xs text-text-muted mt-1 ">{totalScoreRows} total tickets processed</p>
              </div>
              
-             <div className="flex flex-col md:flex-row border border-border rounded-lg overflow-hidden w-full md:w-auto bg-card">
-                <div className="flex flex-col justify-center px-4 md:px-5 py-3 border-b md:border-b-0 md:border-r border-border"
+             <div className="flex flex-col md:flex-row bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden w-full md:w-auto">
+                <div className="flex flex-col justify-center px-4 md:px-6 py-3 border-b md:border-b-0 md:border-r border-border"
                      style={{ borderLeftWidth: '4px', borderLeftColor: 'rgb(var(--kpi-csat))' }}>
                    <div className="flex items-center justify-between md:justify-start gap-4 mb-2">
-                     <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Total Responden</span>
-                     <span className="text-xl font-bold ml-auto tabular-nums" style={{ color: 'rgb(var(--kpi-csat))' }}>{formatNum(answeredScoreRows, 0)}</span>
+                     <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">TOTAL RATING RESPONDENTS</span>
+                     <span className="text-xl font-bold ml-auto" style={{ color: 'rgb(var(--kpi-csat))' }}>{formatNum(answeredScoreRows, 0)}</span>
                    </div>
-                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold items-center">
-                     <span className="text-success flex items-center gap-1 whitespace-nowrap">5<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['5'] || 0, 0)}</span>
-                     <span className="text-success flex items-center gap-1 whitespace-nowrap">4<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['4'] || 0, 0)}</span>
-                     <span className="text-text-muted flex items-center gap-1 whitespace-nowrap">3<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['3'] || 0, 0)}</span>
-                     <span className="text-warning flex items-center gap-1 whitespace-nowrap">2<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['2'] || 0, 0)}</span>
-                     <span className="text-danger flex items-center gap-1 whitespace-nowrap">1<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['1'] || 0, 0)}</span>
+                   <div className="flex flex-wrap gap-2 md:gap-4 text-[11px] font-bold items-center">
+                     <span className="text-success flex items-center gap-1">5<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['5'] || 0, 0)}</span>
+                     <span className="text-success flex items-center gap-1">4<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['4'] || 0, 0)}</span>
+                     <span className="text-text-muted flex items-center gap-1">3<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['3'] || 0, 0)}</span>
+                     <span className="text-warning flex items-center gap-1">2<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['2'] || 0, 0)}</span>
+                     <span className="text-danger flex items-center gap-1">1<Star className="w-3 h-3 fill-current"/>: {formatNum(scoreDistribution['1'] || 0, 0)}</span>
                    </div>
                 </div>
-                <div className="flex flex-col items-center justify-center px-5 py-3 bg-surface-muted/30">
-                   <span className="text-[10px] text-text-muted font-bold tracking-wide uppercase mb-1">Response Rate</span>
-                   <span className="text-lg font-black text-primary tabular-nums">{formatNum(surveyResponseRate, 1)}%</span>
-                   <span className="text-[10px] text-text-muted font-medium mt-0.5">({formatNum(answeredScoreRows, 0)} / {formatNum(totalScoreRows, 0)})</span>
+                <div className="flex flex-col items-center justify-center px-6 py-3 bg-surface-muted/30">
+                   <span className="text-[10px] text-text-muted font-bold tracking-wider uppercase mb-1">Response Rate</span>
+                   <span className="text-lg font-black text-primary">{formatNum(surveyResponseRate, 1)}%</span>
+                   <span className="text-[10px] text-text-muted font-medium mt-0.5">({formatNum(answeredScoreRows, 0)} / {formatNum(totalScoreRows, 0)} Ratings)</span>
                 </div>
              </div>
           </div>
@@ -995,25 +995,25 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           </div>
         </div>
       ) : analysisMode === 'agent' ? (
-        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)] mt-3">
-            <table className="w-full text-left text-sm whitespace-nowrap border-separate border-spacing-x-1 border-spacing-y-0">
-            <thead className="bg-surface text-text-secondary sticky top-0 z-30 border-b border-border">
+        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+            <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">
+            <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
-                <th className="px-4 py-4 font-bold text-center border-b border-border md:sticky md:left-0 z-40 bg-surface min-w-[56px]">No</th>
-                <SortableHeader label="Nama / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="border-b border-border md:sticky md:left-[56px] z-40 bg-surface min-w-[220px] max-w-[220px]" />
-                <SortableHeader label="BPO" sortKey="bpo" config={agentSortConfig} onSort={handleAgentSort} className="border-b border-border md:sticky md:left-[276px] z-40 bg-surface min-w-[84px] max-w-[84px]" />
-                <SortableHeader label="Team Leader" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="border-b border-border md:sticky md:left-[360px] z-40 bg-surface min-w-[116px] max-w-[116px]" />
+                <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
+                <SortableHeader label="Name / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
+                <SortableHeader label="BPO" sortKey="bpo" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
+                <SortableHeader label="Team Leader" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                 {uniqueDates.map(date => (
-                  <th key={date} className="px-3 py-4 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[100px]">
+                  <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface `}>
                     {date}
                   </th>
                 ))}
-                <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface border-b border-border min-w-[100px] shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
-                <th className="px-4 py-4 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[72px]">Tiket</th>
-                <th className="px-4 py-4 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[72px]">Takeout</th>
-                <th className="px-4 py-4 font-bold text-center text-text-primary bg-surface border-b border-border min-w-[80px]">Takeout %</th>
-                <th className="px-4 py-4 font-bold text-center text-text-primary bg-surface border-b border-border md:sticky md:right-0 z-40 border-l border-border/50 min-w-[88px] shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                  Aksi
+                <SortableHeader label="Average" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                <th className="p-2 font-bold text-center text-text-muted bg-surface">Tickets</th>
+                <th className="p-2 font-bold text-center text-text-muted bg-surface">Takeout</th>
+                <th className="p-2 font-bold text-center text-text-primary bg-surface">Takeout %</th>
+                <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                  Action
                 </th>
               </tr>
             </thead>
@@ -1025,21 +1025,21 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 const displayName = agent.name || agent.csId;
 
                 return (
-                <tr key={agent.csId} className="border-b border-border/70 transition-colors group hover:bg-surface-muted/60">
-                  <td className="px-4 py-4 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[56px]">{index + 1}</td>
-                  <td className="px-4 py-4 font-medium md:sticky md:left-[56px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[220px] max-w-[220px] truncate">
+                <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
+                  <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
+                  <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
                     <button 
                       onClick={() => useStore.getState().setSelectedAgentFor360(agent.csId)}
                       className="text-kpi-neutral-text hover:underline font-semibold"
                     >
                       {displayName}
                     </button>
-                    <div className="text-[10px] text-text-muted font-normal mt-1">{agent.csId}</div>
+                    <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
                   </td>
-                  <td className="px-4 py-4 font-medium text-text-primary uppercase md:sticky md:left-[276px] z-20 bg-card group-hover:bg-surface-muted min-w-[84px] max-w-[84px] truncate">
+                  <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
                     {agent.bpo || '-'}
                   </td>
-                  <td className="px-4 py-4 font-medium text-text-primary md:sticky md:left-[360px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[116px] max-w-[116px] truncate">{agent.teamLeader || '-'}</td>
+                  <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                   
                   {uniqueDates.map(date => {
                     const dailyArr = viewMode === 'full' ? agent.dailyHistory.csatScFull : agent.dailyHistory.csatScFair;
@@ -1053,15 +1053,16 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                     
                     if (!daily || daily.count === 0 || isOff) {
                       return (
-                        <td key={date} className={`p-0 text-center text-text-disabled z-10 min-w-[100px] ${bgClass}`}>
+                        <td key={date} className={`p-0 text-center text-text-disabled z-10 ${bgClass}`}>
                            <button 
                              onClick={() => isOff ? null : setSelectedAgent({ agent, date, type: 'csat' })} 
-                             className={`w-full h-full min-h-[58px] flex flex-col items-center justify-center px-3 py-2.5 transition-colors ${isOff ? 'cursor-default' : 'hover:bg-surface-muted cursor-pointer'}`}
-                             title={isOff && daily && daily.count > 0 ? `Agent OFF — ${daily.count} survey tetap dihitung di total` : ''}
+                             className={`w-full h-full min-h-[36px] flex flex-col items-center justify-center transition-colors group/btn relative ${isOff ? 'cursor-default' : 'hover:bg-surface-muted cursor-pointer'}`}
+                             title={isOff && daily && daily.count > 0 ? `Agent OFF — ${daily.count} survey(s) tetap dihitung di total` : ''}
                            >
                              <span className="text-[11px]">
                                {isOff ? <span className="text-text-muted/40 italic text-[9px]">off</span> : '-'}
                              </span>
+                             {!isOff && <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity absolute right-1 text-text-muted" />}
                            </button>
                         </td>
                       );
@@ -1072,25 +1073,25 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                     const textColor = isPullout ? `text-text-muted italic` : baseColor;
 
                     return (
-                      <td key={date} className={`p-0 text-center z-10 min-w-[100px] ${bgClass}`}>
+                      <td key={date} className={`p-0 text-center z-10 ${bgClass}`}>
                         <button 
                           onClick={() => setSelectedAgent({ agent, date, type: 'csat' })} 
-                          className="w-full h-full min-h-[58px] flex flex-col items-center justify-center gap-1.5 px-3 py-2.5 hover:bg-surface-muted transition-colors cursor-pointer"
-                          title={`${formatNum(avg)}% · ${daily.count} rating`}
+                          className="w-full h-full min-h-[36px] flex flex-col items-center justify-center hover:bg-surface-muted transition-colors group/btn relative cursor-pointer"
                         >
-                          <span className={`text-xs font-bold tabular-nums leading-none ${textColor}`}>
+                          <span className={`text-[11px] font-bold ${textColor}`}>
                             {formatNum(avg)}%
                           </span>
-                          <span className={`text-[10px] font-medium leading-none ${isPullout ? 'text-text-muted/70 italic' : 'text-text-muted'}`}>({daily.count})</span>
+                          <span className={`text-[9px] font-medium ${isPullout ? 'text-text-muted/70 italic' : 'text-text-muted'}`}>({daily.count} valid ratings)</span>
+                          <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 text-text-muted transition-opacity absolute right-1" />
                         </button>
                       </td>
                     );
                   })}
                   
-                  <td className={`px-4 py-4 text-center font-bold z-10 relative min-w-[100px] shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]`}>
+                  <td className={`p-2 text-center font-bold  z-10  relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]`}>
                     {totalCount > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        <span className={`text-xs font-bold tabular-nums ${getKpiColor(
+                      <div className="flex flex-col">
+                        <span className={`text-[11px] font-bold ${getKpiColor(
                           viewMode === 'full'
                             ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
                             : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0),
@@ -1102,26 +1103,24 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                               : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0)
                           )}%
                         </span>
-                        <span className="text-[10px] text-text-muted font-medium">({totalCount})</span>
+                        <span className="text-[9px] text-text-muted font-medium">({totalCount} valid ratings)</span>
                       </div>
                     ) : '-'}
                   </td>
-                  <td className="px-4 py-4 text-center text-text-secondary z-10 tabular-nums">{formatNum(takeoutStats.total, 0)}</td>
-                  <td className="px-4 py-4 text-center text-text-secondary z-10 tabular-nums">{formatNum(takeoutStats.takeout, 0)}</td>
-                  <td className={`px-4 py-4 text-center font-bold z-10 tabular-nums ${takeoutStats.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
+                  <td className="p-2 text-center text-text-secondary z-10">{formatNum(takeoutStats.total, 0)}</td>
+                  <td className="p-2 text-center text-text-secondary z-10">{formatNum(takeoutStats.takeout, 0)}</td>
+                  <td className={`p-2 text-center font-bold z-10 ${takeoutStats.pct >= takeoutFairness.teamPct + 10 ? 'text-danger' : 'text-text-primary'}`}>
                     {takeoutStats.total > 0 ? `${formatNum(takeoutStats.pct, 1)}%` : '-'}
                   </td>
-                  <td className="p-0 text-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50 min-w-[88px]">
-                    <div className="flex h-full min-h-[58px] items-center justify-center px-4">
-                      <button 
-                        onClick={() => setSelectedAgent({ agent, type: 'csat' })}
-                        className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-primary transition-colors px-2.5 py-1.5 rounded-md hover:bg-surface-muted cursor-pointer"
-                        title="Lihat detail"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span className="font-bold">Detail</span>
-                      </button>
-                    </div>
+                  <td className="p-2 text-center flex items-center justify-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50">
+                    <button 
+                      onClick={() => setSelectedAgent({ agent, type: 'csat' })}
+                      className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
+                      title="View All Detail"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="font-bold">Detail</span>
+                    </button>
                   </td>
                 </tr>
               )})}
@@ -1141,22 +1140,22 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           </table>
         </div>
       ) : analysisMode === 'defect' ? (
-        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)] mt-3">
-            <table className="w-full text-left text-sm whitespace-nowrap border-separate border-spacing-x-1 border-spacing-y-0">
+        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+            <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">
             <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
-                <th className="px-4 py-4 font-bold text-center border-b border-border md:sticky md:left-0 z-40 bg-surface min-w-[56px] max-w-[56px]">No</th>
-                <SortableHeader label="Nama / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[56px] z-40 bg-surface min-w-[220px] max-w-[220px]" />
-                <SortableHeader label="BPO" sortKey="bpo" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[276px] z-40 bg-surface min-w-[84px] max-w-[84px]" />
-                <SortableHeader label="Team Leader" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[360px] z-40 bg-surface min-w-[116px] max-w-[116px]" />
-                <SortableHeader label="Skor 1" sortKey="score1" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface min-w-[64px]" />
-                <SortableHeader label="Skor 2" sortKey="score2" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface min-w-[64px]" />
-                <SortableHeader label="Skor 3" sortKey="score3" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface min-w-[64px]" />
-                <SortableHeader label="Skor 4" sortKey="score4" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface min-w-[64px]" />
-                <SortableHeader label="Skor 5" sortKey="score5" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface min-w-[64px]" />
-                <SortableHeader label="Kategori paling sering" sortKey="category" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border bg-surface w-full min-w-[180px]" />
-                <th className="px-4 py-4 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-b border-border border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] min-w-[88px]">
-                  Aksi
+                <th className="p-2 font-bold text-center border-b border-border md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
+                <SortableHeader label="Name / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
+                <SortableHeader label="BPO" sortKey="bpo" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
+                <SortableHeader label="Team Leader" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                <SortableHeader label="Score 1" sortKey="score1" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
+                <SortableHeader label="Score 2" sortKey="score2" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
+                <SortableHeader label="Score 3" sortKey="score3" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
+                <SortableHeader label="Score 4" sortKey="score4" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
+                <SortableHeader label="Score 5" sortKey="score5" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
+                <SortableHeader label="Most Frequent Category" sortKey="category" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border bg-surface w-full" />
+                <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-b border-border border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                  Action
                 </th>
               </tr>
             </thead>
@@ -1178,8 +1177,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
                 return (
                 <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
-                  <td className="px-4 py-4 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[56px] max-w-[56px]">{index + 1}</td>
-                  <td className="px-4 py-4 font-medium md:sticky md:left-[56px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[220px] max-w-[220px] truncate">
+                  <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
+                  <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
                     <button 
                       onClick={() => useStore.getState().setSelectedAgentFor360(agent.csId)}
                       className="text-kpi-neutral-text hover:underline font-semibold"
@@ -1188,44 +1187,44 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                     </button>
                     <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
                   </td>
-                  <td className="px-4 py-4 font-medium text-text-primary uppercase md:sticky md:left-[276px] z-20 bg-card group-hover:bg-surface-muted min-w-[84px] max-w-[84px] truncate">
+                  <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
                     {agent.bpo || '-'}
                   </td>
-                  <td className="px-4 py-4 font-medium text-text-primary md:sticky md:left-[360px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[116px] max-w-[116px] truncate">{agent.teamLeader || '-'}</td>
+                  <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                   
-                  <td className="px-4 py-4 text-center z-10">
-                     <span className={`px-2.5 py-1.5 rounded font-bold text-xs ${score1Count > 0 ? 'bg-danger/10 text-danger' : 'text-text-disabled'}`}>
+                  <td className="p-2 text-center z-10">
+                     <span className={`px-2 py-1 rounded font-bold text-[11px] ${score1Count > 0 ? 'bg-danger/10 text-danger' : 'text-text-disabled'}`}>
                        {score1Count}
                      </span>
                   </td>
-                  <td className="px-4 py-4 text-center z-10">
-                     <span className={`px-2.5 py-1.5 rounded font-bold text-xs ${score2Count > 0 ? 'bg-warning/10 text-warning-[.8]' : 'text-text-disabled'}`}>
+                  <td className="p-2 text-center z-10">
+                     <span className={`px-2 py-1 rounded font-bold text-[11px] ${score2Count > 0 ? 'bg-warning/10 text-warning-[.8]' : 'text-text-disabled'}`}>
                        {score2Count}
                      </span>
                   </td>
-                  <td className="px-4 py-4 text-center z-10">
-                     <span className={`px-2.5 py-1.5 rounded font-bold text-xs ${score3Count > 0 ? 'bg-warning/10 text-warning' : 'text-text-disabled'}`}>
+                  <td className="p-2 text-center z-10">
+                     <span className={`px-2 py-1 rounded font-bold text-[11px] ${score3Count > 0 ? 'bg-warning/10 text-warning' : 'text-text-disabled'}`}>
                        {score3Count}
                      </span>
                   </td>
-                  <td className="px-4 py-4 text-center z-10">
-                     <span className={`px-2.5 py-1.5 rounded font-bold text-xs ${score4Count > 0 ? 'bg-success/10 text-success' : 'text-text-disabled'}`}>
+                  <td className="p-2 text-center z-10">
+                     <span className={`px-2 py-1 rounded font-bold text-[11px] ${score4Count > 0 ? 'bg-success/10 text-success' : 'text-text-disabled'}`}>
                        {score4Count}
                      </span>
                   </td>
-                  <td className="px-4 py-4 text-center z-10">
-                     <span className={`px-2.5 py-1.5 rounded font-bold text-xs ${score5Count > 0 ? 'bg-success/10 text-success' : 'text-text-disabled'}`}>
+                  <td className="p-2 text-center z-10">
+                     <span className={`px-2 py-1 rounded font-bold text-[11px] ${score5Count > 0 ? 'bg-success/10 text-success' : 'text-text-disabled'}`}>
                        {score5Count}
                      </span>
                   </td>
-                  <td className="px-4 py-4 font-medium text-text-primary z-10 truncate max-w-[300px]">
+                  <td className="p-2 font-medium text-text-primary z-10 truncate max-w-[300px]">
                     {topCat}
                   </td>
                   
-                  <td className="px-4 py-4 text-center flex items-center justify-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50 min-w-[88px]">
+                  <td className="p-2 text-center flex items-center justify-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50">
                     <button 
                       onClick={() => setSelectedAgent({ agent, type: 'defects' })}
-                      className="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary transition-colors px-2.5 py-1.5 rounded-md hover:bg-surface-muted relative cursor-pointer"
+                      className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
                       title="View Defect Details"
                     >
                       <Eye className="w-3.5 h-3.5" />
