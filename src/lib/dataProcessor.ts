@@ -399,6 +399,64 @@ export const processKPIs = (
     return d.toISOString().split("T")[0];
   };
 
+  // Keep schedule lookup available even when the previous calendar day is
+  // outside the selected KPI range. This matters for overnight shift 22 data
+  // landing after midnight on the first day of a period.
+  const scheduleStatusByAgentDate = new Map<string, string>();
+  const scheduleDateLabelByAgentDate = new Map<string, string>();
+  const getScheduleKey = (agentId: string, normDate: string) =>
+    `${agentId}|${normDate}`;
+
+  const isShift22Status = (statusRaw: string) => {
+    const status = String(statusRaw || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "")
+      .replace(",", ".");
+    return status === "22" || status === "22.0" || status === "22:00" || status === "22:00:00";
+  };
+
+  const extractTimestampHour = (rawTimestamp: unknown) => {
+    const match = String(rawTimestamp || "").match(
+      /(?:^|[T\s])(\d{1,2}):\d{2}(?::\d{2})?/,
+    );
+    if (!match) return -1;
+
+    const hour = Number(match[1]);
+    return hour >= 0 && hour < 24 ? hour : -1;
+  };
+
+  const getShiftAdjustedDate = (
+    agentId: string,
+    normDate: string | null,
+    hour: number,
+  ) => {
+    if (!normDate || hour < 0 || hour >= 7) return normDate;
+
+    const previousDate = subtractOneDay(normDate);
+    const previousStatus = scheduleStatusByAgentDate.get(
+      getScheduleKey(agentId, previousDate),
+    );
+
+    return previousStatus && isShift22Status(previousStatus)
+      ? previousDate
+      : normDate;
+  };
+
+  const getScheduleDateLabel = (agentId: string, normDate: string | null) => {
+    if (!normDate) return "";
+
+    const scheduleLabel = scheduleDateLabelByAgentDate.get(
+      getScheduleKey(agentId, normDate),
+    );
+    if (scheduleLabel) return scheduleLabel;
+
+    const parts = normDate.split("-");
+    return parts.length === 3
+      ? `${parts[2]}/${parts[1]}/${parts[0]}`
+      : normDate;
+  };
+
   const getAgent = (id: string) => {
     const cleanId = String(id || "").trim();
     if (
@@ -500,6 +558,28 @@ export const processKPIs = (
     Object.keys(agentDictionary).forEach((csId) => {
       getAgent(csId);
     });
+  }
+
+  if (schedData.length > 1) {
+    const scheduleHeaders = schedData[0] || [];
+    for (let c = 5; c < scheduleHeaders.length; c++) {
+      const dateLabel = String(scheduleHeaders[c] || "").trim();
+      const normDate = dateLabel ? normalizeDateStr(dateLabel) : null;
+      if (!normDate) continue;
+
+      for (let r = 1; r < schedData.length; r++) {
+        const row = schedData[r];
+        const agentId = String(row?.[1] || "").trim();
+        if (!agentId) continue;
+
+        const status = String(row?.[c] || "").trim().toUpperCase();
+        if (!status) continue;
+
+        const key = getScheduleKey(agentId, normDate);
+        scheduleStatusByAgentDate.set(key, status);
+        scheduleDateLabelByAgentDate.set(key, dateLabel);
+      }
+    }
   }
 
   // 0. Schedule Logic
@@ -627,39 +707,14 @@ export const processKPIs = (
       if (!rawDateStr || !normDate) continue;
 
       let targetDateLabel = rawDateStr;
-
-      const timeParts = rawDateStr.split(/[\s,T]+/);
-      let hour = -1;
-      if (timeParts.length > 1) {
-        const hp = timeParts[1].split(":");
-        if (hp.length > 0) {
-          hour = parseInt(hp[0], 10);
-        }
-      }
+      const hour = extractTimestampHour(rawDateStr);
 
       const agentId = String(row[idIdx]).trim();
       const agent = getAgent(agentId);
       if (!agent) continue;
 
-      if (hour >= 0 && hour < 7) {
-        const prevNorm = subtractOneDay(normDate);
-        const prevSched = agent.dailyHistory.schedule.find(
-          (s) => s.normDate === prevNorm,
-        );
-        if (prevSched && prevSched.status === "22") {
-          normDate = prevNorm;
-        }
-      }
-
-      const matchingSched = agent.dailyHistory.schedule.find(
-        (s) => s.normDate === normDate,
-      );
-      if (matchingSched) {
-        targetDateLabel = matchingSched.date;
-      } else {
-        const parts = normDate.split("-");
-        targetDateLabel = `${parts[2]}/${parts[1]}/${parts[0]}`;
-      }
+      normDate = getShiftAdjustedDate(agentId, normDate, hour);
+      targetDateLabel = getScheduleDateLabel(agentId, normDate);
 
       if (!isWithin(normDate)) continue;
 
@@ -783,13 +838,21 @@ export const processKPIs = (
       );
       if (idIdx === -1) continue;
 
+      const agentId = String(row[idIdx]).trim();
       const dateStr = idIdx > 0 ? String(row[0] || "") : "";
-      const normDate = dateStr ? normalizeDateStr(dateStr) : null;
+      let normDate = dateStr ? normalizeDateStr(dateStr) : null;
+      const timestampStr = String(row[22] || "").trim();
+      const hour = extractTimestampHour(timestampStr);
+      normDate = getShiftAdjustedDate(agentId, normDate, hour);
       if (dateStr && normDate && !isWithin(normDate)) continue;
 
-      const agentId = String(row[idIdx]).trim();
       const agent = getAgent(agentId);
       if (!agent) continue;
+      const targetDateLabel = dateStr
+        ? normDate
+          ? getScheduleDateLabel(agentId, normDate)
+          : dateStr
+        : dateStr;
 
       // Score: Column O (ID D + 11)
       const scoreStr = String(row[idIdx + 11] || "")
@@ -808,20 +871,14 @@ export const processKPIs = (
       const uid = String(row[idIdx + 5] || "").trim();
 
       // Extract hour from column W (index 22) for hourly productivity
-      const timestampStr = String(row[22] || "").trim();
       if (timestampStr) {
-        const timeParts = timestampStr.split(" ");
-        if (timeParts.length > 1) {
-           const time = timeParts[1]; // e.g. "21:12:00"
-           const hrStr = time.split(":")[0];
-           const hr = parseInt(hrStr, 10);
-           if (!isNaN(hr) && hr >= 0 && hr < 24) {
+        if (hour >= 0 && hour < 24) {
+             const hr = hour;
              agent.hourlyProductivity[hr] += 1;
              const categoryLabel = category
                ? category.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
                : "Unknown Case";
              agent.hourlyCategoryCounts[hr][categoryLabel] = (agent.hourlyCategoryCounts[hr][categoryLabel] || 0) + 1;
-           }
         }
       }
 
@@ -851,7 +908,7 @@ export const processKPIs = (
       
       if (dateStr) {
          agent.csatHistory.push({
-            date: dateStr,
+            date: targetDateLabel,
             normDate,
             ticketId,
             chatId,
@@ -920,10 +977,10 @@ export const processKPIs = (
 
 
           let fullDay = agent.dailyHistory.csatScFull.find(
-            (h) => h.date === dateStr,
+            (h) => h.date === targetDateLabel,
           );
           if (!fullDay) {
-            fullDay = { date: dateStr, score: 0, count: 0 };
+            fullDay = { date: targetDateLabel, score: 0, count: 0 };
             agent.dailyHistory.csatScFull.push(fullDay);
           }
           if (score >= 4) fullDay.score += 1;
@@ -945,10 +1002,10 @@ export const processKPIs = (
             agent.csatScFairTotalValid += 1;
 
             let fairDay = agent.dailyHistory.csatScFair.find(
-              (h) => h.date === dateStr,
+              (h) => h.date === targetDateLabel,
             );
             if (!fairDay) {
-              fairDay = { date: dateStr, score: 0, count: 0 };
+              fairDay = { date: targetDateLabel, score: 0, count: 0 };
               agent.dailyHistory.csatScFair.push(fairDay);
             }
             if (score >= 4) fairDay.score += 1; // good count
@@ -997,13 +1054,20 @@ export const processKPIs = (
       );
       if (idIdx === -1) continue;
 
+      const agentId = String(row[idIdx]).trim();
       const dateStr = idIdx > 0 ? String(row[0] || "") : "";
-      const normDate = dateStr ? normalizeDateStr(dateStr) : null;
+      let normDate = dateStr ? normalizeDateStr(dateStr) : null;
+      const hour = extractTimestampHour(dateStr);
+      normDate = getShiftAdjustedDate(agentId, normDate, hour);
       if (dateStr && normDate && !isWithin(normDate)) continue;
 
-      const agentId = String(row[idIdx]).trim();
       const agent = getAgent(agentId);
       if (!agent) continue;
+      const targetDateLabel = dateStr
+        ? normDate
+          ? getScheduleDateLabel(agentId, normDate)
+          : dateStr
+        : dateStr;
 
       const parseSla = (val: string) => {
         let clean = val.replace(",", ".").trim();
@@ -1030,13 +1094,13 @@ export const processKPIs = (
         if (!sla1mSum[agent.csId]) sla1mSum[agent.csId] = { sum: 0, count: 0 };
         sla1mSum[agent.csId].sum += sla1;
         sla1mSum[agent.csId].count += 1;
-        agent.dailyHistory.sla1m.push({ date: dateStr, value: sla1 });
+        agent.dailyHistory.sla1m.push({ date: targetDateLabel, value: sla1 });
       }
       if (sla3 !== null && !isNaN(sla3)) {
         if (!sla3mSum[agent.csId]) sla3mSum[agent.csId] = { sum: 0, count: 0 };
         sla3mSum[agent.csId].sum += sla3;
         sla3mSum[agent.csId].count += 1;
-        agent.dailyHistory.sla3m.push({ date: dateStr, value: sla3 });
+        agent.dailyHistory.sla3m.push({ date: targetDateLabel, value: sla3 });
       }
     }
   }
@@ -1051,11 +1115,18 @@ export const processKPIs = (
 
       // Column N (Index 13) is Checking Date
       const dateStr = String(row[13] || "");
-      const normDate = dateStr ? normalizeDateStr(dateStr) : null;
+      const agentId = String(row[0]).trim();
+      let normDate = dateStr ? normalizeDateStr(dateStr) : null;
+      const hour = extractTimestampHour(dateStr);
+      normDate = getShiftAdjustedDate(agentId, normDate, hour);
       if (dateStr && normDate && !isWithin(normDate)) continue;
+      const targetDateLabel = dateStr
+        ? normDate
+          ? getScheduleDateLabel(agentId, normDate)
+          : dateStr
+        : dateStr;
 
       // Column A (Index 0) is CS ID
-      const agentId = String(row[0]).trim();
       const agent = getAgent(agentId);
       if (!agent) continue;
 
@@ -1109,7 +1180,7 @@ export const processKPIs = (
       }
       
       agent.qaHistory.push({
-        date: dateStr,
+        date: targetDateLabel,
         normDate,
         systemCheckingType,
         ticketId,
