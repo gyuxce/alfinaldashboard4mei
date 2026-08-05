@@ -31,14 +31,14 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
     const calculate = (dataset: AgentKPI[]) => {
       let totalProd = 0, sumManDays = 0, sumSla1m = 0, sumSla3m = 0, sumWhu = 0;
       let sumCsatScFull = 0, countCsatScFull = 0, sumCsatScFair = 0, countCsatScFair = 0;
-      let sumQa = 0, countQa = 0, slaCount = 0, whuCount = 0, attPresence = 0, attDuty = 0;
+      let sumQa = 0, countQa = 0, sla1mCount = 0, sla3mCount = 0, whuCount = 0, attPresence = 0, attDuty = 0;
       const officialCsat = getOfficialCsatAggregate(dataset);
 
       dataset.forEach((d) => {
         totalProd += d.productivityTotal;
         sumManDays += d.manDays;
-        if (d.sla1m !== null) sumSla1m += d.sla1m;
-        if (d.sla3m !== null) { sumSla3m += d.sla3m; slaCount++; }
+        if (d.sla1m !== null) { sumSla1m += d.sla1m; sla1mCount++; }
+        if (d.sla3m !== null) { sumSla3m += d.sla3m; sla3mCount++; }
         if (d.whu !== null) { sumWhu += d.whu; whuCount++; }
         sumCsatScFull += d.csatScGoodCount || 0;
         countCsatScFull += d.csatScTotalValid || 0;
@@ -59,8 +59,8 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
         csatScFullCount: countCsatScFull,
         csatScFair: countCsatScFair > 0 ? (sumCsatScFair / countCsatScFair) * 100 : 0,
         csatScFairCount: countCsatScFair,
-        sla1m: slaCount > 0 ? sumSla1m / slaCount : 0,
-        sla3m: slaCount > 0 ? sumSla3m / slaCount : 0,
+        sla1m: sla1mCount > 0 ? sumSla1m / sla1mCount : 0,
+        sla3m: sla3mCount > 0 ? sumSla3m / sla3mCount : 0,
         whu: whuCount > 0 ? sumWhu / whuCount : 0,
         qa: countQa > 0 ? sumQa / countQa : 0,
         attendance: attDuty > 0 ? (attPresence / attDuty) * 100 : 0,
@@ -346,56 +346,74 @@ type KpiFormula = {
 
 const KPI_FORMULAS: Record<string, KpiFormula> = {
   "Total Productivity": {
-    formula: "Sum productivity dari semua agent yang masuk filter.",
-    source: "Productivity CSAT WHU",
+    formula: "Jumlah seluruh chat atau tiket pada periode yang dipilih.",
+    source: "Data produktivitas",
   },
   "Avg Productivity": {
     target: "100",
-    formula: "Total Productivity / Man-Days.",
-    source: "Productivity CSAT WHU + Schedule",
+    formula: "Total produktivitas dibagi jumlah hari kerja.",
+    source: "Data produktivitas dan jadwal",
   },
   "CSAT Official": {
     target: "3.75 / 5",
-    formula: "Total poin rating 1-5 / total responden (weighted by respondents).",
-    source: "Productivity CSAT WHU",
+    formula: "Jumlah poin rating dibagi jumlah responden.",
+    source: "Data CSAT Official",
+    note: "Rating 1 sampai 5 dihitung sesuai jumlah responden.",
   },
   "CSAT SC Full": {
     target: "75%",
-    formula: "Score good (4-5) / total score valid, score 3 tidak dihitung.",
-    source: "CSAT SC",
-    note: "Data takeout tetap ikut dihitung.",
+    formula: "Jumlah rating 4 dan 5 dibagi seluruh rating yang valid.",
+    source: "Data survei CSAT",
+    note: "Seluruh rating valid, termasuk rating 3, tetap dihitung.",
   },
   "CSAT SC After Takeout": {
     target: "92%",
-    formula: "Score good (4-5) / total score valid setelah data takeout dikeluarkan.",
-    source: "CSAT SC",
-    note: "Kategori takeout dikeluarkan dari pembagi dan pembilang.",
+    formula: "Jumlah rating 4 dan 5 dibagi rating valid setelah kasus takeout dikeluarkan.",
+    source: "Data survei CSAT",
+    note: "Kasus yang masuk kategori takeout tidak ikut dihitung.",
   },
   "SLA 1 Menit": {
     target: "92%",
-    formula: "Rata-rata SLA response 1 menit dari semua agent valid.",
-    source: "SLA Responses",
+    formula: "Rata-rata persentase respons yang memenuhi batas 1 menit.",
+    source: "Data SLA",
   },
   "SLA 3 Menit": {
     target: "96%",
-    formula: "Rata-rata SLA response 3 menit dari semua agent valid.",
-    source: "SLA Responses",
+    formula: "Rata-rata persentase respons yang memenuhi batas 3 menit.",
+    source: "Data SLA",
   },
   "WHU (%)": {
     target: "96%",
-    formula: "Rata-rata WHU percentage dari semua agent valid.",
-    source: "Productivity CSAT WHU",
+    formula: "Rata-rata persentase WHU dari data yang tersedia.",
+    source: "Data produktivitas",
   },
   "QA Score": {
     target: "92%",
-    formula: "Total QC score / jumlah QA yang punya score.",
-    source: "QA Score",
+    formula: "Rata-rata nilai pemeriksaan QA yang memiliki nilai.",
+    source: "Data QA",
   },
   "Attendance": {
     target: "95%",
-    formula: "Presence / Duty * 100.",
-    source: "Schedule",
-    note: "PULLOUT dihitung sebagai duty dan presence.",
+    formula: "Hari hadir dibagi hari kerja, lalu dikali 100.",
+    source: "Data jadwal",
+    note: "Hari PULLOUT tetap dihitung sebagai hari kerja dan hadir.",
+  },
+  "Training Completion": {
+    target: "100%",
+    formula: "Nilai mengikuti status penyelesaian training.",
+    source: "Data training",
+    note: "Data training belum tersedia, sehingga sementara dinilai 100%.",
+  },
+  "Quiz": {
+    target: "92%",
+    formula: "Nilai mengikuti hasil quiz dibandingkan target.",
+    source: "Data quiz",
+    note: "Data quiz belum tersedia, sehingga sementara dinilai 100%.",
+  },
+  "Final Score": {
+    target: "100",
+    formula: "Gabungan QA 50%, produktivitas 20%, CSAT 20%, training 5%, dan quiz 5%.",
+    source: "Seluruh KPI",
   },
 };
 
@@ -407,7 +425,7 @@ const FormulaTooltip = ({ title }: { title: string }) => {
     <span className="group/formula relative inline-flex shrink-0 items-center">
       <button
         type="button"
-        aria-label={`Formula ${title}`}
+        aria-label={`Penjelasan ${title}`}
         title={`${title}: ${formula.formula}`}
         className="inline-flex h-5 w-5 items-center justify-center rounded-full text-text-muted hover:bg-surface-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
       >
@@ -426,7 +444,7 @@ const FormulaTooltip = ({ title }: { title: string }) => {
           {formula.formula}
         </span>
         <span className="mt-2 block text-[10px] text-text-muted">
-          Source: {formula.source}
+          Sumber data: {formula.source}
         </span>
         {formula.note && (
           <span className="mt-1 block text-[10px] leading-relaxed text-text-muted">
@@ -458,10 +476,10 @@ const KpiRulesPanel = ({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Info size={14} className="shrink-0 text-primary" />
-            <h2 className="text-sm font-bold text-text-primary">KPI Rules</h2>
+            <h2 className="text-sm font-bold text-text-primary">Aturan KPI</h2>
           </div>
           <p className="mt-0.5 text-xs text-text-muted">
-            Target, formula, source data, dan catatan hitungan KPI.
+            Target dan ringkasan cara penilaian setiap KPI.
           </p>
         </div>
         <ChevronDown
@@ -478,9 +496,9 @@ const KpiRulesPanel = ({
                 <tr>
                   <th className="px-4 py-2 font-bold uppercase tracking-wide">KPI</th>
                   <th className="px-4 py-2 font-bold uppercase tracking-wide">Target</th>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Formula</th>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Source</th>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Notes</th>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Cara Hitung</th>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Sumber Data</th>
+                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Catatan</th>
                 </tr>
               </thead>
               <tbody>

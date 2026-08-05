@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
-import { Search, Users, Activity, HeartPulse, UserMinus } from 'lucide-react';
+import { Search, Users, HeartPulse, UserMinus } from 'lucide-react';
 import { useStore } from '../../store';
 import { EmptyState } from '../ui/EmptyState';
 
@@ -17,12 +17,11 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return activeData.filter(a => a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase()));
   }, [activeData, search]);
 
-  const { avgTeamAttendance, totalSick, totalPullout, totalOff, totalC } = useMemo(() => {
+  const { avgTeamAttendance, totalSick, totalPullout, totalC } = useMemo(() => {
     let totDuty = 0;
     let totPresence = 0;
     let sick = 0;
     let pullout = 0;
-    let offDays = 0;
     let leaveDays = 0;
     
     activeData.forEach(a => {
@@ -30,12 +29,11 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
        totPresence += a.attendancePresence;
        sick += a.attendanceS;
        pullout += a.attendancePullout;
-       offDays += a.attendanceOff;
        leaveDays += a.attendanceC;
     });
     
     const avg = totDuty > 0 ? Math.min(100, (totPresence / totDuty) * 100) : 0;
-    return { avgTeamAttendance: avg, totalSick: sick, totalPullout: pullout, totalOff: offDays, totalC: leaveDays };
+    return { avgTeamAttendance: avg, totalSick: sick, totalPullout: pullout, totalC: leaveDays };
   }, [activeData]);
 
   return (
@@ -58,7 +56,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       </div>
       
       {/* WIDGETS */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
                <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Avg Team Attendance</div>
@@ -67,15 +65,6 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </div>
             </div>
             <div className="text-2xl font-bold tracking-tight text-primary z-10">{formatNum(avgTeamAttendance, 1)}%</div>
-         </div>
-         <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-2">
-               <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Total OFF</div>
-               <div className="w-7 h-7 rounded-full bg-surface-muted flex items-center justify-center z-10 shrink-0">
-                 <Activity className="w-3.5 h-3.5 text-text-muted" />
-               </div>
-            </div>
-            <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalOff, 0)}</div>
          </div>
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
@@ -136,12 +125,9 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
                     <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
                     <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                      <button 
-                        onClick={() => useStore.getState().setSelectedAgentFor360(agent.csId)}
-                        className="text-kpi-neutral-text hover:underline font-semibold"
-                      >
+                      <span className="text-kpi-neutral-text font-semibold">
                         {displayName}
-                      </button>
+                      </span>
                       <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
                     </td>
                     <td className="p-2 font-medium text-text-primary truncate md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px]">{agent.teamLeader || '-'}</td>

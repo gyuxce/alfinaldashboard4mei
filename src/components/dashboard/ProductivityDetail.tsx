@@ -525,12 +525,9 @@ export const ProductivityDetail: React.FC<{
                     {idx + 1}
                   </td>
                   <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                    <button 
-                      onClick={() => useStore.getState().setSelectedAgentFor360(agent.csId)}
-                      className="text-kpi-neutral-text hover:underline font-semibold"
-                    >
+                    <span className="text-kpi-neutral-text font-semibold">
                       {displayName}
-                    </button>
+                    </span>
                     <div className="text-[9px] text-text-muted font-normal mt-0.5">
                       {agent.csId}
                     </div>

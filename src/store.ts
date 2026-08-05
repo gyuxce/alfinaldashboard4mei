@@ -64,7 +64,6 @@ export interface AppState {
   selectedBpo: string;
   selectedTL: string;
   selectedGlobalAgent: string;
-  selectedAgentFor360: string | null;
   agentDictionary: Record<string, { name: string; bpo: string; teamLeader: string }>;
   isComparisonEnabled: boolean;
   comparisonMode: 'wow' | 'mom';
@@ -80,7 +79,6 @@ export interface AppState {
   setSelectedBpo: (bpo: string) => void;
   setSelectedTL: (tl: string) => void;
   setSelectedGlobalAgent: (agent: string) => void;
-  setSelectedAgentFor360: (agentId: string | null) => void;
   clearFiles: () => void;
   hydrateFromStorage: () => Promise<void>;
   
@@ -120,7 +118,6 @@ export const useStore = create<AppState>((set, get) => ({
   selectedBpo: 'All BPO',
   selectedTL: 'All TL',
   selectedGlobalAgent: 'All Agents',
-  selectedAgentFor360: null,
   agentDictionary: {},
   isComparisonEnabled: false,
   comparisonMode: 'wow',
@@ -205,7 +202,6 @@ export const useStore = create<AppState>((set, get) => ({
   setSelectedBpo: (bpo) => set(() => ({ selectedBpo: bpo })),
   setSelectedTL: (tl) => set(() => ({ selectedTL: tl })),
   setSelectedGlobalAgent: (agent) => set(() => ({ selectedGlobalAgent: agent })),
-  setSelectedAgentFor360: (agentId) => set(() => ({ selectedAgentFor360: agentId })),
   setIsComparisonEnabled: (enabled) => set(() => ({ isComparisonEnabled: enabled })),
   setComparisonMode: (mode) => set(() => ({ comparisonMode: mode })),
 

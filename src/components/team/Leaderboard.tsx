@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
 import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
-import { Trophy, Users, User, ArrowRight, ClipboardList } from "lucide-react";
+import { Trophy, Users, User, ArrowRight } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
@@ -42,48 +42,6 @@ interface LeaderboardRow {
   quiz_points: number;
 }
 
-type DevelopmentStage = "development" | "sp1" | "sp2" | "termination";
-
-interface DevelopmentRow {
-  csId: string;
-  name: string;
-  tl: string;
-  stage: DevelopmentStage | null;
-  pendingStage: DevelopmentStage | null;
-  cleanStreak: number;
-  bottomCount: number;
-  bottomMonths: string[];
-  lastBottomMonth: string;
-  currentRank: number | null;
-  history: string[];
-}
-
-const DEVELOPMENT_STAGE_META: Record<
-  DevelopmentStage,
-  { label: string; next: string; className: string }
-> = {
-  development: {
-    label: "Development Plan",
-    next: "SP 1",
-    className: "bg-warning-soft text-warning",
-  },
-  sp1: {
-    label: "SP 1",
-    next: "SP 2",
-    className: "bg-orange-100 text-orange-700",
-  },
-  sp2: {
-    label: "SP 2",
-    next: "Termination",
-    className: "bg-danger-soft text-danger",
-  },
-  termination: {
-    label: "Termination",
-    next: "Final",
-    className: "bg-danger text-white",
-  },
-};
-
 const normalizeAgentName = (value: string) =>
   value.trim().replace(/\s+/g, " ").toLowerCase();
 
@@ -91,17 +49,6 @@ const INACTIVE_AGENT_RULES = [
   {
     name: "edgar gasita adhigama",
     inactiveFrom: "2026-06",
-  },
-] as const;
-
-const DEVELOPMENT_HISTORY_SEEDS = [
-  {
-    name: "rupertus wilian brodus jelati",
-    stage: "sp1" as DevelopmentStage,
-    bottomCount: 1,
-    bottomMonths: ["Apr 2026"],
-    lastBottomMonth: "Apr 2026",
-    history: ["Apr 2026: SP1"],
   },
 ] as const;
 
@@ -265,8 +212,8 @@ export const Leaderboard: React.FC = () => {
     scheduleData.length > 0 ||
     qaData.length > 0;
 
-  const { agentRows, tlRows, developmentRows } = useMemo(() => {
-    if (!hasData) return { agentRows: [], tlRows: [], developmentRows: [] };
+  const { agentRows, tlRows } = useMemo(() => {
+    if (!hasData) return { agentRows: [], tlRows: [] };
 
     const rawData = processKPIs(
       productivityData,
@@ -475,177 +422,7 @@ export const Leaderboard: React.FC = () => {
     aList.sort((a, b) => b.score - a.score);
     tList.sort((a, b) => b.score - a.score);
 
-    const monthRanges: { start: string; end: string; label: string }[] = [];
-    const activeEnd = new Date(`${endDate}T12:00:00`);
-    if (!Number.isNaN(activeEnd.getTime())) {
-      let year = 2026;
-      let monthIndex = 4;
-      while (
-        year < activeEnd.getFullYear() ||
-        (year === activeEnd.getFullYear() && monthIndex <= activeEnd.getMonth())
-      ) {
-        const lastDay = new Date(year, monthIndex + 1, 0).getDate();
-        const monthNumber = String(monthIndex + 1).padStart(2, "0");
-        monthRanges.push({
-          start: `${year}-${monthNumber}-01`,
-          end: `${year}-${monthNumber}-${String(lastDay).padStart(2, "0")}`,
-          label: new Intl.DateTimeFormat("id-ID", {
-            month: "short",
-            year: "numeric",
-          }).format(new Date(year, monthIndex, 1)),
-        });
-        monthIndex += 1;
-        if (monthIndex > 11) {
-          monthIndex = 0;
-          year += 1;
-        }
-      }
-    }
-
-    const developmentMap = new Map<string, DevelopmentRow>();
-    DEVELOPMENT_HISTORY_SEEDS.forEach((seed) => {
-      const dictionaryEntry = Object.entries(agentDictionary).find(
-        ([, info]) => normalizeAgentName(info.name || "") === seed.name,
-      );
-      if (!dictionaryEntry) return;
-      const [csId, info] = dictionaryEntry;
-      developmentMap.set(csId, {
-        csId,
-        name: info.name || csId,
-        tl: info.teamLeader || "-",
-        stage: seed.stage,
-        pendingStage: null,
-        cleanStreak: 0,
-        bottomCount: seed.bottomCount,
-        bottomMonths: [...seed.bottomMonths],
-        lastBottomMonth: seed.lastBottomMonth,
-        currentRank: null,
-        history: [...seed.history],
-      });
-    });
-
-    monthRanges.forEach((monthRange) => {
-      const today = new Date();
-      const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-      const isOpenMonth = monthRange.start.slice(0, 7) === currentMonthKey;
-
-      Array.from(developmentMap.entries()).forEach(([csId, row]) => {
-        if (isAgentInactive({ name: row.name }, monthRange.end)) {
-          developmentMap.delete(csId);
-        }
-      });
-
-      const monthlyAgents = processKPIs(
-        productivityData,
-        csatScData,
-        slaData,
-        scheduleData,
-        qaData,
-        monthRange.start,
-        monthRange.end,
-        agentDictionary,
-      )
-        .filter((agent) => !isAgentInactive(agent, monthRange.end))
-        .map((agent) => ({
-          agent,
-          score: getLeaderboardComposite(agent).composite.score,
-        }))
-        .filter(
-          (entry): entry is { agent: AgentKPI; score: number } =>
-            entry.score !== null,
-        )
-        .sort(
-          (a, b) =>
-            b.score - a.score ||
-            (a.agent.name || a.agent.csId).localeCompare(
-              b.agent.name || b.agent.csId,
-            ),
-        );
-
-      const eligibleIds = new Set(monthlyAgents.map((entry) => entry.agent.csId));
-      const bottomRanks = new Map(
-        monthlyAgents.slice(-3).map((entry) => [
-          entry.agent.csId,
-          monthlyAgents.findIndex((candidate) => candidate.agent.csId === entry.agent.csId) + 1,
-        ]),
-      );
-
-      eligibleIds.forEach((csId) => {
-        const monthlyEntry = monthlyAgents.find((entry) => entry.agent.csId === csId)!;
-        const current = developmentMap.get(csId);
-        const bottomRank = bottomRanks.get(csId);
-
-        if (bottomRank !== undefined) {
-          const nextStage: DevelopmentStage = !current || current.stage === null
-            ? "development"
-            : current.stage === "development"
-              ? "sp1"
-              : current.stage === "sp1"
-                ? "sp2"
-                : "termination";
-
-          developmentMap.set(csId, {
-            csId,
-            name: monthlyEntry.agent.name || csId,
-            tl: monthlyEntry.agent.teamLeader || "-",
-            stage: isOpenMonth ? (current?.stage || null) : nextStage,
-            pendingStage: isOpenMonth ? nextStage : null,
-            cleanStreak: isOpenMonth ? (current?.cleanStreak || 0) : 0,
-            bottomCount: (current?.bottomCount || 0) + 1,
-            bottomMonths: [...(current?.bottomMonths || []), monthRange.label],
-            lastBottomMonth: monthRange.label,
-            currentRank: bottomRank,
-            history: [
-              ...(current?.history || []),
-              isOpenMonth
-                ? `${monthRange.label}: Bottom sementara -> potensi ${DEVELOPMENT_STAGE_META[nextStage].label}`
-                : `${monthRange.label}: Bottom -> ${DEVELOPMENT_STAGE_META[nextStage].label}`,
-            ],
-          });
-          return;
-        }
-
-        if (!current || current.stage === null || current.stage === "termination") return;
-        if (current.stage === "development") {
-          developmentMap.delete(csId);
-          return;
-        }
-        if (isOpenMonth) return;
-        const cleanStreak = current.cleanStreak + 1;
-        if (cleanStreak >= 3) {
-          developmentMap.delete(csId);
-        } else {
-          developmentMap.set(csId, {
-            ...current,
-            name: monthlyEntry.agent.name || current.name,
-            tl: monthlyEntry.agent.teamLeader || current.tl,
-            pendingStage: null,
-            cleanStreak,
-            currentRank: null,
-            history: [
-              ...current.history,
-              `${monthRange.label}: Tidak Bottom 3 (SP tetap aktif)`,
-            ],
-          });
-        }
-      });
-    });
-
-    const stagePriority: Record<DevelopmentStage, number> = {
-      termination: 4,
-      sp2: 3,
-      sp1: 2,
-      development: 1,
-    };
-    const developmentList = Array.from(developmentMap.values()).sort(
-      (a, b) => {
-        const aStage = a.pendingStage || a.stage || "development";
-        const bStage = b.pendingStage || b.stage || "development";
-        return stagePriority[bStage] - stagePriority[aStage] || a.name.localeCompare(b.name);
-      },
-    );
-
-    return { agentRows: aList, tlRows: tList, developmentRows: developmentList };
+    return { agentRows: aList, tlRows: tList };
   }, [
     hasData,
     productivityData,
@@ -872,82 +649,6 @@ export const Leaderboard: React.FC = () => {
         </table>
       </div>
 
-      <aside className="overflow-hidden rounded-lg border border-border-strong bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="flex items-center justify-between border-b border-border-strong bg-surface-muted px-3 py-2.5">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-primary" />
-            <div>
-              <h3 className="text-sm font-bold text-text-primary">Development Plan</h3>
-              <p className="text-[10px] text-text-muted">Monthly Bottom 3 tracking</p>
-            </div>
-          </div>
-          <span className="text-sm font-black text-text-primary">{developmentRows.length}</span>
-        </div>
-
-        <div>
-          {developmentRows.length > 0 ? (
-            <table className="w-full table-fixed text-left text-[11px]">
-              <thead className="sticky top-0 z-10 bg-surface text-text-muted">
-                <tr className="border-b border-border-strong">
-                  <th className="w-[46%] px-3 py-2 font-bold uppercase">Agent</th>
-                  <th className="px-3 py-2 font-bold uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {developmentRows.map((row) => {
-                  const stageMeta = row.stage ? DEVELOPMENT_STAGE_META[row.stage] : null;
-                  const pendingMeta = row.pendingStage ? DEVELOPMENT_STAGE_META[row.pendingStage] : null;
-                  return (
-                    <React.Fragment key={row.csId}>
-                    <tr className="align-top">
-                      <td className="px-3 py-2.5">
-                        <div className="truncate font-bold text-text-primary" title={row.name}>{row.name}</div>
-                        <div className="mt-0.5 truncate text-[10px] text-text-muted" title={`${row.csId} | ${row.tl}`}>
-                          {row.csId} | {row.tl}
-                        </div>
-                        <div className="mt-1 text-[10px] font-semibold text-text-secondary">
-                          Bottom terdeteksi {row.bottomCount}x | {row.bottomMonths.join(", ")}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className={cn(
-                          "inline-flex px-1.5 py-0.5 text-[10px] font-black",
-                          stageMeta ? stageMeta.className : "bg-surface-muted text-text-secondary",
-                        )}>
-                          {stageMeta ? `Status resmi: ${stageMeta.label}` : "Status resmi: Belum ada"}
-                        </span>
-                        <div className="mt-1.5 text-[10px] text-text-secondary">
-                          {row.currentRank !== null
-                            ? `${pendingMeta ? "Peringkat bulan berjalan" : "Peringkat saat Bottom"} #${row.currentRank}`
-                            : "Tidak Bottom 3 bulan ini"}
-                        </div>
-                      </td>
-                    </tr>
-                    <tr className="border-b border-border last:border-b-0">
-                      <td colSpan={2} className="px-3 pb-2.5 pt-0">
-                        {pendingMeta && (
-                          <div className="mb-1.5 bg-warning-soft px-2 py-1.5 text-[10px] font-bold leading-relaxed text-warning">
-                            Jika bulan ini ditutup tetap Bottom 3, status menjadi {pendingMeta.label}.
-                          </div>
-                        )}
-                        <div className="whitespace-normal bg-surface-muted px-2 py-1.5 text-[10px] leading-relaxed text-text-secondary">
-                          {row.history.join(" | ")}
-                        </div>
-                      </td>
-                    </tr>
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <div className="px-4 py-8 text-center">
-              <p className="text-xs font-bold text-text-primary">Tidak ada status aktif</p>
-              <p className="mt-1 text-[10px] text-text-muted">Riwayat dimulai dari Mei 2026.</p>
-            </div>
-          )}
-        </div>
-      </aside>
       </div>
 
       {selectedAgent && (

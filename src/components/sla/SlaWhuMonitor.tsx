@@ -142,12 +142,9 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
                     <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
                     <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                      <button 
-                        onClick={() => useStore.getState().setSelectedAgentFor360(agent.csId)}
-                        className="text-kpi-neutral-text hover:underline font-semibold"
-                      >
+                      <span className="text-kpi-neutral-text font-semibold">
                         {displayName}
-                      </button>
+                      </span>
                       <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
                     </td>
                     <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">

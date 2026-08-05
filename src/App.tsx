@@ -31,7 +31,6 @@ import {
 import { cn } from './lib/utils';
 
 import { SearchableSelect } from './components/ui/SearchableSelect';
-import { KpiAiBot } from './components/ai/KpiAiBot';
 
 const FileCenter = React.lazy(() => import('./components/dashboard/FileCenter').then(module => ({ default: module.FileCenter })));
 const DashboardSummary = React.lazy(() => import('./components/dashboard/DashboardSummary').then(module => ({ default: module.DashboardSummary })));
@@ -45,7 +44,6 @@ const QaAgent360 = React.lazy(() => import('./components/qa/QaAgent360').then(mo
 const Leaderboard = React.lazy(() => import('./components/team/Leaderboard').then(module => ({ default: module.Leaderboard })));
 const ScheduleBoard = React.lazy(() => import('./components/team/ScheduleBoard').then(module => ({ default: module.ScheduleBoard })));
 const AttendanceMonitor = React.lazy(() => import('./components/team/AttendanceMonitor').then(module => ({ default: module.AttendanceMonitor })));
-const Agent360Radar = React.lazy(() => import('./components/team/Agent360Radar').then(module => ({ default: module.Agent360Radar })));
 
 function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
@@ -280,8 +278,8 @@ export default function App() {
 
   const { 
     csidData, productivityData, csatScData, slaData, scheduleData, qaData, 
-    startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, selectedAgentFor360, agentDictionary, selectedSheetMonth,
-    setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedAgentFor360,
+    startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, agentDictionary, selectedSheetMonth,
+    setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, activeMonthRowCounts,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode
@@ -453,19 +451,6 @@ export default function App() {
     };
   }, [rawData, previousRawData, previousRawData2, previousRawData3, baseTlList, selectedBpo, selectedTL, selectedGlobalAgent]);
 
-  const aiBotFilters = useMemo(() => ({
-    bpo: selectedBpo || 'All BPO',
-    teamLeader: selectedTL || 'All TL',
-    agent: selectedGlobalAgent || 'All Agents',
-    startDate: startDate || '',
-    endDate: endDate || '',
-    comparison: isComparisonEnabled
-      ? comparisonMode === 'mom'
-        ? 'Month over Month'
-        : 'Week over Week / previous period'
-      : 'Off',
-  }), [comparisonMode, endDate, isComparisonEnabled, selectedBpo, selectedGlobalAgent, selectedTL, startDate]);
-
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
@@ -480,11 +465,6 @@ export default function App() {
     { id: 'attendance', label: 'Attendance Monitor', icon: Calendar },
     { id: 'files', label: 'File Center', icon: FolderDown },
   ];
-
-  const agent360Data = useMemo(() => {
-    if (!selectedAgentFor360) return null;
-    return rawData.find(a => a.csId === selectedAgentFor360) || null;
-  }, [selectedAgentFor360, rawData]);
 
   if (isHydrating) {
     return (
@@ -948,22 +928,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Ultimate Agent 360 Pop-up */}
-      {agent360Data && (
-        <React.Suspense fallback={null}>
-          <Agent360Radar
-             agent={agent360Data}
-             onClose={() => setSelectedAgentFor360(null)}
-          />
-        </React.Suspense>
-      )}
-
-      <KpiAiBot
-        data={kpiData}
-        activeTab={activeTab}
-        filters={aiBotFilters}
-        onOpenFilters={() => setIsMobileFilterOpen(true)}
-      />
     </div>
   );
 }
