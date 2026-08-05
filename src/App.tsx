@@ -278,7 +278,7 @@ export default function App() {
 
   const { 
     csidData, productivityData, csatScData, slaData, scheduleData, qaData, 
-    startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, agentDictionary, selectedSheetMonth,
+    startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, agentDictionary, agentDictionaryByMonth, selectedSheetMonth,
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, activeMonthRowCounts,
@@ -384,7 +384,7 @@ export default function App() {
   ]);
 
   const { rawData, previousRawData, previousRawData2, previousRawData3, tlList: baseTlList } = useMemo(() => {
-    let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary);
+    let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, agentDictionaryByMonth);
     
     let prevRaw: any[] = [];
     let prevRaw2: any[] = [];
@@ -392,13 +392,13 @@ export default function App() {
     if (isComparisonEnabled && startDate && endDate) {
       const getPrevRange = comparisonMode === 'mom' ? getPreviousMonthPeriod : getPreviousPeriod;
       const prevRange = getPrevRange(startDate, endDate);
-      prevRaw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange.start, prevRange.end, agentDictionary);
+      prevRaw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange.start, prevRange.end, agentDictionary, agentDictionaryByMonth);
       
       const prevRange2 = getPrevRange(prevRange.start, prevRange.end);
-      prevRaw2 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange2.start, prevRange2.end, agentDictionary);
+      prevRaw2 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange2.start, prevRange2.end, agentDictionary, agentDictionaryByMonth);
       
       const prevRange3 = getPrevRange(prevRange2.start, prevRange2.end);
-      prevRaw3 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange3.start, prevRange3.end, agentDictionary);
+      prevRaw3 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange3.start, prevRange3.end, agentDictionary, agentDictionaryByMonth);
     }
 
     const tls = new Set<string>();
@@ -408,7 +408,7 @@ export default function App() {
     const tlsArr = Array.from(tls).sort((a,b) => a.localeCompare(b));
     
     return { rawData: raw, previousRawData: prevRaw, previousRawData2: prevRaw2, previousRawData3: prevRaw3, tlList: tlsArr };
-  }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, isComparisonEnabled, comparisonMode]);
+  }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, agentDictionaryByMonth, isComparisonEnabled, comparisonMode]);
 
   const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, tlList, agentList } = useMemo(() => {
     let data = rawData;

@@ -380,8 +380,34 @@ export const processKPIs = (
     string,
     { name: string; bpo: string; teamLeader: string }
   >,
+  agentDictionaryByMonth?: Record<
+    string,
+    Record<string, { name: string; bpo: string; teamLeader: string }>
+  >,
 ): AgentKPI[] => {
   const agents: Record<string, AgentKPI> = {};
+
+  const monthCodes = [
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+  ];
+  const getPeriodDictionary = () => {
+    if (!agentDictionaryByMonth || Object.keys(agentDictionaryByMonth).length === 0) {
+      return agentDictionary;
+    }
+
+    const periodDate = startDate || endDate || "";
+    const [year, month] = periodDate.split("-").map(Number);
+    if (!year || !month || month < 1 || month > 12) return agentDictionary;
+
+    const monthKey = `${monthCodes[month - 1]}_${year}`;
+    return (
+      agentDictionaryByMonth[monthKey] ||
+      (monthKey === "MAY_2026" ? agentDictionaryByMonth.legacy : undefined) ||
+      agentDictionary
+    );
+  };
+  const periodDictionary = getPeriodDictionary();
 
   const isWithin = (dStr: string | null) => {
     if (!startDate && !endDate) return true;
@@ -469,7 +495,7 @@ export const processKPIs = (
     )
       return null;
     if (!agents[cleanId]) {
-      const dictInfo = agentDictionary?.[cleanId] || {
+      const dictInfo = periodDictionary?.[cleanId] || {
         name: "",
         bpo: "",
         teamLeader: "",
@@ -554,8 +580,8 @@ export const processKPIs = (
     return agents[cleanId];
   };
 
-  if (agentDictionary) {
-    Object.keys(agentDictionary).forEach((csId) => {
+  if (periodDictionary) {
+    Object.keys(periodDictionary).forEach((csId) => {
       getAgent(csId);
     });
   }
@@ -1252,8 +1278,8 @@ export const processKPIs = (
     return agent;
   });
 
-  if (agentDictionary && Object.keys(agentDictionary).length > 0) {
-    resultData = resultData.filter((a) => !!agentDictionary[a.csId]);
+  if (periodDictionary && Object.keys(periodDictionary).length > 0) {
+    resultData = resultData.filter((a) => !!periodDictionary[a.csId]);
   }
 
   return resultData.sort((a, b) => a.csId.localeCompare(b.csId));

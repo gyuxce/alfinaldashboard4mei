@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
-import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
-import { Trophy, Users, User, ArrowRight } from "lucide-react";
+import { AgentKPI, getPreviousMonthPeriod, getPreviousPeriod, processKPIs } from "../../lib/dataProcessor";
+import { ArrowLeftRight, ArrowRight, Trophy, Users, User } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
@@ -40,6 +40,20 @@ interface LeaderboardRow {
   quiz_score: number;
   quiz_pct: number;
   quiz_points: number;
+}
+
+interface ComparisonSnapshot {
+  id: string;
+  label: string;
+  subtitle: string;
+  score: number | null;
+  qa: number | null;
+  productivity: number | null;
+  csat: number | null;
+  duty: number;
+  chat: number;
+  good: number;
+  bad: number;
 }
 
 const normalizeAgentName = (value: string) =>
@@ -115,6 +129,73 @@ const getLeaderboardComposite = (agent: AgentKPI) => {
   };
 };
 
+const average = (values: number[]) =>
+  values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+
+const getAgentComparisonSnapshot = (agent: AgentKPI | undefined): ComparisonSnapshot | null => {
+  if (!agent) return null;
+
+  const { composite, csatGood, csatBad } = getLeaderboardComposite(agent);
+  return {
+    id: agent.csId,
+    label: agent.name || agent.csId,
+    subtitle: agent.teamLeader ? `TL: ${agent.teamLeader}` : agent.csId,
+    score: composite.score,
+    qa: composite.qaPct,
+    productivity: composite.productivityPct,
+    csat: composite.csatPct,
+    duty: agent.manDays,
+    chat: agent.productivityTotal,
+    good: csatGood,
+    bad: csatBad,
+  };
+};
+
+const getTeamLeaderComparisonSnapshot = (
+  rawData: AgentKPI[],
+  teamLeader: string,
+  periodEnd: string,
+): ComparisonSnapshot | null => {
+  if (!teamLeader) return null;
+
+  const agents = rawData.filter(
+    (agent) =>
+      agent.teamLeader === teamLeader && !isAgentInactive(agent, periodEnd),
+  );
+  if (agents.length === 0) return null;
+
+  const composites = agents.map((agent) => getLeaderboardComposite(agent));
+  const csatGood = composites.reduce((sum, item) => sum + item.csatGood, 0);
+  const csatBad = composites.reduce((sum, item) => sum + item.csatBad, 0);
+  const csatTotal = csatGood + csatBad;
+
+  return {
+    id: teamLeader,
+    label: teamLeader,
+    subtitle: `${agents.length} agent`,
+    score: average(
+      composites
+        .map((item) => item.composite.score)
+        .filter((value): value is number => value !== null),
+    ),
+    qa: average(
+      composites
+        .map((item) => item.composite.qaPct)
+        .filter((value): value is number => value !== null),
+    ),
+    productivity: average(
+      composites
+        .map((item) => item.composite.productivityPct)
+        .filter((value): value is number => value !== null),
+    ),
+    csat: csatTotal > 0 ? (csatGood / csatTotal) * 100 : null,
+    duty: agents.reduce((sum, agent) => sum + agent.manDays, 0),
+    chat: agents.reduce((sum, agent) => sum + agent.productivityTotal, 0),
+    good: csatGood,
+    bad: csatBad,
+  };
+};
+
 interface AgentKpiRowProps {
   label: string;
   weight: string;
@@ -172,9 +253,56 @@ const getScoreColor = (score: number | null): string => {
   return 'text-danger font-bold text-[11px]';
 };
 
+const formatComparisonMetric = (value: number | null, suffix = "") =>
+  value === null || Number.isNaN(value) ? "-" : `${formatNum(value, 2)}${suffix}`;
+
+const ComparisonMetric = ({
+  label,
+  primary,
+  secondary,
+  suffix = "",
+}: {
+  label: string;
+  primary: number | null;
+  secondary: number | null;
+  suffix?: string;
+}) => {
+  const delta =
+    primary !== null && secondary !== null ? primary - secondary : null;
+  const deltaClass =
+    delta === null
+      ? "text-text-muted"
+      : delta > 0
+        ? "text-success-text"
+        : delta < 0
+          ? "text-danger-text"
+          : "text-text-muted";
+
+  return (
+    <div className="rounded-lg border border-border bg-surface/60 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}</p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <span className="text-base font-bold text-text-primary">
+          {formatComparisonMetric(primary, suffix)}
+        </span>
+        <span className={`text-[11px] font-semibold ${deltaClass}`}>
+          {delta === null ? "-" : `${delta > 0 ? "+" : ""}${formatNum(delta, 2)}${suffix}`}
+        </span>
+      </div>
+      <p className="mt-0.5 text-[10px] text-text-muted">
+        Pembanding: {formatComparisonMetric(secondary, suffix)}
+      </p>
+    </div>
+  );
+};
+
 export const Leaderboard: React.FC = () => {
   const [toggleMode, setToggleMode] = useState<"tl" | "agent">("agent");
   const [selectedAgent, setSelectedAgent] = useState<LeaderboardRow | null>(null);
+  const [compareKind, setCompareKind] = useState<"agent" | "tl">("agent");
+  const [comparePrimary, setComparePrimary] = useState("");
+  const [compareSecondary, setCompareSecondary] = useState("");
+  const [compareSource, setCompareSource] = useState<"active" | "previous">("previous");
 
   React.useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -191,8 +319,10 @@ export const Leaderboard: React.FC = () => {
     scheduleData,
     qaData,
     agentDictionary,
+    agentDictionaryByMonth,
     startDate,
     endDate,
+    comparisonMode,
   } = useStore();
 
   const handleOpenFiles = () => {
@@ -212,8 +342,8 @@ export const Leaderboard: React.FC = () => {
     scheduleData.length > 0 ||
     qaData.length > 0;
 
-  const { agentRows, tlRows } = useMemo(() => {
-    if (!hasData) return { agentRows: [], tlRows: [] };
+  const { agentRows, tlRows, rawData } = useMemo(() => {
+    if (!hasData) return { agentRows: [], tlRows: [], rawData: [] as AgentKPI[] };
 
     const rawData = processKPIs(
       productivityData,
@@ -224,6 +354,7 @@ export const Leaderboard: React.FC = () => {
       startDate,
       endDate,
       agentDictionary,
+      agentDictionaryByMonth,
     );
 
     // Prepare Agent List
@@ -422,7 +553,7 @@ export const Leaderboard: React.FC = () => {
     aList.sort((a, b) => b.score - a.score);
     tList.sort((a, b) => b.score - a.score);
 
-    return { agentRows: aList, tlRows: tList };
+    return { agentRows: aList, tlRows: tList, rawData };
   }, [
     hasData,
     productivityData,
@@ -431,8 +562,123 @@ export const Leaderboard: React.FC = () => {
     scheduleData,
     qaData,
     agentDictionary,
+    agentDictionaryByMonth,
     startDate,
     endDate,
+  ]);
+
+  const comparisonEntities = useMemo(() => {
+    if (compareKind === "agent") {
+      return rawData
+        .filter((agent) => !isAgentInactive(agent, endDate))
+        .map((agent) => ({
+          id: agent.csId,
+          label: agent.name || agent.csId,
+          subtitle: agent.teamLeader || agent.csId,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    }
+
+    const teamLeaders = new Set<string>();
+    rawData
+      .filter((agent) => !isAgentInactive(agent, endDate))
+      .forEach((agent) => {
+        if (agent.teamLeader.trim() !== "") teamLeaders.add(agent.teamLeader);
+      });
+
+    return Array.from(teamLeaders)
+      .sort((a, b) => a.localeCompare(b))
+      .map((teamLeader) => ({
+        id: teamLeader,
+        label: teamLeader,
+        subtitle: "Team Leader",
+      }));
+  }, [compareKind, endDate, rawData]);
+
+  React.useEffect(() => {
+    if (comparisonEntities.length === 0) {
+      setComparePrimary("");
+      setCompareSecondary("");
+      return;
+    }
+
+    setComparePrimary((current) =>
+      comparisonEntities.some((entity) => entity.id === current)
+        ? current
+        : comparisonEntities[0].id,
+    );
+    setCompareSecondary((current) =>
+      comparisonEntities.some((entity) => entity.id === current)
+        ? current
+        : (comparisonEntities[1] || comparisonEntities[0]).id,
+    );
+  }, [comparisonEntities]);
+
+  const previousComparisonPeriod = useMemo(() => {
+    if (!startDate || !endDate) return { start: "", end: "" };
+    return comparisonMode === "mom"
+      ? getPreviousMonthPeriod(startDate, endDate)
+      : getPreviousPeriod(startDate, endDate);
+  }, [comparisonMode, endDate, startDate]);
+
+  const previousComparisonData = useMemo(() => {
+    if (!hasData || compareSource !== "previous") return [];
+    return processKPIs(
+      productivityData,
+      csatScData,
+      slaData,
+      scheduleData,
+      qaData,
+      previousComparisonPeriod.start,
+      previousComparisonPeriod.end,
+      agentDictionary,
+      agentDictionaryByMonth,
+    );
+  }, [
+    agentDictionary,
+    agentDictionaryByMonth,
+    compareSource,
+    csatScData,
+    endDate,
+    hasData,
+    previousComparisonPeriod.end,
+    previousComparisonPeriod.start,
+    productivityData,
+    qaData,
+    scheduleData,
+    slaData,
+    startDate,
+  ]);
+
+  const primaryComparisonSnapshot = useMemo(() => {
+    if (compareKind === "agent") {
+      return getAgentComparisonSnapshot(
+        rawData.find((agent) => agent.csId === comparePrimary),
+      );
+    }
+    return getTeamLeaderComparisonSnapshot(rawData, comparePrimary, endDate);
+  }, [compareKind, comparePrimary, endDate, rawData]);
+
+  const secondaryComparisonSnapshot = useMemo(() => {
+    const sourceData = compareSource === "previous" ? previousComparisonData : rawData;
+    if (compareKind === "agent") {
+      return getAgentComparisonSnapshot(
+        sourceData.find((agent) => agent.csId === compareSecondary),
+      );
+    }
+    return getTeamLeaderComparisonSnapshot(
+      sourceData,
+      compareSecondary,
+      compareSource === "previous" ? previousComparisonPeriod.end : endDate,
+    );
+  }, [
+    compareKind,
+    compareSecondary,
+    compareSource,
+    endDate,
+    previousComparisonData,
+    previousComparisonPeriod.end,
+    rawData,
   ]);
 
   if (!hasData) {
@@ -521,6 +767,134 @@ export const Leaderboard: React.FC = () => {
           <Users className="w-4 h-4" /> Team Leaders
         </button>
       </div>
+
+      <section className="rounded-lg border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-bold text-text-primary">
+              <ArrowLeftRight className="h-4 w-4 text-primary" />
+              Perbandingan KPI
+            </h3>
+            <p className="mt-0.5 text-[11px] text-text-muted">
+              Bandingkan agent atau Team Leader berdasarkan periode aktif dan pembanding yang dipilih.
+            </p>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1">
+            <button
+              type="button"
+              onClick={() => setCompareSource("active")}
+              className={cn(
+                "rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
+                compareSource === "active"
+                  ? "bg-card text-primary shadow-sm"
+                  : "text-text-muted hover:text-text-primary",
+              )}
+            >
+              Periode aktif
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompareSource("previous")}
+              className={cn(
+                "rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
+                compareSource === "previous"
+                  ? "bg-card text-primary shadow-sm"
+                  : "text-text-muted hover:text-text-primary",
+              )}
+            >
+              {comparisonMode === "mom" ? "Bulan sebelumnya" : "Periode sebelumnya"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[auto_1fr_1fr] lg:items-end">
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1">
+            <button
+              type="button"
+              onClick={() => setCompareKind("agent")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors",
+                compareKind === "agent"
+                  ? "bg-card text-primary shadow-sm"
+                  : "text-text-muted hover:text-text-primary",
+              )}
+            >
+              <User className="h-3.5 w-3.5" /> Agents
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompareKind("tl")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors",
+                compareKind === "tl"
+                  ? "bg-card text-primary shadow-sm"
+                  : "text-text-muted hover:text-text-primary",
+              )}
+            >
+              <Users className="h-3.5 w-3.5" /> Team Leaders
+            </button>
+          </div>
+
+          <label className="block text-[11px] font-semibold text-text-secondary">
+            Objek utama
+            <select
+              value={comparePrimary}
+              onChange={(event) => setComparePrimary(event.target.value)}
+              className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-3 text-xs font-medium text-text-primary outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            >
+              {comparisonEntities.map((entity) => (
+                <option key={entity.id} value={entity.id}>
+                  {entity.label}{compareKind === "agent" ? ` | ${entity.subtitle}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-[11px] font-semibold text-text-secondary">
+            Bandingkan dengan
+            <select
+              value={compareSecondary}
+              onChange={(event) => setCompareSecondary(event.target.value)}
+              className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-3 text-xs font-medium text-text-primary outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            >
+              {comparisonEntities.map((entity) => (
+                <option key={entity.id} value={entity.id}>
+                  {entity.label}{compareKind === "agent" ? ` | ${entity.subtitle}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {primaryComparisonSnapshot && secondaryComparisonSnapshot ? (
+          <>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-[11px]">
+              <div>
+                <span className="font-bold text-text-primary">{primaryComparisonSnapshot.label}</span>
+                <span className="mx-2 text-text-muted">vs</span>
+                <span className="font-bold text-text-primary">{secondaryComparisonSnapshot.label}</span>
+              </div>
+              <span className="text-text-muted">
+                {compareSource === "previous"
+                  ? `${comparisonMode === "mom" ? "Bulan" : "Periode"} sebelumnya: ${previousComparisonPeriod.start} s/d ${previousComparisonPeriod.end}`
+                  : "Keduanya dari periode aktif"}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+              <ComparisonMetric label="Final Score" primary={primaryComparisonSnapshot.score} secondary={secondaryComparisonSnapshot.score} />
+              <ComparisonMetric label="QA" primary={primaryComparisonSnapshot.qa} secondary={secondaryComparisonSnapshot.qa} suffix="%" />
+              <ComparisonMetric label="Productivity" primary={primaryComparisonSnapshot.productivity} secondary={secondaryComparisonSnapshot.productivity} suffix="%" />
+              <ComparisonMetric label="CSAT" primary={primaryComparisonSnapshot.csat} secondary={secondaryComparisonSnapshot.csat} suffix="%" />
+              <ComparisonMetric label="Total Duty" primary={primaryComparisonSnapshot.duty} secondary={secondaryComparisonSnapshot.duty} />
+              <ComparisonMetric label="Total Chat" primary={primaryComparisonSnapshot.chat} secondary={secondaryComparisonSnapshot.chat} />
+            </div>
+          </>
+        ) : (
+          <div className="mt-4 rounded-lg border border-dashed border-border bg-surface-muted p-4 text-center text-xs text-text-muted">
+            Data pembanding belum tersedia untuk pilihan ini pada periode tersebut.
+          </div>
+        )}
+      </section>
 
       <div className="flex flex-col gap-4">
       <div className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">

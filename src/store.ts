@@ -65,6 +65,7 @@ export interface AppState {
   selectedTL: string;
   selectedGlobalAgent: string;
   agentDictionary: Record<string, { name: string; bpo: string; teamLeader: string }>;
+  agentDictionaryByMonth: Record<string, Record<string, { name: string; bpo: string; teamLeader: string }>>;
   isComparisonEnabled: boolean;
   comparisonMode: 'wow' | 'mom';
 
@@ -119,6 +120,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedTL: 'All TL',
   selectedGlobalAgent: 'All Agents',
   agentDictionary: {},
+  agentDictionaryByMonth: {},
   isComparisonEnabled: false,
   comparisonMode: 'wow',
   fileValidations: {},
@@ -169,7 +171,7 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
       });
-      dictUpdates = { agentDictionary: dict };
+      dictUpdates = { agentDictionary: dict, agentDictionaryByMonth: { legacy: dict } };
     }
 
     const dataKey = key.replace('File', 'Data');
@@ -221,6 +223,7 @@ export const useStore = create<AppState>((set, get) => ({
       csidData: [],
       qaData: [],
       agentDictionary: {},
+      agentDictionaryByMonth: {},
       fileValidations: {},
       fileNames: {},
       activeMonthRowCounts: null,
@@ -313,6 +316,7 @@ export const useStore = create<AppState>((set, get) => ({
           }
         });
         fileData.agentDictionary = dict;
+        fileData.agentDictionaryByMonth = { legacy: dict };
       }
 
       set({ ...fileData, persistedKeys: keys, isHydrating: false });
@@ -418,6 +422,12 @@ export const useStore = create<AppState>((set, get) => ({
       };
 
       const newAgentDict = buildDict(csvCsid.data);
+      const agentDictionaryByMonth = historyMonthKeys.reduce((result, monthKey, index) => {
+        result[monthKey] = buildDict(
+          sheetDataToParseResult(historicalSheets[index].csid).data,
+        );
+        return result;
+      }, {} as Record<string, Record<string, { name: string; bpo: string; teamLeader: string }>>);
       
       set({
         // We set dummy files so the UI knows data is "present"
@@ -435,7 +445,8 @@ export const useStore = create<AppState>((set, get) => ({
         scheduleData: csvSchedule.data,
         qaData: csvQa.data,
 
-        agentDictionary: newAgentDict,
+        agentDictionary: agentDictionaryByMonth[selectedMonth] || newAgentDict,
+        agentDictionaryByMonth,
         activeMonthRowCounts: currentMonthRows,
         lastSyncTime: new Date(),
         isFetchingSheets: false,
