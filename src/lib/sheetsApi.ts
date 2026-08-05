@@ -2,7 +2,11 @@ import { normalizeDateStr } from './dataProcessor';
 
 // Config (dari env variables)
 const API_KEY = import.meta.env.VITE_SHEETS_API_KEY;
-const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
+const DEFAULT_SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
+// Spreadsheet baru untuk periode Agustus-Oktober 2026.
+// Env variable tetap bisa dipakai jika ID-nya nanti dipindahkan atau diganti.
+const AUG_OCT_2026_SPREADSHEET_ID =
+  import.meta.env.VITE_SPREADSHEET_ID_AUG_OCT_2026 || '156IyfTTE77MPbCUWoHS741M_VJoMzyLr6Tr-498Zmok';
 const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
@@ -49,9 +53,10 @@ function buildSheetFetchError(sheetName: string, status: number, statusText: str
 // Fetch single sheet
 export async function fetchSheet(
   sheetName: string,
-  range: string = 'A:AZ'
+  range: string = 'A:AZ',
+  spreadsheetId: string = DEFAULT_SPREADSHEET_ID
 ): Promise<SheetData> {
-  const url = `${BASE_URL}/${SPREADSHEET_ID}/values/${encodeURIComponent(sheetName)}!${range}?key=${API_KEY}`;
+  const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!${range}?key=${API_KEY}`;
 
   for (let attempt = 0; attempt < 4; attempt++) {
     const response = await fetch(url);
@@ -210,8 +215,17 @@ export function getSheetConfigForMonth(monthKey: string): SheetConfig {
   };
 }
 
+export function getSpreadsheetIdForMonth(monthKey: string): string {
+  if (['AUG_2026', 'SEP_2026', 'OCT_2026'].includes(monthKey)) {
+    return AUG_OCT_2026_SPREADSHEET_ID;
+  }
+
+  return DEFAULT_SPREADSHEET_ID;
+}
+
 export async function fetchAllSheets(
-  config: SheetConfig = DEFAULT_CONFIG
+  config: SheetConfig = DEFAULT_CONFIG,
+  spreadsheetId: string = DEFAULT_SPREADSHEET_ID
 ): Promise<AllSheetsData> {
   const sheetEntries = [
     ['csid', config.csidSheetName],
@@ -227,7 +241,7 @@ export async function fetchAllSheets(
     params.append('ranges', buildRange(sheetName));
   });
 
-  const url = `${BASE_URL}/${SPREADSHEET_ID}/values:batchGet?${params.toString()}`;
+  const url = `${BASE_URL}/${spreadsheetId}/values:batchGet?${params.toString()}`;
 
   for (let attempt = 0; attempt < 4; attempt++) {
     const response = await fetch(url);

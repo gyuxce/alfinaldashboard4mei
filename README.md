@@ -25,6 +25,8 @@ Untuk mode Google Sheets, buat file `.env.local`:
 ```env
 VITE_SHEETS_API_KEY=your_google_sheets_api_key
 VITE_SPREADSHEET_ID=your_spreadsheet_id
+# Optional: override the Spreadsheet ID for the Aug-Oct 2026 archive
+VITE_SPREADSHEET_ID_AUG_OCT_2026=your_aug_oct_2026_spreadsheet_id
 ```
 
 Nama tab default yang dibaca:
@@ -57,6 +59,8 @@ Untuk data bulanan, biarkan tab Mei tetap memakai env di atas. Mulai Juni 2026, 
 - `QA_JUN_2026`
 
 Ganti suffix bulan untuk bulan berikutnya, misalnya `JUL_2026`, `AUG_2026`, dan seterusnya. Pilihan bulan di File Center dibuat otomatis sampai beberapa tahun ke depan, jadi tidak perlu update code hanya untuk menambah tahun baru.
+
+Untuk periode Agustus-Oktober 2026, aplikasi membaca `AUG_2026`, `SEP_2026`, dan `OCT_2026` dari Spreadsheet terpisah. Jika `VITE_SPREADSHEET_ID_AUG_OCT_2026` tidak diisi, aplikasi memakai Spreadsheet ID bawaan untuk link periode tersebut.
 
 ## Scripts
 

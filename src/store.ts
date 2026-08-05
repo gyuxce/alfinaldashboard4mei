@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, getCurrentSheetMonthKey, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
+import { fetchAllSheets, getCurrentSheetMonthKey, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
 
 function formatLocalDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -336,7 +336,10 @@ export const useStore = create<AppState>((set, get) => ({
       const selectedMonth = get().selectedSheetMonth;
       const sheetConfig = getSheetConfigForMonth(selectedMonth);
       const monthOption = getSheetMonthOption(selectedMonth);
-      const currentMonthData = await fetchAllSheets(sheetConfig);
+      const currentMonthData = await fetchAllSheets(
+        sheetConfig,
+        getSpreadsheetIdForMonth(selectedMonth),
+      );
       const currentMonthRows = {
         csidData: countDataRows(sheetDataToParseResult(currentMonthData.csid).data),
         productivityData: countDataRows(sheetDataToParseResult(currentMonthData.productivity).data),
@@ -356,7 +359,10 @@ export const useStore = create<AppState>((set, get) => ({
         historyMonthKeys.map(monthKey =>
           monthKey === selectedMonth
             ? Promise.resolve(currentMonthData)
-            : fetchAllSheets(getSheetConfigForMonth(monthKey)),
+            : fetchAllSheets(
+                getSheetConfigForMonth(monthKey),
+                getSpreadsheetIdForMonth(monthKey),
+              ),
         ),
       );
       const allData = historicalSheets.reduce(
