@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort } from '../../lib/utils';
-import { Search, Star } from 'lucide-react';
+import { Search, Star, Users, TrendingDown, CalendarDays } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
@@ -74,6 +74,31 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
+  const highlightStats = useMemo(() => {
+    const aggregate = getOfficialCsatAggregate(tableData);
+    const lowestAgent = [...tableData]
+      .filter(agent => agent.csatAsli !== null)
+      .sort((a, b) => (a.csatAsli || 0) - (b.csatAsli || 0))[0];
+
+    const dailyMap = new Map<string, { sum: number; count: number }>();
+    tableData.forEach(agent => {
+      agent.dailyHistory?.csat?.forEach(entry => {
+        const count = entry.count || 1;
+        const current = dailyMap.get(entry.date) || { sum: 0, count: 0 };
+        dailyMap.set(entry.date, {
+          sum: current.sum + (entry.sum ?? entry.value * count),
+          count: current.count + count,
+        });
+      });
+    });
+
+    const lowestDay = Array.from(dailyMap.entries())
+      .map(([date, stats]) => ({ date, score: stats.count > 0 ? stats.sum / stats.count : 0 }))
+      .sort((a, b) => a.score - b.score)[0];
+
+    return { aggregate, lowestAgent, lowestDay };
+  }, [tableData]);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
@@ -94,6 +119,53 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                 />
              </div>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Skor CSAT</span>
+            <Star className="h-4 w-4 text-warning" />
+          </div>
+          <div className="mt-2 text-2xl font-black text-text-primary">
+            {highlightStats.aggregate.score !== null ? `${formatNum(highlightStats.aggregate.score, 2)} / 5` : '-'}
+          </div>
+          <p className="mt-1 text-[11px] text-text-muted">Target 3.75</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Responden</span>
+            <Users className="h-4 w-4 text-primary" />
+          </div>
+          <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.aggregate.respondents, 0)}</div>
+          <p className="mt-1 text-[11px] text-text-muted">Pada periode terpilih</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Hari Terendah</span>
+            <CalendarDays className="h-4 w-4 text-danger" />
+          </div>
+          <div className="mt-2 truncate text-lg font-black text-text-primary" title={highlightStats.lowestDay?.date || '-'}>
+            {highlightStats.lowestDay?.date || '-'}
+          </div>
+          <p className="mt-1 text-[11px] text-text-muted">
+            {highlightStats.lowestDay ? `${formatNum(highlightStats.lowestDay.score, 2)} / 5` : 'Belum ada data'}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Skor Terendah</span>
+            <TrendingDown className="h-4 w-4 text-danger" />
+          </div>
+          <div className="mt-2 truncate text-lg font-black text-text-primary" title={highlightStats.lowestAgent?.name || '-'}>
+            {highlightStats.lowestAgent?.name || '-'}
+          </div>
+          <p className="mt-1 text-[11px] text-text-muted">
+            {highlightStats.lowestAgent?.csatAsli !== null && highlightStats.lowestAgent?.csatAsli !== undefined
+              ? `${formatNum(highlightStats.lowestAgent.csatAsli, 2)} / 5`
+              : 'Belum ada data'}
+          </p>
         </div>
       </div>
 

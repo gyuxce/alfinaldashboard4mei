@@ -211,6 +211,29 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return sortable;
   }, [defectData, defectSortConfig]);
 
+  const highlightStats = useMemo(() => {
+    const totalEvaluations = tableData.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
+    const totalMistakes = defectData.reduce((sum, agent) => sum + agent.totalDefect, 0);
+    const categoryCounts: Record<string, number> = {};
+
+    defectData.forEach(agent => {
+      agent.defects.forEach(defect => {
+        const category = defect.category || 'Tidak ada kategori';
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      });
+    });
+
+    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      totalEvaluations,
+      totalMistakes,
+      mistakeRate: totalEvaluations > 0 ? (totalMistakes / totalEvaluations) * 100 : 0,
+      topCategory: topCategory ? topCategory[0] : '-',
+      topCategoryCount: topCategory ? topCategory[1] : 0,
+    };
+  }, [tableData, defectData]);
+
   return (
     <div className="flex flex-col gap-4 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
@@ -256,6 +279,43 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Evaluasi</span>
+            <BarChart2 className="h-4 w-4 text-primary" />
+          </div>
+          <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.totalEvaluations, 0)}</div>
+          <p className="mt-1 text-[11px] text-text-muted">QA pada periode terpilih</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Mistake</span>
+            <AlertCircle className="h-4 w-4 text-danger" />
+          </div>
+          <div className="mt-2 text-2xl font-black text-danger">{formatNum(highlightStats.totalMistakes, 0)}</div>
+          <p className="mt-1 text-[11px] text-text-muted">Temuan dari seluruh evaluasi</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Persentase Mistake</span>
+            <AlertCircle className="h-4 w-4 text-warning" />
+          </div>
+          <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.mistakeRate, 1)}%</div>
+          <p className="mt-1 text-[11px] text-text-muted">Dibandingkan total evaluasi</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Top Mistake</span>
+            <AlertCircle className="h-4 w-4 text-danger" />
+          </div>
+          <div className="mt-2 truncate text-lg font-black text-text-primary" title={highlightStats.topCategory}>
+            {highlightStats.topCategory}
+          </div>
+          <p className="mt-1 text-[11px] text-text-muted">{formatNum(highlightStats.topCategoryCount, 0)} temuan</p>
         </div>
       </div>
 

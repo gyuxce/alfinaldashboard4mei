@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
-import { Search, Users, HeartPulse, UserMinus } from 'lucide-react';
+import { Search, Users, HeartPulse, UserMinus, AlertTriangle } from 'lucide-react';
 import { useStore } from '../../store';
 import { EmptyState } from '../ui/EmptyState';
 
@@ -17,12 +17,13 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return activeData.filter(a => a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase()));
   }, [activeData, search]);
 
-  const { avgTeamAttendance, totalSick, totalPullout, totalC } = useMemo(() => {
+  const { avgTeamAttendance, totalSick, totalPullout, totalC, belowTarget } = useMemo(() => {
     let totDuty = 0;
     let totPresence = 0;
     let sick = 0;
     let pullout = 0;
     let leaveDays = 0;
+    let agentsBelowTarget = 0;
     
     activeData.forEach(a => {
        totDuty += a.attendanceDuty;
@@ -30,10 +31,11 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
        sick += a.attendanceS;
        pullout += a.attendancePullout;
        leaveDays += a.attendanceC;
+       if (a.attendanceDuty > 0 && a.attendanceScore < 95) agentsBelowTarget += 1;
     });
     
     const avg = totDuty > 0 ? Math.min(100, (totPresence / totDuty) * 100) : 0;
-    return { avgTeamAttendance: avg, totalSick: sick, totalPullout: pullout, totalC: leaveDays };
+    return { avgTeamAttendance: avg, totalSick: sick, totalPullout: pullout, totalC: leaveDays, belowTarget: agentsBelowTarget };
   }, [activeData]);
 
   return (
@@ -56,7 +58,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       </div>
       
       {/* WIDGETS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
                <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Avg Team Attendance</div>
@@ -65,6 +67,16 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                </div>
             </div>
             <div className="text-2xl font-bold tracking-tight text-primary z-10">{formatNum(avgTeamAttendance, 1)}%</div>
+         </div>
+         <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
+            <div className="flex justify-between items-start mb-2">
+               <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Di Bawah Target</div>
+               <div className="w-7 h-7 rounded-full bg-danger-soft flex items-center justify-center z-10 shrink-0">
+                 <AlertTriangle className="w-3.5 h-3.5 text-danger" />
+               </div>
+            </div>
+            <div className="text-2xl font-bold tracking-tight text-danger z-10">{formatNum(belowTarget, 0)}</div>
+            <p className="mt-1 text-[10px] text-text-muted">Target attendance 95%</p>
          </div>
          <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
