@@ -32,18 +32,16 @@ interface IncentiveRow {
 interface TeamLeaderIncentiveRow {
   teamLeader: string;
   agentCount: number;
-  eligibleCount: number;
   incompleteCount: number;
-  averageQa: number | null;
-  averageCsat: number | null;
-  averageProductivity: number | null;
-  averageScore: number | null;
-  tier1Count: number;
-  tier2Count: number;
-  tier3Count: number;
-  baseIncentive: number;
+  finalQaPct: number | null;
+  finalCsatPct: number | null;
+  finalProductivityPct: number | null;
+  finalScore: number | null;
+  tier: string;
+  baseIncentive: number | null;
   productivityBonus: number;
-  totalIncentive: number;
+  totalIncentive: number | null;
+  status: IncentiveStatus;
 }
 
 const formatCurrency = (value: number | null) => {
@@ -301,35 +299,69 @@ export const IncentiveSimulation: React.FC = () => {
       grouped.set(teamLeader, current);
     });
 
-    const average = (values: Array<number | null>) => {
-      const completeValues = values.filter((value): value is number => value !== null);
-      return completeValues.length > 0
-        ? completeValues.reduce((sum, value) => sum + value, 0) / completeValues.length
-        : null;
-    };
-
     return Array.from(grouped.entries())
       .map(([teamLeader, agentRows]): TeamLeaderIncentiveRow => {
-        const eligibleRows = agentRows.filter((row) => row.status === "eligible");
-        const completeRows = agentRows.filter((row) => row.status !== "incomplete");
+        const teamAgents = filteredAgents.filter((agent) => (agent.teamLeader || "-") === teamLeader);
+        const qaCount = teamAgents.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
+        const qaSum = teamAgents.reduce((sum, agent) => sum + agent.qaScoreSum, 0);
+        const csatRespondents = teamAgents.reduce((sum, agent) => sum + agent.csatRespondents, 0);
+        const csatWeightedPct = teamAgents.reduce((sum, agent) => {
+          const csatPct = getCsatPercent(agent);
+          return sum + (csatPct === null ? 0 : csatPct * agent.csatRespondents);
+        }, 0);
+        const totalDuty = teamAgents.reduce((sum, agent) => sum + agent.manDays, 0);
+        const totalChat = teamAgents.reduce((sum, agent) => sum + agent.productivityTotal, 0);
+        const finalQaPct = qaCount > 0 ? qaSum / qaCount : null;
+        const finalCsatPct = csatRespondents > 0 ? csatWeightedPct / csatRespondents : null;
+        const productivityTarget = totalDuty > 0 ? totalDuty * DAILY_LIVECHAT_TARGET : null;
+        const finalProductivityPct = productivityTarget !== null
+          ? (totalChat / productivityTarget) * 100
+          : null;
+        const hasCompleteData = finalQaPct !== null && finalCsatPct !== null && finalProductivityPct !== null;
+        const incompleteCount = agentRows.filter((row) => row.status === "incomplete").length;
+
+        if (!hasCompleteData) {
+          return {
+            teamLeader,
+            agentCount: agentRows.length,
+            incompleteCount,
+            finalQaPct,
+            finalCsatPct,
+            finalProductivityPct,
+            finalScore: null,
+            tier: "-",
+            baseIncentive: null,
+            productivityBonus: 0,
+            totalIncentive: null,
+            status: "incomplete",
+          };
+        }
+
+        const finalScore = getQcPoints(finalQaPct)
+          + (finalCsatPct / 100) * 25
+          + (Math.min(finalProductivityPct, 100) / 100) * 20;
+        const tier = getTier(finalScore);
+        const isEligible = tier.label !== "-";
+        const productivityBonus = isEligible && productivityTarget !== null
+          ? Math.max(0, totalChat - productivityTarget) / 100 * LIVECHAT_PRODUCTIVITY_BONUS_PER_100
+          : 0;
+
         return {
           teamLeader,
           agentCount: agentRows.length,
-          eligibleCount: eligibleRows.length,
-          incompleteCount: agentRows.filter((row) => row.status === "incomplete").length,
-          averageQa: average(completeRows.map((row) => row.qaPct)),
-          averageCsat: average(completeRows.map((row) => row.csatPct)),
-          averageProductivity: average(completeRows.map((row) => row.productivityPct)),
-          averageScore: average(completeRows.map((row) => row.totalScore)),
-          tier1Count: eligibleRows.filter((row) => row.tier === "T1").length,
-          tier2Count: eligibleRows.filter((row) => row.tier === "T2").length,
-          tier3Count: eligibleRows.filter((row) => row.tier === "T3").length,
-          baseIncentive: eligibleRows.reduce((sum, row) => sum + (row.baseIncentive || 0), 0),
-          productivityBonus: eligibleRows.reduce((sum, row) => sum + (row.productivityBonus || 0), 0),
-          totalIncentive: eligibleRows.reduce((sum, row) => sum + (row.totalIncentive || 0), 0),
+          incompleteCount,
+          finalQaPct,
+          finalCsatPct,
+          finalProductivityPct,
+          finalScore,
+          tier: tier.label,
+          baseIncentive: tier.incentive,
+          productivityBonus,
+          totalIncentive: isEligible ? tier.incentive + productivityBonus : 0,
+          status: isEligible ? "eligible" : "ineligible",
         };
       })
-      .sort((a, b) => (b.averageScore || -1) - (a.averageScore || -1));
+      .sort((a, b) => (b.finalScore || -1) - (a.finalScore || -1));
   }, [filteredAgents]);
 
   const eligibleRows = rows.filter((row) => row.status === "eligible");
@@ -341,10 +373,10 @@ export const IncentiveSimulation: React.FC = () => {
   const hasData = productivityData.length > 0 || csatScData.length > 0 || qaData.length > 0 || scheduleData.length > 0;
   const teamLeaderAgentCount = teamLeaderRows.reduce((sum, row) => sum + row.agentCount, 0);
   const teamLeaderIneligibleCount = teamLeaderRows.reduce(
-    (sum, row) => sum + row.agentCount - row.eligibleCount - row.incompleteCount,
+    (sum, row) => sum + (row.status === "ineligible" ? 1 : 0),
     0,
   );
-  const teamLeaderTotalIncentive = teamLeaderRows.reduce((sum, row) => sum + row.totalIncentive, 0);
+  const teamLeaderTotalIncentive = teamLeaderRows.reduce((sum, row) => sum + (row.totalIncentive || 0), 0);
   const periodLabel = new Intl.DateTimeFormat("id-ID", {
     month: "long",
     year: "numeric",
@@ -414,7 +446,7 @@ export const IncentiveSimulation: React.FC = () => {
                 <SummaryCard label="TL disimulasikan" value={teamLeaderRows.length} detail="Mengikuti filter global" />
                 <SummaryCard label="Total agent" value={teamLeaderAgentCount} detail="Agent di bawah TL" />
                 <SummaryCard label="Tidak eligible" value={teamLeaderIneligibleCount} detail="Skor total di bawah 80" tone="warning" />
-                <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Total tier + bonus tim" tone="success" />
+                <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Tier TL + bonus produktivitas" tone="success" />
               </>
             )}
           </div>
@@ -428,7 +460,7 @@ export const IncentiveSimulation: React.FC = () => {
                 <p className="mt-0.5 text-[11px] text-text-muted">
                   {viewMode === "agent"
                     ? "Nilai produktivitas di atas target menghasilkan bonus tambahan."
-                    : "Ringkasan rata-rata KPI dan total estimasi insentif agent di bawah setiap TL."}
+                    : "Final KPI TL menentukan satu tier dan satu estimasi insentif untuk setiap TL."}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
@@ -529,9 +561,9 @@ export const IncentiveSimulation: React.FC = () => {
                 <thead className="sticky top-0 z-20 bg-primary text-white">
                   <tr>
                     {[
-                      "#", "Team Leader", "Agents", "Avg QA", "Avg CSAT", "Avg Prod",
-                      "Avg Score", "T1", "T2", "T3", "Data Belum Lengkap", "Insentif Tier",
-                      "Bonus Prod", "Total Estimasi",
+                      "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
+                      "Final KPI", "Tier TL", "Data Belum Lengkap", "Insentif TL", "Bonus Prod",
+                      "Total Estimasi", "Status",
                     ].map((label) => (
                       <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
                         {label}
@@ -545,22 +577,25 @@ export const IncentiveSimulation: React.FC = () => {
                       <td className="px-2 py-2 font-semibold text-text-muted">{index + 1}</td>
                       <td className="px-2 py-2 font-bold text-text-primary">{row.teamLeader}</td>
                       <td className="px-2 py-2 text-text-secondary">{row.agentCount}</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.averageQa, 2)}%</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.averageCsat, 2)}%</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.averageProductivity, 1)}%</td>
-                      <td className="px-2 py-2 font-bold text-text-primary">{formatNum(row.averageScore, 2)}</td>
-                      <td className="px-2 py-2 font-semibold text-primary">{row.tier1Count}</td>
-                      <td className="px-2 py-2 font-semibold text-primary">{row.tier2Count}</td>
-                      <td className="px-2 py-2 font-semibold text-primary">{row.tier3Count}</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalQaPct, 2)}%</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalCsatPct, 2)}%</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalProductivityPct, 1)}%</td>
+                      <td className="px-2 py-2 font-bold text-text-primary">{formatNum(row.finalScore, 2)}</td>
+                      <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
                       <td className="px-2 py-2 font-semibold text-warning-text">{row.incompleteCount}</td>
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
                       <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.productivityBonus)}</td>
                       <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
+                      <td className="px-2 py-2">
+                        <span className={cn("inline-flex rounded-full px-2 py-1 text-[10px] font-bold", statusClass[row.status])}>
+                          {statusLabel[row.status]}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                   {teamLeaderRows.length === 0 && (
                     <tr>
-                      <td colSpan={14} className="p-8 text-center text-xs text-text-muted">
+                      <td colSpan={13} className="p-8 text-center text-xs text-text-muted">
                         Tidak ada Team Leader pada filter yang dipilih.
                       </td>
                     </tr>
