@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Calculator, CheckCircle2, CircleAlert, FileText, Info } from "lucide-react";
+import { Calculator, CheckCircle2, CircleAlert, FileText, Info, User, Users } from "lucide-react";
 import { useStore } from "../../store";
 import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
@@ -27,6 +27,23 @@ interface IncentiveRow {
   productivityBonus: number | null;
   totalIncentive: number | null;
   status: IncentiveStatus;
+}
+
+interface TeamLeaderIncentiveRow {
+  teamLeader: string;
+  agentCount: number;
+  eligibleCount: number;
+  incompleteCount: number;
+  averageQa: number | null;
+  averageCsat: number | null;
+  averageProductivity: number | null;
+  averageScore: number | null;
+  tier1Count: number;
+  tier2Count: number;
+  tier3Count: number;
+  baseIncentive: number;
+  productivityBonus: number;
+  totalIncentive: number;
 }
 
 const formatCurrency = (value: number | null) => {
@@ -190,6 +207,7 @@ const SummaryCard = ({
 );
 
 export const IncentiveSimulation: React.FC = () => {
+  const [viewMode, setViewMode] = React.useState<"agent" | "tl">("agent");
   const {
     productivityData,
     csatScData,
@@ -235,7 +253,7 @@ export const IncentiveSimulation: React.FC = () => {
     ],
   );
 
-  const rows = useMemo(() => {
+  const filteredAgents = useMemo(() => {
     let filtered = rawData.filter(
       (agent) => !isInactiveAgent(agent, simulationPeriod.end),
     );
@@ -256,16 +274,8 @@ export const IncentiveSimulation: React.FC = () => {
       );
     }
 
-    return filtered
-      .map(buildIncentiveRow)
-      .sort((a, b) => {
-        if (a.totalScore === null && b.totalScore === null) return a.name.localeCompare(b.name);
-        if (a.totalScore === null) return 1;
-        if (b.totalScore === null) return -1;
-        return b.totalScore - a.totalScore;
-      });
+    return filtered;
   }, [
-    endDate,
     rawData,
     selectedBpo,
     selectedGlobalAgent,
@@ -273,14 +283,68 @@ export const IncentiveSimulation: React.FC = () => {
     simulationPeriod.end,
   ]);
 
-  const completeRows = rows.filter((row) => row.status !== "incomplete");
+  const rows = useMemo(() => filteredAgents
+      .map(buildIncentiveRow)
+      .sort((a, b) => {
+        if (a.totalScore === null && b.totalScore === null) return a.name.localeCompare(b.name);
+        if (a.totalScore === null) return 1;
+        if (b.totalScore === null) return -1;
+        return b.totalScore - a.totalScore;
+      }), [filteredAgents]);
+
+  const teamLeaderRows = useMemo(() => {
+    const grouped = new Map<string, IncentiveRow[]>();
+    filteredAgents.forEach((agent) => {
+      const teamLeader = agent.teamLeader || "-";
+      const current = grouped.get(teamLeader) || [];
+      current.push(buildIncentiveRow(agent));
+      grouped.set(teamLeader, current);
+    });
+
+    const average = (values: Array<number | null>) => {
+      const completeValues = values.filter((value): value is number => value !== null);
+      return completeValues.length > 0
+        ? completeValues.reduce((sum, value) => sum + value, 0) / completeValues.length
+        : null;
+    };
+
+    return Array.from(grouped.entries())
+      .map(([teamLeader, agentRows]): TeamLeaderIncentiveRow => {
+        const eligibleRows = agentRows.filter((row) => row.status === "eligible");
+        const completeRows = agentRows.filter((row) => row.status !== "incomplete");
+        return {
+          teamLeader,
+          agentCount: agentRows.length,
+          eligibleCount: eligibleRows.length,
+          incompleteCount: agentRows.filter((row) => row.status === "incomplete").length,
+          averageQa: average(completeRows.map((row) => row.qaPct)),
+          averageCsat: average(completeRows.map((row) => row.csatPct)),
+          averageProductivity: average(completeRows.map((row) => row.productivityPct)),
+          averageScore: average(completeRows.map((row) => row.totalScore)),
+          tier1Count: eligibleRows.filter((row) => row.tier === "T1").length,
+          tier2Count: eligibleRows.filter((row) => row.tier === "T2").length,
+          tier3Count: eligibleRows.filter((row) => row.tier === "T3").length,
+          baseIncentive: eligibleRows.reduce((sum, row) => sum + (row.baseIncentive || 0), 0),
+          productivityBonus: eligibleRows.reduce((sum, row) => sum + (row.productivityBonus || 0), 0),
+          totalIncentive: eligibleRows.reduce((sum, row) => sum + (row.totalIncentive || 0), 0),
+        };
+      })
+      .sort((a, b) => (b.averageScore || -1) - (a.averageScore || -1));
+  }, [filteredAgents]);
+
   const eligibleRows = rows.filter((row) => row.status === "eligible");
-  const incompleteRows = rows.filter((row) => row.status === "incomplete");
+  const ineligibleRows = rows.filter((row) => row.status === "ineligible");
   const totalIncentive = eligibleRows.reduce(
     (sum, row) => sum + (row.totalIncentive || 0),
     0,
   );
   const hasData = productivityData.length > 0 || csatScData.length > 0 || qaData.length > 0 || scheduleData.length > 0;
+  const teamLeaderAgentCount = teamLeaderRows.reduce((sum, row) => sum + row.agentCount, 0);
+  const teamLeaderIneligibleCount = teamLeaderRows.reduce(
+    (sum, row) => sum + row.agentCount - row.eligibleCount - row.incompleteCount,
+    0,
+  );
+  const teamLeaderTotalIncentive = teamLeaderRows.reduce((sum, row) => sum + row.totalIncentive, 0);
   const periodLabel = new Intl.DateTimeFormat("id-ID", {
     month: "long",
     year: "numeric",
@@ -314,19 +378,57 @@ export const IncentiveSimulation: React.FC = () => {
         </div>
       ) : (
         <>
+          <div className="inline-flex w-max items-center gap-1 rounded-lg bg-surface-muted p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("agent")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors",
+                viewMode === "agent" ? "bg-card text-primary shadow-sm" : "text-text-muted hover:text-text-primary",
+              )}
+            >
+              <User className="h-3.5 w-3.5" /> Agents
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("tl")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors",
+                viewMode === "tl" ? "bg-card text-primary shadow-sm" : "text-text-muted hover:text-text-primary",
+              )}
+            >
+              <Users className="h-3.5 w-3.5" /> Team Leaders
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard label="Agent disimulasikan" value={rows.length} detail="Mengikuti filter global" />
-            <SummaryCard label="Eligible" value={eligibleRows.length} detail="Mendapat tier insentif" tone="success" />
-            <SummaryCard label="Data belum lengkap" value={incompleteRows.length} detail="Tidak dipaksakan menjadi nol" tone="warning" />
-            <SummaryCard label="Total estimasi" value={formatCurrency(totalIncentive)} detail="Tier + bonus produktivitas" tone="success" />
+            {viewMode === "agent" ? (
+              <>
+                <SummaryCard label="Agent disimulasikan" value={rows.length} detail="Mengikuti filter global" />
+                <SummaryCard label="Eligible" value={eligibleRows.length} detail="Mendapat tier insentif" tone="success" />
+                <SummaryCard label="Tidak eligible" value={ineligibleRows.length} detail="Skor total di bawah 80" tone="warning" />
+                <SummaryCard label="Total estimasi" value={formatCurrency(totalIncentive)} detail="Tier + bonus produktivitas" tone="success" />
+              </>
+            ) : (
+              <>
+                <SummaryCard label="TL disimulasikan" value={teamLeaderRows.length} detail="Mengikuti filter global" />
+                <SummaryCard label="Total agent" value={teamLeaderAgentCount} detail="Agent di bawah TL" />
+                <SummaryCard label="Tidak eligible" value={teamLeaderIneligibleCount} detail="Skor total di bawah 80" tone="warning" />
+                <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Total tier + bonus tim" tone="success" />
+              </>
+            )}
           </div>
 
           <section className="rounded-lg border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <div className="flex flex-col gap-2 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 className="text-sm font-bold text-text-primary">Simulasi per Agent</h3>
+                <h3 className="text-sm font-bold text-text-primary">
+                  {viewMode === "agent" ? "Simulasi per Agent" : "Simulasi per Team Leader"}
+                </h3>
                 <p className="mt-0.5 text-[11px] text-text-muted">
-                  Nilai produktivitas di atas target menghasilkan bonus tambahan.
+                  {viewMode === "agent"
+                    ? "Nilai produktivitas di atas target menghasilkan bonus tambahan."
+                    : "Ringkasan rata-rata KPI dan total estimasi insentif agent di bawah setiap TL."}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
@@ -335,8 +437,26 @@ export const IncentiveSimulation: React.FC = () => {
               </div>
             </div>
 
-            <div className="max-h-[calc(100vh-390px)] overflow-auto">
-              <table className="min-w-[1820px] w-full border-collapse text-left text-[11px]">
+            {viewMode === "agent" ? (
+            <div className="max-h-[calc(100vh-350px)] overflow-auto">
+              <table className="min-w-[1240px] w-full table-fixed border-collapse text-left text-[10px]">
+                <colgroup>
+                  <col className="w-[34px]" />
+                  <col className="w-[190px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[64px]" />
+                  <col className="w-[72px]" />
+                  <col className="w-[64px]" />
+                  <col className="w-[72px]" />
+                  <col className="w-[84px]" />
+                  <col className="w-[76px]" />
+                  <col className="w-[72px]" />
+                  <col className="w-[50px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[108px]" />
+                  <col className="w-[112px]" />
+                </colgroup>
                 <thead className="sticky top-0 z-20 bg-primary text-white">
                   <tr>
                     {[
@@ -344,7 +464,7 @@ export const IncentiveSimulation: React.FC = () => {
                       "Produktivitas", "Poin Prod", "Total Score", "Tier", "Insentif Tier",
                       "Bonus Prod", "Total Insentif", "Status",
                     ].map((label) => (
-                      <th key={label} className="border-r border-white/30 px-3 py-2.5 font-bold last:border-r-0">
+                      <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
                         {label}
                       </th>
                     ))}
@@ -353,40 +473,40 @@ export const IncentiveSimulation: React.FC = () => {
                 <tbody>
                   {rows.map((row, index) => (
                     <tr key={row.csId} className="border-b border-border hover:bg-surface-muted">
-                      <td className="px-3 py-2.5 font-semibold text-text-muted">{index + 1}</td>
-                      <td className="px-3 py-2.5">
-                        <p className="font-bold text-text-primary">{row.name}</p>
-                        <p className="mt-0.5 text-[10px] text-text-muted">{row.csId}</p>
+                      <td className="px-2 py-2 font-semibold text-text-muted">{index + 1}</td>
+                      <td className="px-2 py-2">
+                        <p className="truncate font-bold text-text-primary" title={row.name}>{row.name}</p>
+                        <p className="mt-0.5 truncate text-[10px] text-text-muted" title={row.csId}>{row.csId}</p>
                       </td>
-                      <td className="px-3 py-2.5 text-text-secondary">{row.teamLeader}</td>
-                      <td className="px-3 py-2.5 font-semibold text-text-secondary">
+                      <td className="truncate px-2 py-2 text-text-secondary" title={row.teamLeader}>{row.teamLeader}</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">
                         {formatNum(row.qaPct, 2)}%
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-text-secondary">
+                      <td className="px-2 py-2 font-semibold text-text-secondary">
                         {formatNum(row.qaPoints, 2)} / 55
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-text-secondary">
+                      <td className="px-2 py-2 font-semibold text-text-secondary">
                         {formatNum(row.csatPct, 2)}%
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-text-secondary">
+                      <td className="px-2 py-2 font-semibold text-text-secondary">
                         {formatNum(row.csatPoints, 2)} / 25
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-text-secondary">
+                      <td className="px-2 py-2 font-semibold text-text-secondary">
                         {row.productivityActual === null || row.productivityTarget === null
                           ? "-"
-                          : `${formatNum(row.productivityActual, 0)} / ${formatNum(row.productivityTarget, 0)} (${formatNum(row.productivityPct, 1)}%)`}
+                          : `${formatNum(row.productivityActual, 0)} / ${formatNum(row.productivityTarget, 0)}`}
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-text-secondary">
+                      <td className="px-2 py-2 font-semibold text-text-secondary">
                         {formatNum(row.productivityPoints, 2)} / 20
                       </td>
-                      <td className="px-3 py-2.5 font-bold text-text-primary">
+                      <td className="px-2 py-2 font-bold text-text-primary">
                         {formatNum(row.totalScore, 2)}
                       </td>
-                      <td className="px-3 py-2.5 font-bold text-primary">{row.tier}</td>
-                      <td className="px-3 py-2.5 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
-                      <td className="px-3 py-2.5 font-semibold text-success-text">{formatCurrency(row.productivityBonus)}</td>
-                      <td className="px-3 py-2.5 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
+                      <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.productivityBonus)}</td>
+                      <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
+                      <td className="px-2 py-2">
                         <span className={cn("inline-flex rounded-full px-2 py-1 text-[10px] font-bold", statusClass[row.status])}>
                           {statusLabel[row.status]}
                         </span>
@@ -403,6 +523,52 @@ export const IncentiveSimulation: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            ) : (
+            <div className="max-h-[calc(100vh-350px)] overflow-auto">
+              <table className="min-w-[1100px] w-full border-collapse text-left text-[10px]">
+                <thead className="sticky top-0 z-20 bg-primary text-white">
+                  <tr>
+                    {[
+                      "#", "Team Leader", "Agents", "Avg QA", "Avg CSAT", "Avg Prod",
+                      "Avg Score", "T1", "T2", "T3", "Data Belum Lengkap", "Insentif Tier",
+                      "Bonus Prod", "Total Estimasi",
+                    ].map((label) => (
+                      <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamLeaderRows.map((row, index) => (
+                    <tr key={row.teamLeader} className="border-b border-border hover:bg-surface-muted">
+                      <td className="px-2 py-2 font-semibold text-text-muted">{index + 1}</td>
+                      <td className="px-2 py-2 font-bold text-text-primary">{row.teamLeader}</td>
+                      <td className="px-2 py-2 text-text-secondary">{row.agentCount}</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.averageQa, 2)}%</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.averageCsat, 2)}%</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.averageProductivity, 1)}%</td>
+                      <td className="px-2 py-2 font-bold text-text-primary">{formatNum(row.averageScore, 2)}</td>
+                      <td className="px-2 py-2 font-semibold text-primary">{row.tier1Count}</td>
+                      <td className="px-2 py-2 font-semibold text-primary">{row.tier2Count}</td>
+                      <td className="px-2 py-2 font-semibold text-primary">{row.tier3Count}</td>
+                      <td className="px-2 py-2 font-semibold text-warning-text">{row.incompleteCount}</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
+                      <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.productivityBonus)}</td>
+                      <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
+                    </tr>
+                  ))}
+                  {teamLeaderRows.length === 0 && (
+                    <tr>
+                      <td colSpan={14} className="p-8 text-center text-xs text-text-muted">
+                        Tidak ada Team Leader pada filter yang dipilih.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            )}
           </section>
 
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
