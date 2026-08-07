@@ -377,11 +377,6 @@ export const IncentiveSimulation: React.FC = () => {
     0,
   );
   const teamLeaderTotalIncentive = teamLeaderRows.reduce((sum, row) => sum + (row.totalIncentive || 0), 0);
-  const periodLabel = new Intl.DateTimeFormat("id-ID", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(`${simulationPeriod.start}T00:00:00`));
-
   return (
     <div className="flex flex-col gap-5 p-2">
       <div>
@@ -393,9 +388,6 @@ export const IncentiveSimulation: React.FC = () => {
           Skema Livechat berdasarkan data periode yang sudah selesai.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
-          <span className="rounded-full border border-primary/20 bg-primary-soft px-2.5 py-1 font-semibold text-primary">
-            Periode simulasi: {periodLabel}
-          </span>
           <span className="rounded-full border border-border bg-surface px-2.5 py-1">
             QC 55% + CSAT 25% + Produktivitas 20%
           </span>
