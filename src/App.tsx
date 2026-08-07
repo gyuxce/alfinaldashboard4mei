@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Calculator,
   Check,
   AlertTriangle
 } from 'lucide-react';
@@ -42,6 +43,7 @@ const SlaWhuMonitor = React.lazy(() => import('./components/sla/SlaWhuMonitor').
 const WhuMonitor = React.lazy(() => import('./components/sla/WhuMonitor').then(module => ({ default: module.WhuMonitor })));
 const QaAgent360 = React.lazy(() => import('./components/qa/QaAgent360').then(module => ({ default: module.QaAgent360 })));
 const Leaderboard = React.lazy(() => import('./components/team/Leaderboard').then(module => ({ default: module.Leaderboard })));
+const IncentiveSimulation = React.lazy(() => import('./components/team/IncentiveSimulation').then(module => ({ default: module.IncentiveSimulation })));
 const ScheduleBoard = React.lazy(() => import('./components/team/ScheduleBoard').then(module => ({ default: module.ScheduleBoard })));
 const AttendanceMonitor = React.lazy(() => import('./components/team/AttendanceMonitor').then(module => ({ default: module.AttendanceMonitor })));
 
@@ -454,6 +456,7 @@ export default function App() {
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+    { id: 'incentive', label: 'Simulasi Insentif', icon: Calculator },
     { id: 'productivity', label: 'Productivity Detail', icon: Activity },
     { id: 'csat_official', label: 'CSAT Official', icon: Star },
     { id: 'csat', label: 'CSAT Room (Surveys)', icon: Star },
@@ -899,6 +902,7 @@ export default function App() {
           <React.Suspense fallback={<TabLoading />}>
             {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'leaderboard' && <Leaderboard />}
+            {activeTab === 'incentive' && <IncentiveSimulation />}
             {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
