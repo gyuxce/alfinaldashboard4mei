@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, parseDateForSort } from '../../lib/utils';
+import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Users, TrendingDown, CalendarDays } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
@@ -258,6 +258,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
   const { startDate, endDate } = useStore();
   const comparisonMode = useStore(state => state.comparisonMode);
+  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('weekly');
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
@@ -325,11 +326,53 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         return {
           date: validDate,
           CSAT: stats.count > 0 ? Number((stats.sum / stats.count).toFixed(2)) : 0,
+          count: stats.count,
           rawDate: date
         };
       })
       .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
   }, [data]);
+
+  const weeklyData = React.useMemo(() => {
+    const weeks = new Map<string, { label: string, startDate: string, sum: number, count: number }>();
+    const getWeekBucket = (date: string) => {
+      const parsedTimestamp = parseDateForSort(date);
+      if (!parsedTimestamp) return { key: date, label: date, startDate: date };
+
+      const start = new Date(parsedTimestamp);
+      const day = start.getDay();
+      start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day));
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const toDateKey = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+      const formatDate = (value: Date) => new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(value);
+      const label = start.getMonth() === end.getMonth()
+        ? `${start.getDate()}-${end.getDate()} ${new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(start)}`
+        : `${formatDate(start)}-${formatDate(end)}`;
+
+      return { key: toDateKey(start), label, startDate: toDateKey(start) };
+    };
+
+    dailyData.forEach(day => {
+      const bucket = getWeekBucket(day.rawDate);
+      if (!weeks.has(bucket.key)) {
+        weeks.set(bucket.key, { label: bucket.label, startDate: bucket.startDate, sum: 0, count: 0 });
+      }
+      const week = weeks.get(bucket.key)!;
+      week.sum += day.CSAT * day.count;
+      week.count += day.count;
+    });
+
+    return Array.from(weeks.values())
+      .map(week => ({
+        date: week.label,
+        CSAT: week.count > 0 ? Number((week.sum / week.count).toFixed(2)) : 0,
+        rawDate: week.startDate,
+      }))
+      .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
+  }, [dailyData]);
+
+  const trendData = trendMode === 'weekly' ? weeklyData : dailyData;
 
   return (
     <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
@@ -355,14 +398,31 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
           </div>
         </div>
 
-        {/* Daily Trend Panel */}
+        {/* Weekly/Daily Trend Panel */}
         <div className="flex flex-col">
-          <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-sm font-bold text-text-primary">
+              {trendMode === 'weekly' ? 'Weekly Average Trend' : 'Daily Trend'} ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})
+            </h3>
+            <div className="inline-flex items-center rounded-lg border border-border bg-surface-muted p-0.5">
+              {(['weekly', 'daily'] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setTrendMode(mode)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors',
+                    trendMode === mode ? 'bg-card text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
+                  )}
+                >
+                  {mode === 'weekly' ? 'Weekly' : 'Daily'}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={trendData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 5]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />

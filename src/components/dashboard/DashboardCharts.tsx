@@ -1,5 +1,5 @@
 import React from "react";
-import { formatNum } from "../../lib/utils";
+import { formatNum, parseDateForSort } from "../../lib/utils";
 import {
   AreaChart,
   Area,
@@ -20,6 +20,67 @@ interface DashboardChartsProps {
 }
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTrend }) => {
+  const [trendMode, setTrendMode] = React.useState<'weekly' | 'daily'>('weekly');
+
+  const weeklyTrend = React.useMemo(() => {
+    const weeks = new Map<string, {
+      label: string,
+      startDate: string,
+      productivity: number,
+      prevProductivity: number,
+      hasPrevious: boolean,
+    }>();
+
+    const getWeekBucket = (date: string) => {
+      const parsedTimestamp = parseDateForSort(date);
+      if (!parsedTimestamp) return { key: date, label: date, startDate: date };
+
+      const start = new Date(parsedTimestamp);
+      const day = start.getDay();
+      start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day));
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const toDateKey = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+      const formatDate = (value: Date) => new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(value);
+      const label = start.getMonth() === end.getMonth()
+        ? `${start.getDate()}-${end.getDate()} ${new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(start)}`
+        : `${formatDate(start)}-${formatDate(end)}`;
+
+      return { key: toDateKey(start), label, startDate: toDateKey(start) };
+    };
+
+    dailyTrend.forEach(item => {
+      const bucket = getWeekBucket(item.date);
+      if (!weeks.has(bucket.key)) {
+        weeks.set(bucket.key, {
+          label: bucket.label,
+          startDate: bucket.startDate,
+          productivity: 0,
+          prevProductivity: 0,
+          hasPrevious: false,
+        });
+      }
+
+      const week = weeks.get(bucket.key)!;
+      week.productivity += item.productivity || 0;
+      if (item.prevProductivity !== null && item.prevProductivity !== undefined) {
+        week.prevProductivity += item.prevProductivity;
+        week.hasPrevious = true;
+      }
+    });
+
+    return Array.from(weeks.values())
+      .map(week => ({
+        date: week.startDate,
+        dateLabel: week.label,
+        productivity: week.productivity,
+        prevProductivity: week.hasPrevious ? week.prevProductivity : null,
+      }))
+      .sort((a, b) => parseDateForSort(a.date) - parseDateForSort(b.date));
+  }, [dailyTrend]);
+
+  const trendData = trendMode === 'weekly' ? weeklyTrend : dailyTrend;
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6 min-w-0">
       {/* KPI Comparison Chart */}
@@ -167,18 +228,33 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
         </div>
       </div>
 
-      {/* Daily Trend Chart */}
+      {/* Weekly/Daily Trend Chart */}
       <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h2 className="text-sm font-bold text-text-primary">
-            Daily Performance Trend <span className="text-text-muted font-medium text-xs ml-1">(Total Productivity)</span>
+            {trendMode === 'weekly' ? 'Weekly' : 'Daily'} Performance Trend <span className="text-text-muted font-medium text-xs ml-1">(Total Productivity)</span>
           </h2>
+          <div className="inline-flex items-center self-start rounded-lg border border-border bg-surface-muted p-0.5 sm:self-auto">
+            {(['weekly', 'daily'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setTrendMode(mode)}
+                className={[
+                  'rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors',
+                  trendMode === mode ? 'bg-card text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
+                ].join(' ')}
+              >
+                {mode === 'weekly' ? 'Weekly' : 'Daily'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="w-full h-[280px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={dailyTrend}
+              data={trendData}
               margin={{ top: 40, right: 30, left: -20, bottom: 0 }}
             >
               <defs>
@@ -257,7 +333,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 animationDuration={500}
                 dot={(props: any) => {
                    const { cx, cy, index } = props;
-                   const isLast = index === dailyTrend.length - 1;
+                   const isLast = index === trendData.length - 1;
                    return (
                       <circle 
                          key={`dot-${index}`}
@@ -272,7 +348,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 }}
                 activeDot={{ r: 6, strokeWidth: 0, fill: "#EF4444" }}
               >
-                {dailyTrend.length <= 14 && (
+                {trendData.length <= 14 && (
                   <LabelList 
                     dataKey="productivity" 
                     position="top" 

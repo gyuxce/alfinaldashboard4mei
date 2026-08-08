@@ -1133,6 +1133,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
   const { startDate, endDate } = useStore();
   const comparisonMode = useStore(state => state.comparisonMode);
+  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('weekly');
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
@@ -1177,6 +1178,35 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
     { name: getWeekLabel(1), 'SC Full': w1.full, 'SC After Takeout': w1.takeout },
     { name: getWeekLabel(0), 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
+
+  const dailyData = React.useMemo(() => {
+    const dates = new Map<string, { goodFull: number, totalFull: number, goodTakeout: number, totalTakeout: number }>();
+    (data || []).forEach(a => {
+      a.dailyHistory?.csatScFull?.forEach(h => {
+        if (!dates.has(h.date)) dates.set(h.date, { goodFull: 0, totalFull: 0, goodTakeout: 0, totalTakeout: 0 });
+        if (h.count > 0) {
+          dates.get(h.date)!.goodFull += h.score;
+          dates.get(h.date)!.totalFull += h.count;
+        }
+      });
+      a.dailyHistory?.csatScFair?.forEach(h => {
+        if (!dates.has(h.date)) dates.set(h.date, { goodFull: 0, totalFull: 0, goodTakeout: 0, totalTakeout: 0 });
+        if (h.count > 0) {
+          dates.get(h.date)!.goodTakeout += h.score;
+          dates.get(h.date)!.totalTakeout += h.count;
+        }
+      });
+    });
+
+    return Array.from(dates.entries())
+      .map(([date, stats]) => ({
+        date: new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(parseDateForSort(date))),
+        'SC Full': stats.totalFull > 0 ? Number(((stats.goodFull / stats.totalFull) * 100).toFixed(2)) : 0,
+        'SC After Takeout': stats.totalTakeout > 0 ? Number(((stats.goodTakeout / stats.totalTakeout) * 100).toFixed(2)) : 0,
+        rawDate: date,
+      }))
+      .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
+  }, [data]);
 
   const weeklyData = React.useMemo(() => {
     const weeks = new Map<string, {
@@ -1260,6 +1290,8 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
       .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
   }, [data]);
 
+  const trendData = trendMode === 'weekly' ? weeklyData : dailyData;
+
   return (
     <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1286,14 +1318,31 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
           </div>
         </div>
 
-        {/* Daily Trend Panel */}
+        {/* Weekly/Daily Trend Panel */}
         <div className="flex flex-col">
-          <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">Weekly Average Trend ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-sm font-bold text-text-primary">
+              {trendMode === 'weekly' ? 'Weekly Average Trend' : 'Daily Trend'} ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})
+            </h3>
+            <div className="inline-flex items-center rounded-lg border border-border bg-surface-muted p-0.5">
+              {(['weekly', 'daily'] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setTrendMode(mode)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors',
+                    trendMode === mode ? 'bg-card text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
+                  )}
+                >
+                  {mode === 'weekly' ? 'Weekly' : 'Daily'}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={trendData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
