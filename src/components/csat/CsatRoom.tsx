@@ -1461,7 +1461,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                   <th className="p-1 font-bold w-6 text-center">#</th>
                   <th className="p-1 font-bold">Category</th>
                   <th className="p-1 font-bold w-8 text-center">Freq</th>
-                  <th className="p-1 font-bold w-12 text-center">CSAT %</th>
+                  <th className="p-1 font-bold w-16 text-center whitespace-nowrap">Good CSAT %</th>
                 </tr>
               </thead>
               <tbody>
