@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AgentKPI, CSATEntry, isCsatTakeoutCategory } from '../../lib/dataProcessor';
+import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useStore } from '../../store';
@@ -8,15 +8,6 @@ import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
 import { CsatDetailModal } from "./CsatDetailModal";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, AreaChart, Area } from 'recharts';
-
-const getDisplayedScoreCount = (agent: AgentKPI, viewMode: 'full' | 'fair') =>
-  (['1', '2', '3', '4', '5'] as const).reduce((total, scoreKey) => {
-    const cases = agent.csatScScoreDistribution?.[scoreKey] || {};
-    return total + Object.entries(cases).reduce((count, [category, value]) => {
-      if (viewMode === 'fair' && isCsatTakeoutCategory(category)) return count;
-      return count + (Number(value) || 0);
-    }, 0);
-  }, 0);
 
 export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
@@ -84,7 +75,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     return data.filter(a => {
       const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
       const matchTL = filterTL ? a.teamLeader === filterTL : true;
-      const count = getDisplayedScoreCount(a, viewMode);
+      const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
       return matchSearch && matchTL && count > 0;
     });
   }, [data, search, filterTL, viewMode]);
@@ -98,60 +89,53 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
-  const categoryDistribution = useMemo(() => {
-    type CategoryScoreRow = {
-      name: string;
-      score1: number;
-      score2: number;
-      score3: number;
-      score4: number;
-      score5: number;
-    };
+  const topCategories = useMemo(() => {
+    const agg: Record<string, number> = {};
+    tableData.forEach(a => {
+       const cats = viewMode === 'full' ? (a.csatScCategoriesFull || {}) : (a.csatScCategoriesFair || {});
+       for (const cat in cats) {
+          if (!agg[cat]) agg[cat] = 0;
+          agg[cat] += cats[cat];
+       }
+    });
+    return Object.entries(agg)
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, 10)
+      .map((entry, idx) => ({ rank: idx+1, name: entry[0], count: entry[1] }));
+  }, [tableData, viewMode]);
 
-    const categoryMap: Record<string, CategoryScoreRow> = {};
-    const scoreKeys = ['1', '2', '3', '4', '5'] as const;
-
-    tableData.forEach(agent => {
-      scoreKeys.forEach(scoreKey => {
-        const cases = agent.csatScScoreDistribution?.[scoreKey] || {};
-        Object.entries(cases).forEach(([rawCategory, rawCount]) => {
-          if (viewMode === 'fair' && isCsatTakeoutCategory(rawCategory)) return;
-          const label = String(rawCategory || '').trim().replace(/\s+/g, ' ');
-          if (!label) return;
-
-          const key = label.toLowerCase();
-          if (!categoryMap[key]) {
-            categoryMap[key] = {
-              name: label,
-              score1: 0,
-              score2: 0,
-              score3: 0,
-              score4: 0,
-              score5: 0,
-            };
-          }
-          categoryMap[key][`score${scoreKey}` as 'score1' | 'score2' | 'score3' | 'score4' | 'score5'] += Number(rawCount) || 0;
-        });
-      });
+  const prevTopCategories = useMemo(() => {
+    const prevTableData = previousData.filter(a => {
+      const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchTL = filterTL ? a.teamLeader === filterTL : true;
+      const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
+      return matchSearch && matchTL && count > 0;
     });
 
-    return Object.values(categoryMap)
-      .map(category => {
-        const badCount = category.score1 + category.score2;
-        const goodCount = category.score4 + category.score5;
-        const totalCount = badCount + category.score3 + goodCount;
-        return {
-          ...category,
-          badCount,
-          goodCount,
-          totalCount,
-          csatPct: totalCount > 0 ? (goodCount / totalCount) * 100 : null,
-        };
-      })
-      .filter(category => category.totalCount > 0)
-      .sort((a, b) => b.badCount - a.badCount || b.totalCount - a.totalCount)
-      .slice(0, 10)
-      .map((category, index) => ({ ...category, rank: index + 1 }));
+    const agg: Record<string, number> = {};
+    prevTableData.forEach(a => {
+       const cats = viewMode === 'full' ? (a.csatScCategoriesFull || {}) : (a.csatScCategoriesFair || {});
+       for (const cat in cats) {
+          if (!agg[cat]) agg[cat] = 0;
+          agg[cat] += cats[cat];
+       }
+    });
+    return agg;
+  }, [previousData, search, filterTL, viewMode]);
+
+  const agentRankings = useMemo(() => {
+    const agents = tableData.map(a => {
+       const count = viewMode === 'full' ? (a.csatScBadScoreFullCount || 0) : (a.csatScBadScoreFairCount || 0);
+       return { name: a.name || a.csId, csId: a.csId, bpo: a.bpo, tl: a.teamLeader, badScoreCount: count };
+    });
+    
+    const critical = [...agents].sort((a, b) => b.badScoreCount - a.badScoreCount).filter(a => a.badScoreCount > 0).slice(0, 10);
+    const stable = [...agents].sort((a, b) => {
+       if (a.badScoreCount === b.badScoreCount) return a.name.localeCompare(b.name);
+       return a.badScoreCount - b.badScoreCount;
+    }).slice(0, 10);
+    
+    return { critical, stable };
   }, [tableData, viewMode]);
 
   const scoreDistribution = useMemo(() => {
@@ -727,8 +711,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-3">
                <div>
-                 <h2 className="text-base font-bold text-text-primary">Category Score Distribution</h2>
-                 <p className="text-xs text-text-muted mt-1 ">Score setiap kategori, termasuk jumlah bad score (1+2) dan good score (4+5)</p>
+                 <h2 className="text-base font-bold text-text-primary">Top Categories (Score 1 & 2)</h2>
+                 <p className="text-xs text-text-muted mt-1 ">Identifies categories and top contributors for bad scores</p>
                </div>
                <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
                  {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
@@ -750,57 +734,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   onAgentClick={handleAgentClick}
                 />
               ) : (
-                <>
                 <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                 <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top 10 Categories by Bad Score</div>
-                 <table className="w-full min-w-[980px] text-left text-[10px]">
-                   <thead className="bg-surface text-text-secondary border-b border-border">
-                     <tr>
-                       <th className="p-2 font-bold w-12 text-center">Rank</th>
-                       <th className="p-2 font-bold">Category</th>
-                       <th className="p-2 font-bold w-16 text-center text-danger">Score 1</th>
-                       <th className="p-2 font-bold w-16 text-center text-orange-500">Score 2</th>
-                       <th className="p-2 font-bold w-16 text-center text-warning">Score 3</th>
-                       <th className="p-2 font-bold w-16 text-center text-success/80">Score 4</th>
-                       <th className="p-2 font-bold w-16 text-center text-success">Score 5</th>
-                       <th className="p-2 font-bold w-20 text-center text-danger">Bad (1+2)</th>
-                       <th className="p-2 font-bold w-20 text-center text-success">Good (4+5)</th>
-                       <th className="p-2 font-bold w-20 text-center">CSAT %</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {categoryDistribution.map(category => {
-                       const isTakeoutCategory = isCsatTakeoutCategory(category.name);
-                       return (
-                         <tr
-                           key={category.name}
-                           className="border-b border-border hover:bg-surface-muted transition-colors cursor-pointer"
-                           onClick={() => handleCategoryClick(category.name, viewMode === 'full' ? 'From Full Data' : 'After Take Out', data)}
-                         >
-                           <td className="p-2 text-center text-text-muted font-medium">{category.rank}</td>
-                           <td className={`p-2 font-medium max-w-[320px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={category.name}>{category.name}</td>
-                           <td className="p-2 text-center font-bold text-danger">{formatNum(category.score1, 0)}</td>
-                           <td className="p-2 text-center font-bold text-orange-500">{formatNum(category.score2, 0)}</td>
-                           <td className="p-2 text-center font-bold text-warning">{formatNum(category.score3, 0)}</td>
-                           <td className="p-2 text-center font-bold text-success/80">{formatNum(category.score4, 0)}</td>
-                           <td className="p-2 text-center font-bold text-success">{formatNum(category.score5, 0)}</td>
-                           <td className="p-2 text-center font-bold text-danger">{formatNum(category.badCount, 0)}</td>
-                           <td className="p-2 text-center font-bold text-success">{formatNum(category.goodCount, 0)}</td>
-                           <td className="p-2 text-center font-bold text-text-secondary">{category.csatPct === null ? '-' : `${formatNum(category.csatPct, 1)}%`}</td>
-                         </tr>
-                       );
-                     })}
-                     {categoryDistribution.length === 0 && (
-                       <tr>
-                         <td colSpan={10} className="p-8 text-center text-text-muted text-sm border-b border-border">
-                           No categories found for the selected criteria.
-                         </td>
-                       </tr>
-                     )}
-                   </tbody>
-                 </table>
-                </div>
-                <div className="hidden">
                  <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top 10 Categories</div>
                 <table className="w-full text-left text-[10px]">
                  <thead className="bg-surface text-text-secondary border-b border-border">
@@ -812,14 +746,14 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    </tr>
                  </thead>
                  <tbody className="">
-                     {([] as any[]).map((cat) => {
+                   {topCategories.map((cat) => {
                       const isTakeoutCategory = [
                           "tidak bisa transaksi namun memiliki limit",
                           "pengajuan limit kredit ditolak",
                           "pertanyaan belum bisa diidentifikasi"
                       ].includes(cat.name.toLowerCase());
                       
-                      const prevCount = 0;
+                      const prevCount = prevTopCategories[cat.name] || 0;
                       const diff = cat.count - prevCount;
                       const isUp = diff > 0;
                       const isDown = diff < 0;
@@ -843,7 +777,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                         </tr>
                       );
                    })}
-                    {false && (
+                   {topCategories.length === 0 && (
                      <tr>
                        <td colSpan={3} className="p-8 text-center text-text-muted text-sm border-b border-border">
                          No categories found for the selected criteria.
@@ -851,15 +785,14 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                      </tr>
                    )}
                  </tbody>
-                </table>
-               </div>
-               </>
-               )}
+               </table>
+              </div>
+              )}
             </div>
           </div>
 
           {/* Agents Panel */}
-          <div className="hidden">
+          <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-3">
                <div>
                  <h2 className="text-base font-bold text-text-primary">Agent Bottom Score 1-2</h2>
@@ -896,14 +829,14 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    </tr>
                  </thead>
                  <tbody className="">
-                     {([] as any[]).map((agent, i) => (
+                   {agentRankings.critical.map((agent, i) => (
                      <tr key={agent.csId} className="border-b border-border hover:bg-surface-muted transition-colors group">
                        <td className="p-2 text-center text-text-muted font-medium">{i+1}</td>
                        <td className="p-2 font-medium text-text-primary max-w-[200px] truncate" title={agent.name}>{agent.name}</td>
                        <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{agent.badScoreCount}</td>
                      </tr>
                    ))}
-                    {false && (
+                   {agentRankings.critical.length === 0 && (
                      <tr>
                        <td colSpan={3} className="p-8 text-center text-text-muted text-sm border-b border-border">
                          No critical agents found.
@@ -1456,59 +1389,33 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
   const topAgentsLimit = isSmallBpo ? 2 : 5;
 
   const calcTopCats = (dataset: AgentKPI[]) => {
-    const agg: Record<string, {
-      label: string;
-      score1: number;
-      score2: number;
-      score3: number;
-      score4: number;
-      score5: number;
-    }> = {};
+    const agg: Record<string, { label: string, count: number, good: number, total: number }> = {};
     dataset.filter(a => {
       const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
       const matchTL = filterTL ? a.teamLeader === filterTL : true;
-      const count = getDisplayedScoreCount(a, viewMode);
+      const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
       return matchSearch && matchTL && count > 0;
     }).forEach(a => {
        a.csatHistory
-         .filter(h => (viewMode === 'full' || !h.isTakeout) && h.score >= 1 && h.score <= 5)
+         .filter(h => (viewMode === 'full' || !h.isTakeout) && isValidCsatScScore(h.score))
          .forEach(h => {
            const label = String(h.category || '').trim().replace(/\s+/g, ' ');
            const key = label.toLowerCase();
            if (!key) return;
-           if (!agg[key]) {
-             agg[key] = { label, score1: 0, score2: 0, score3: 0, score4: 0, score5: 0 };
-           }
-           agg[key][`score${h.score}` as 'score1' | 'score2' | 'score3' | 'score4' | 'score5'] += 1;
+           if (!agg[key]) agg[key] = { label, count: 0, good: 0, total: 0 };
+           agg[key].total += 1;
+           if (h.score === 1 || h.score === 2) agg[key].count += 1;
+           if (h.score === 4 || h.score === 5) agg[key].good += 1;
          });
     });
     return Object.entries(agg)
-      .map(([, entry]) => {
-        const badCount = entry.score1 + entry.score2;
-        const goodCount = entry.score4 + entry.score5;
-        const totalCount = badCount + entry.score3 + goodCount;
-        return {
-          ...entry,
-          badCount,
-          goodCount,
-          totalCount,
-          csatPct: totalCount > 0 ? (goodCount / totalCount) * 100 : null,
-        };
-      })
-      .sort((a, b) => b.badCount - a.badCount || b.totalCount - a.totalCount)
+      .sort((a,b) => b[1].count - a[1].count)
       .slice(0, topCatsLimit)
-      .map((entry, idx) => ({
+      .map(([, entry], idx) => ({
         rank: idx + 1,
         name: entry.label,
-        score1: entry.score1,
-        score2: entry.score2,
-        score3: entry.score3,
-        score4: entry.score4,
-        score5: entry.score5,
-        badCount: entry.badCount,
-        goodCount: entry.goodCount,
-        totalCount: entry.totalCount,
-        csatPct: entry.csatPct,
+        count: entry.count,
+        csatPct: entry.total > 0 ? (entry.good / entry.total) * 100 : null,
       }));
   };
 
@@ -1516,7 +1423,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     return dataset.filter(a => {
       const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
       const matchTL = filterTL ? a.teamLeader === filterTL : true;
-       const count = getDisplayedScoreCount(a, viewMode);
+      const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
       return matchSearch && matchTL && count > 0;
     }).map(a => {
        const count = viewMode === 'full' ? (a.csatScBadScoreFullCount || 0) : (a.csatScBadScoreFairCount || 0);
@@ -1551,21 +1458,15 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
           {(type === 'all' || type === 'category') && (
             <div className="overflow-hidden border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
               <div className="p-2 bg-surface-muted border-b border-border font-bold text-[10px] text-text-secondary text-center uppercase">
-                Top {topCatsLimit} Categories by Bad Score
+                Top {topCatsLimit} Categories
               </div>
-            <table className="w-full min-w-[900px] text-left text-[10px]">
+            <table className="w-full text-left text-[10px]">
               <thead className="bg-surface text-text-secondary border-b border-border">
                 <tr>
                   <th className="p-1 font-bold w-6 text-center">#</th>
                   <th className="p-1 font-bold">Category</th>
-                  <th className="p-1 font-bold w-12 text-center text-danger">S1</th>
-                  <th className="p-1 font-bold w-12 text-center text-orange-500">S2</th>
-                  <th className="p-1 font-bold w-12 text-center text-warning">S3</th>
-                  <th className="p-1 font-bold w-12 text-center text-success/80">S4</th>
-                  <th className="p-1 font-bold w-12 text-center text-success">S5</th>
-                  <th className="p-1 font-bold w-16 text-center text-danger whitespace-nowrap">Bad</th>
-                  <th className="p-1 font-bold w-16 text-center text-success whitespace-nowrap">Good</th>
-                  <th className="p-1 font-bold w-16 text-center whitespace-nowrap">CSAT %</th>
+                  <th className="p-1 font-bold w-8 text-center">Freq</th>
+                  <th className="p-1 font-bold w-16 text-center whitespace-nowrap">Good CSAT %</th>
                 </tr>
               </thead>
               <tbody>
@@ -1579,20 +1480,14 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                     >
                       <td className="p-1 text-center text-text-muted font-medium">{i+1}</td>
                       <td className={`p-1 font-medium max-w-[96px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
-                      <td className="p-1 text-center font-bold text-[9px] text-danger">{formatNum(cat.score1, 0)}</td>
-                      <td className="p-1 text-center font-bold text-[9px] text-orange-500">{formatNum(cat.score2, 0)}</td>
-                      <td className="p-1 text-center font-bold text-[9px] text-warning">{formatNum(cat.score3, 0)}</td>
-                      <td className="p-1 text-center font-bold text-[9px] text-success/80">{formatNum(cat.score4, 0)}</td>
-                      <td className="p-1 text-center font-bold text-[9px] text-success">{formatNum(cat.score5, 0)}</td>
-                      <td className="p-1 text-center font-bold text-[9px] text-danger">{formatNum(cat.badCount, 0)}</td>
-                      <td className="p-1 text-center font-bold text-[9px] text-success">{formatNum(cat.goodCount, 0)}</td>
+                      <td className="p-1 text-center font-bold text-[9px] text-text-secondary">{formatNum(cat.count, 0)}</td>
                       <td className="p-1 text-center font-bold text-[9px] text-text-secondary">{cat.csatPct === null ? '-' : `${formatNum(cat.csatPct, 1)}%`}</td>
                     </tr>
                   );
                 })}
                 {week.cats.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="p-2 text-center text-text-muted text-[9px] border-b border-border">
+                    <td colSpan={4} className="p-2 text-center text-text-muted text-[9px] border-b border-border">
                       No categories
                     </td>
                   </tr>
