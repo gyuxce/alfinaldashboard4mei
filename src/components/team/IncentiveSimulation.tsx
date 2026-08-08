@@ -314,23 +314,25 @@ export const IncentiveSimulation: React.FC = () => {
     [agentDictionary, agentDictionaryByMonth, startDate],
   );
 
+  const simulationRoster = useMemo(
+    () => applyAgentRoster(rawData, activePeriodRoster)
+      .filter((agent) => !isInactiveAgent(agent, simulationPeriod.end)),
+    [activePeriodRoster, rawData, simulationPeriod.end],
+  );
+
   const filteredAgents = useMemo(() => {
-    const rosterData = applyAgentRoster(rawData, activePeriodRoster);
-    return rosterData.filter(
-      (agent) => !isInactiveAgent(agent, simulationPeriod.end)
-        && matchesAgentScope(agent, {
+    return simulationRoster.filter(
+      (agent) => matchesAgentScope(agent, {
           bpo: selectedBpo,
           teamLeader: selectedTL,
           agent: selectedGlobalAgent,
         }),
     );
   }, [
-    rawData,
-    activePeriodRoster,
+    simulationRoster,
     selectedBpo,
     selectedGlobalAgent,
     selectedTL,
-    simulationPeriod.end,
   ]);
 
   const rows = useMemo(() => filteredAgents
@@ -447,17 +449,15 @@ export const IncentiveSimulation: React.FC = () => {
       })
       .sort((a, b) => (b.finalScore || -1) - (a.finalScore || -1));
 
-    const eligibleScores = leaderRows
-      .filter((row) => row.status === "eligible" && row.finalScore !== null)
-      .map((row) => row.finalScore as number);
-    const bestLeaderScore = eligibleScores.length > 0 ? Math.max(...eligibleScores) : null;
+    const teamLeaderCount = new Set(
+      simulationRoster.map((agent) => String(agent.teamLeader || "-").trim() || "-"),
+    ).size;
+    const bonusPerEligibleTeamLeader = teamLeaderCount > 0
+      ? TEAM_LEADER_BEST_BONUS / teamLeaderCount
+      : 0;
 
     return leaderRows.map((row) => {
-      const isBestLeader = bestLeaderScore !== null
-        && row.status === "eligible"
-        && row.finalScore !== null
-        && Math.abs(row.finalScore - bestLeaderScore) < 0.0001;
-      const bestLeaderBonus = isBestLeader ? TEAM_LEADER_BEST_BONUS : 0;
+      const bestLeaderBonus = row.status === "eligible" ? bonusPerEligibleTeamLeader : 0;
       const totalIncentive = row.status === "eligible"
         ? (row.baseIncentive || 0) + bestLeaderBonus
         : row.totalIncentive;
@@ -468,7 +468,7 @@ export const IncentiveSimulation: React.FC = () => {
         grossThp: totalIncentive === null ? null : row.grossSalary + totalIncentive,
       };
     });
-  }, [filteredAgents]);
+  }, [filteredAgents, simulationRoster]);
 
   const eligibleRows = rows.filter((row) => row.status === "eligible");
   const ineligibleRows = rows.filter((row) => row.status === "ineligible");
@@ -593,7 +593,7 @@ export const IncentiveSimulation: React.FC = () => {
                 <SummaryCard label="TL disimulasikan" value={teamLeaderRows.length} detail="Mengikuti filter global" />
                 <SummaryCard label="Total agent" value={teamLeaderAgentCount} detail="Agent di bawah TL" />
                 <SummaryCard label="Tidak eligible" value={teamLeaderIneligibleCount} detail="Skor total di bawah 80" tone="warning" />
-                <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Tier TL + bonus TL terbaik" tone="success" />
+                <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Tier TL + bagian bonus TL" tone="success" />
                 <SummaryCard label="Total THP gross" value={formatCurrency(teamLeaderTotalGrossThp)} detail="Gaji gross + insentif TL" tone="success" />
               </>
             )}
@@ -710,7 +710,7 @@ export const IncentiveSimulation: React.FC = () => {
                   <tr>
                     {[
                       "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
-                      "Breakdown Poin", "Final KPI", "Tier TL", "Insentif TL", "Bonus TL Terbaik",
+                      "Breakdown Poin", "Final KPI", "Tier TL", "Insentif TL", "Bagian Bonus TL",
                       "Gaji Gross", "Total THP Gross", "Status",
                     ].map((label) => (
                       <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
@@ -834,7 +834,7 @@ export const IncentiveSimulation: React.FC = () => {
                 ) : (
                   <>
                     <p className="rounded-lg bg-surface-muted p-3">Skor TL dihitung dari rata-rata KPI agent. Nilai QA memakai rata-rata persentase QA agent, bukan bucket poin agent.</p>
-                    <p className="rounded-lg bg-success-soft p-3 text-success-text">TL terbaik di channel Livechat mendapat bonus tambahan <strong>Rp500.000</strong>.</p>
+                    <p className="rounded-lg bg-success-soft p-3 text-success-text">Pool bonus TL terbaik sebesar <strong>Rp500.000</strong> dibagi rata kepada TL yang eligible. Contoh 5 TL: masing-masing mendapat <strong>Rp100.000</strong>.</p>
                     <p className="rounded-lg bg-surface-muted p-3">Gaji gross TL per bulan <strong className="text-text-primary">Rp4.328.000</strong>. THP gross = gaji gross + insentif TL.</p>
                     <p className="rounded-lg bg-warning-soft p-3 text-warning-text">THP gross belum dikurangi pajak/BPJS dan belum termasuk lembur, hari libur, atau shift malam.</p>
                   </>
