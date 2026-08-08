@@ -1749,7 +1749,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         
         {/* Left: Weekly Cards */}
-        <div className="flex flex-col">
+        <div className="flex flex-col justify-center">
           <div className="flex items-center justify-center mb-4">
             <h4 className="text-xs font-bold text-text-secondary text-center">{comparisonMode === 'mom' ? '3-Month Respondents' : '4-Week Respondents'}</h4>
           </div>
