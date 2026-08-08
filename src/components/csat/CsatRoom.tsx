@@ -1522,16 +1522,16 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                     >
                       <td className="p-1 text-center text-text-muted font-medium">{i+1}</td>
                       <td className={`p-1 font-medium max-w-[96px] truncate ${isRepeat ? 'text-danger font-bold' : 'text-text-primary'}`} title={agent.name}>{agent.name}</td>
-                      <td className="p-1">
-                        <div className="flex flex-wrap gap-1">
+                      <td className="p-1.5 align-top">
+                        <div className="space-y-1">
                           {agent.topCategories.length > 0 ? agent.topCategories.map(category => (
-                            <span
+                            <div
                               key={category.name}
-                              className="inline-block max-w-[145px] truncate rounded border border-border bg-surface-muted px-1 py-0.5 text-[9px] text-text-secondary"
-                              title={`${category.name} - ${category.count} cases`}
+                              className="flex items-start justify-between gap-2 border-b border-border/50 pb-0.5 text-[9px] leading-tight last:border-b-0 last:pb-0"
                             >
-                              {category.name} - {category.count}
-                            </span>
+                              <span className="min-w-0 whitespace-normal break-words text-text-secondary" title={category.name}>{category.name}</span>
+                              <span className="shrink-0 font-bold text-text-primary" title={`${category.count} cases`}>{category.count}</span>
+                            </div>
                           )) : <span className="text-text-muted">-</span>}
                         </div>
                       </td>
