@@ -721,6 +721,8 @@ const WeeklyReportPanel = ({
     return prev3Range.end;
   })();
 
+  const showPrev3 = comparisonMode !== 'mom' && Boolean(hasPrev3);
+
   const rows = [
     { label: 'Total Productivity', curr: formatNum(currentStats.productivity, 0),  prev: formatNum(previousStats.productivity, 0), prev2: formatNum(previousStats2?.productivity || 0, 0), prev3: formatNum(previousStats3?.productivity || 0, 0), delta: currentStats.productivity - previousStats.productivity,   isCount: true,  target: null,  rawCurr: currentStats.productivity,    rawPrev: previousStats.productivity, rawPrev2: previousStats2?.productivity || 0, rawPrev3: previousStats3?.productivity || 0 },
     { label: 'Avg Productivity',   curr: formatNum(currentStats.avgProductivity, 0),prev: formatNum(previousStats.avgProductivity, 0),prev2: formatNum(previousStats2?.avgProductivity || 0, 0),prev3: formatNum(previousStats3?.avgProductivity || 0, 0),delta: currentStats.avgProductivity - previousStats.avgProductivity,isCount: true,  target: 100,   rawCurr: currentStats.avgProductivity, rawPrev: previousStats.avgProductivity, rawPrev2: previousStats2?.avgProductivity || 0, rawPrev3: previousStats3?.avgProductivity || 0 },
@@ -775,7 +777,7 @@ const WeeklyReportPanel = ({
               {getPeriodLabel(prev2End)}
             </div>
           )}
-          {hasPrev3 && (
+          {showPrev3 && (
             <div
               className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2 py-1 rounded-full font-semibold whitespace-nowrap"
               title={`${formatDate(prev3Start)} - ${formatDate(prev3End)}`}
@@ -797,7 +799,7 @@ const WeeklyReportPanel = ({
               <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(endDate)}</th>
               <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prevEnd)}</th>
               {hasPrev2 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prev2End)}</th>}
-              {hasPrev3 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prev3End)}</th>}
+              {showPrev3 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prev3End)}</th>}
               <th className="text-right px-5 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">Perubahan</th>
             </tr>
           </thead>
@@ -842,7 +844,7 @@ const WeeklyReportPanel = ({
                   </td>
                   <td className={`px-4 py-3 text-right text-[14px] font-bold ${prevColor}`}>{row.prev}</td>
                   {hasPrev2 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev2Color}`}>{row.prev2}</td>}
-                  {hasPrev3 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev3Color}`}>{row.prev3}</td>}
+                  {showPrev3 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev3Color}`}>{row.prev3}</td>}
                   <td className="px-5 py-3 text-right">
                     {isFlat ? (
                       <span className="text-[11px] font-semibold text-text-muted">-</span>

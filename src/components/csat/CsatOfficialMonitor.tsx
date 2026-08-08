@@ -305,6 +305,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
     { name: getWeekLabel(1), 'CSAT Official': w1.asli, 'SC Full': w1.full, 'SC After Takeout': w1.takeout },
     { name: getWeekLabel(0), 'CSAT Official': w0.asli, 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
+  const visibleChartData = comparisonMode === 'mom' ? chartData.slice(1) : chartData;
 
   const dailyData = React.useMemo(() => {
     const dates = new Map<string, { sum: number, count: number }>();
@@ -381,11 +382,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         {/* Weekly Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '4-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '3-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={visibleChartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 5]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />

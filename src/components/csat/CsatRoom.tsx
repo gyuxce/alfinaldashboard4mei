@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AgentKPI, CSATEntry, isCsatTakeoutCategory } from '../../lib/dataProcessor';
+import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useStore } from '../../store';
@@ -1178,6 +1178,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
     { name: getWeekLabel(1), 'SC Full': w1.full, 'SC After Takeout': w1.takeout },
     { name: getWeekLabel(0), 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
+  const visibleChartData = comparisonMode === 'mom' ? chartData.slice(1) : chartData;
 
   const dailyData = React.useMemo(() => {
     const dates = new Map<string, { goodFull: number, totalFull: number, goodTakeout: number, totalTakeout: number }>();
@@ -1299,11 +1300,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
         {/* Weekly Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '4-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '3-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={visibleChartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
@@ -1388,23 +1389,34 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
   const topAgentsLimit = isSmallBpo ? 2 : 5;
 
   const calcTopCats = (dataset: AgentKPI[]) => {
-    const agg: Record<string, number> = {};
+    const agg: Record<string, { label: string, count: number, good: number, total: number }> = {};
     dataset.filter(a => {
       const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
       const matchTL = filterTL ? a.teamLeader === filterTL : true;
       const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
       return matchSearch && matchTL && count > 0;
     }).forEach(a => {
-       const cats = viewMode === 'full' ? (a.csatScCategoriesFull || {}) : (a.csatScCategoriesFair || {});
-       for (const cat in cats) {
-          if (!agg[cat]) agg[cat] = 0;
-          agg[cat] += cats[cat];
-       }
+       a.csatHistory
+         .filter(h => (viewMode === 'full' || !h.isTakeout) && isValidCsatScScore(h.score))
+         .forEach(h => {
+           const label = String(h.category || '').trim().replace(/\s+/g, ' ');
+           const key = label.toLowerCase();
+           if (!key) return;
+           if (!agg[key]) agg[key] = { label, count: 0, good: 0, total: 0 };
+           agg[key].total += 1;
+           if (h.score === 1 || h.score === 2) agg[key].count += 1;
+           if (h.score === 4 || h.score === 5) agg[key].good += 1;
+         });
     });
     return Object.entries(agg)
-      .sort((a,b) => b[1] - a[1])
+      .sort((a,b) => b[1].count - a[1].count)
       .slice(0, topCatsLimit)
-      .map((entry, idx) => ({ rank: idx+1, name: entry[0], count: entry[1] }));
+      .map(([, entry], idx) => ({
+        rank: idx + 1,
+        name: entry.label,
+        count: entry.count,
+        csatPct: entry.total > 0 ? (entry.good / entry.total) * 100 : null,
+      }));
   };
 
   const calcTopAgents = (dataset: AgentKPI[]) => {
@@ -1420,30 +1432,18 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
   };
 
   const weeks = [
-    { 
-      name: getWeekLabel(3), 
-      cats: type === 'all' || type === 'category' ? calcTopCats(previousData3) : [], 
-      agents: type === 'all' || type === 'agent' ? calcTopAgents(previousData3) : [] 
-    },
-    { 
-      name: getWeekLabel(2), 
-      cats: type === 'all' || type === 'category' ? calcTopCats(previousData2) : [], 
-      agents: type === 'all' || type === 'agent' ? calcTopAgents(previousData2) : [] 
-    },
-    { 
-      name: getWeekLabel(1), 
-      cats: type === 'all' || type === 'category' ? calcTopCats(previousData) : [], 
-      agents: type === 'all' || type === 'agent' ? calcTopAgents(previousData) : [] 
-    },
-    { 
-      name: getWeekLabel(0), 
-      cats: type === 'all' || type === 'category' ? calcTopCats(data) : [], 
-      agents: type === 'all' || type === 'agent' ? calcTopAgents(data) : [] 
-    },
-  ].filter(d => d.name !== 'WNaN Invalid Date');
+    ...(comparisonMode === 'mom' ? [] : [{ name: getWeekLabel(3), dataset: previousData3 }]),
+    { name: getWeekLabel(2), dataset: previousData2 },
+    { name: getWeekLabel(1), dataset: previousData },
+    { name: getWeekLabel(0), dataset: data },
+  ].filter(period => period.name !== 'WNaN Invalid Date').map(period => ({
+    ...period,
+    cats: type === 'all' || type === 'category' ? calcTopCats(period.dataset) : [],
+    agents: type === 'all' || type === 'agent' ? calcTopAgents(period.dataset) : [],
+  }));
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className={cn('grid grid-cols-1 md:grid-cols-2 gap-4', comparisonMode === 'mom' ? 'xl:grid-cols-3' : 'xl:grid-cols-4')}>
       {weeks.map((week, wIdx) => (
         <div key={wIdx} className="flex flex-col gap-4">
           <div className="p-2 bg-primary/10 text-primary font-bold text-center rounded-xl border border-primary/20 text-[11px] uppercase tracking-wider">
@@ -1461,6 +1461,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                   <th className="p-1 font-bold w-6 text-center">#</th>
                   <th className="p-1 font-bold">Category</th>
                   <th className="p-1 font-bold w-8 text-center">Freq</th>
+                  <th className="p-1 font-bold w-12 text-center">CSAT %</th>
                 </tr>
               </thead>
               <tbody>
@@ -1470,17 +1471,18 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                     <tr 
                       key={cat.name} 
                       className="border-b border-border hover:bg-surface-muted transition-colors cursor-pointer"
-                      onClick={() => onCategoryClick && onCategoryClick(cat.name, week.name, wIdx === 3 ? data : wIdx === 2 ? previousData : wIdx === 1 ? previousData2 : previousData3)}
+                      onClick={() => onCategoryClick && onCategoryClick(cat.name, week.name, week.dataset)}
                     >
                       <td className="p-1 text-center text-text-muted font-medium">{i+1}</td>
                       <td className={`p-1 font-medium max-w-[96px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
                       <td className="p-1 text-center font-bold text-[9px] text-text-secondary">{formatNum(cat.count, 0)}</td>
+                      <td className="p-1 text-center font-bold text-[9px] text-text-secondary">{cat.csatPct === null ? '-' : `${formatNum(cat.csatPct, 1)}%`}</td>
                     </tr>
                   );
                 })}
                 {week.cats.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="p-2 text-center text-text-muted text-[9px] border-b border-border">
+                    <td colSpan={4} className="p-2 text-center text-text-muted text-[9px] border-b border-border">
                       No categories
                     </td>
                   </tr>
@@ -1505,12 +1507,12 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
               </thead>
               <tbody>
                 {week.agents.map((agent, i) => {
-                  const isRepeat = wIdx === weeks.length - 1 && weeks[wIdx - 1].agents.some(prevAgent => prevAgent.csId === agent.csId);
+                  const isRepeat = wIdx === weeks.length - 1 && wIdx > 0 && weeks[wIdx - 1].agents.some(prevAgent => prevAgent.csId === agent.csId);
                   return (
                     <tr 
                       key={agent.csId} 
                       className="border-b border-border hover:bg-surface-muted transition-colors cursor-pointer"
-                      onClick={() => onAgentClick && onAgentClick(agent.csId, agent.name, week.name, wIdx === 3 ? data : wIdx === 2 ? previousData : wIdx === 1 ? previousData2 : previousData3)}
+                      onClick={() => onAgentClick && onAgentClick(agent.csId, agent.name, week.name, week.dataset)}
                     >
                       <td className="p-1 text-center text-text-muted font-medium">{i+1}</td>
                       <td className={`p-1 font-medium max-w-[96px] truncate ${isRepeat ? 'text-danger font-bold' : 'text-text-primary'}`} title={agent.name}>{agent.name}</td>
@@ -1585,13 +1587,15 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
     const w2 = calcRespStats(previousData2);
     const w3 = calcRespStats(previousData3);
 
-    return [
+    const periods = [
       { name: getWeekLabel(3), ...w3 },
       { name: getWeekLabel(2), ...w2 },
       { name: getWeekLabel(1), ...w1 },
       { name: getWeekLabel(0), ...w0 },
-    ].filter(d => d.name !== 'WNaN Invalid Date');
-  }, [data, previousData, previousData2, previousData3, startDate, endDate, viewMode]);
+    ];
+    return (comparisonMode === 'mom' ? periods.slice(1) : periods)
+      .filter(d => d.name !== 'WNaN Invalid Date');
+  }, [data, previousData, previousData2, previousData3, startDate, endDate, viewMode, comparisonMode]);
 
   const dailyRespData = React.useMemo(() => {
     const dates = new Map<string, { processed: number, respondents: number, s5: number, s4: number, s3: number, s2: number, s1: number }>();
@@ -1747,7 +1751,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
         {/* Left: Weekly Cards */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h4 className="text-xs font-bold text-text-secondary text-center">{comparisonMode === 'mom' ? '4-Month Respondents' : '4-Week Respondents'}</h4>
+            <h4 className="text-xs font-bold text-text-secondary text-center">{comparisonMode === 'mom' ? '3-Month Respondents' : '4-Week Respondents'}</h4>
           </div>
           <div className="grid grid-cols-2 gap-4 h-full">
             {weeksData.map((w, idx) => {
