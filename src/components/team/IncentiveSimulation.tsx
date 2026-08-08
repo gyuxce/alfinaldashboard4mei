@@ -354,8 +354,6 @@ export const IncentiveSimulation: React.FC = () => {
     const leaderRows = Array.from(grouped.entries())
       .map(([teamLeader, teamAgents]): TeamLeaderIncentiveRow => {
         const agentRows = teamAgents.map(buildIncentiveRow);
-        const qaCount = teamAgents.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
-        const qaSum = teamAgents.reduce((sum, agent) => sum + agent.qaScoreSum, 0);
         const csatStats = teamAgents.reduce(
           (totals, agent) => {
             const stats = getCsatStats(agent);
@@ -368,7 +366,11 @@ export const IncentiveSimulation: React.FC = () => {
         );
         const totalDuty = teamAgents.reduce((sum, agent) => sum + agent.manDays, 0);
         const totalChat = teamAgents.reduce((sum, agent) => sum + agent.productivityTotal, 0);
-        const finalQaPct = qaCount > 0 ? qaSum / qaCount : null;
+        // TL QA uses the simple average of each agent's QA percentage.
+        // Agent-level bucket points are intentionally not used here.
+        const finalQaPct = agentRows.length > 0 && agentRows.every((row) => row.qaPct !== null)
+          ? agentRows.reduce((sum, row) => sum + (row.qaPct || 0), 0) / agentRows.length
+          : null;
         const csatTotal = csatStats.good + csatStats.bad;
         const finalCsatPct = csatTotal > 0
           ? (csatStats.good / csatTotal) * 100
@@ -384,7 +386,7 @@ export const IncentiveSimulation: React.FC = () => {
           && finalCsatPct !== null
           && finalProductivityPct !== null;
         const averageQaPoints = hasCompleteData
-          ? agentRows.reduce((sum, row) => sum + (row.qaPoints || 0), 0) / agentRows.length
+          ? ((finalQaPct || 0) / 100) * 55
           : null;
         const averageCsatPoints = hasCompleteData
           ? agentRows.reduce((sum, row) => sum + (row.csatPoints || 0), 0) / agentRows.length
@@ -393,7 +395,7 @@ export const IncentiveSimulation: React.FC = () => {
           ? agentRows.reduce((sum, row) => sum + (row.productivityPoints || 0), 0) / agentRows.length
           : null;
         const finalScore = hasCompleteData
-          ? agentRows.reduce((sum, row) => sum + (row.totalScore || 0), 0) / agentRows.length
+          ? (averageQaPoints || 0) + (averageCsatPoints || 0) + (averageProductivityPoints || 0)
           : null;
 
         if (finalScore === null) {
@@ -606,7 +608,7 @@ export const IncentiveSimulation: React.FC = () => {
                 <p className="mt-0.5 text-[11px] text-text-muted">
                   {viewMode === "agent"
                     ? "Nilai produktivitas di atas target menghasilkan bonus tambahan."
-                    : "Skor TL adalah rata-rata final score agent di dalam timnya."}
+                    : "Skor TL memakai rata-rata KPI agent; QA dihitung dari rata-rata persentase QA agent."}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
@@ -831,7 +833,7 @@ export const IncentiveSimulation: React.FC = () => {
                   <p className="rounded-lg bg-surface-muted p-3">Bonus Livechat: setiap 100 chat di atas target = <strong className="text-text-primary">Rp40.000</strong>.</p>
                 ) : (
                   <>
-                    <p className="rounded-lg bg-surface-muted p-3">Skor TL dihitung dari rata-rata final score seluruh agent dalam tim.</p>
+                    <p className="rounded-lg bg-surface-muted p-3">Skor TL dihitung dari rata-rata KPI agent. Nilai QA memakai rata-rata persentase QA agent, bukan bucket poin agent.</p>
                     <p className="rounded-lg bg-success-soft p-3 text-success-text">TL terbaik di channel Livechat mendapat bonus tambahan <strong>Rp500.000</strong>.</p>
                     <p className="rounded-lg bg-surface-muted p-3">Gaji gross TL per bulan <strong className="text-text-primary">Rp4.328.000</strong>. THP gross = gaji gross + insentif TL.</p>
                     <p className="rounded-lg bg-warning-soft p-3 text-warning-text">THP gross belum dikurangi pajak/BPJS dan belum termasuk lembur, hari libur, atau shift malam.</p>
