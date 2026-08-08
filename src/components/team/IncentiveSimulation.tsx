@@ -676,7 +676,7 @@ export const IncentiveSimulation: React.FC = () => {
                   <tr>
                     {[
                       "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
-                      "Final KPI", "Tier TL", "Agent KPI Kurang", "Insentif TL", "Bonus TL Terbaik",
+                      "Final KPI", "Tier TL", "Insentif TL", "Bonus TL Terbaik",
                       "Total Estimasi", "Status",
                     ].map((label) => (
                       <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
@@ -696,7 +696,6 @@ export const IncentiveSimulation: React.FC = () => {
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalProductivityPct, 1)}%</td>
                       <td className="px-2 py-2 font-bold text-text-primary">{formatNum(row.finalScore, 2)}</td>
                       <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
-                      <td className="px-2 py-2 font-semibold text-warning-text">{row.incompleteCount}</td>
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
                       <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.bestLeaderBonus)}</td>
                       <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
@@ -709,7 +708,7 @@ export const IncentiveSimulation: React.FC = () => {
                   ))}
                   {teamLeaderRows.length === 0 && (
                     <tr>
-                      <td colSpan={13} className="p-8 text-center text-xs text-text-muted">
+                      <td colSpan={12} className="p-8 text-center text-xs text-text-muted">
                         Tidak ada Team Leader pada filter yang dipilih.
                       </td>
                     </tr>
