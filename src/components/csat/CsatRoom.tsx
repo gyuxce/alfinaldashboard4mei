@@ -1427,7 +1427,12 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
       return matchSearch && matchTL && count > 0;
     }).map(a => {
        const count = viewMode === 'full' ? (a.csatScBadScoreFullCount || 0) : (a.csatScBadScoreFairCount || 0);
-       return { name: a.name || a.csId, csId: a.csId, badScoreCount: count };
+       const categoryCounts = viewMode === 'full' ? (a.csatScCategoriesFull || {}) : (a.csatScCategoriesFair || {});
+       const topCategories = Object.entries(categoryCounts)
+         .sort(([, countA], [, countB]) => countB - countA)
+         .slice(0, 3)
+         .map(([name, categoryCount]) => ({ name, count: categoryCount }));
+       return { name: a.name || a.csId, csId: a.csId, badScoreCount: count, topCategories };
     }).sort((a, b) => b.badScoreCount - a.badScoreCount).filter(a => a.badScoreCount > 0).slice(0, topAgentsLimit);
   };
 
@@ -1502,6 +1507,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                 <tr>
                   <th className="p-1 font-bold w-6 text-center">#</th>
                   <th className="p-1 font-bold">Agent Name</th>
+                  <th className="p-1 font-bold">Top Categories</th>
                   <th className="p-1 font-bold w-8 text-center">Freq</th>
                 </tr>
               </thead>
@@ -1516,13 +1522,26 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
                     >
                       <td className="p-1 text-center text-text-muted font-medium">{i+1}</td>
                       <td className={`p-1 font-medium max-w-[96px] truncate ${isRepeat ? 'text-danger font-bold' : 'text-text-primary'}`} title={agent.name}>{agent.name}</td>
+                      <td className="p-1">
+                        <div className="flex flex-wrap gap-1">
+                          {agent.topCategories.length > 0 ? agent.topCategories.map(category => (
+                            <span
+                              key={category.name}
+                              className="inline-block max-w-[145px] truncate rounded border border-border bg-surface-muted px-1 py-0.5 text-[9px] text-text-secondary"
+                              title={`${category.name} - ${category.count} cases`}
+                            >
+                              {category.name} - {category.count}
+                            </span>
+                          )) : <span className="text-text-muted">-</span>}
+                        </div>
+                      </td>
                       <td className="p-1 text-center font-bold text-[9px] text-text-secondary">{agent.badScoreCount}</td>
                     </tr>
                   );
                 })}
                 {week.agents.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="p-2 text-center text-text-muted text-[9px] border-b border-border">
+                    <td colSpan={4} className="p-2 text-center text-text-muted text-[9px] border-b border-border">
                       No critical agents
                     </td>
                   </tr>
