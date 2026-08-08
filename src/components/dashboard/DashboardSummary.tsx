@@ -692,7 +692,7 @@ const WeeklyReportPanel = ({
       return `${month} ${d.getFullYear()}`;
     }
     const weekNum = Math.ceil(d.getDate() / 7);
-    return `Week ${weekNum} ${month}`;
+    return `W${weekNum} ${month}`;
   };
 
   const getPrevRange = comparisonMode === 'mom' ? getPreviousMonthPeriod : getPreviousPeriod;
@@ -751,25 +751,37 @@ const WeeklyReportPanel = ({
             <p className="text-[10px] text-text-muted mt-0.5">Perbandingan antar periode</p>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-[11px] flex-wrap justify-end mt-2 sm:mt-0">
-          <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold">
+        <div className="flex items-center gap-2 text-[11px] flex-wrap justify-end mt-2 sm:mt-0">
+          <div
+            className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-full font-bold whitespace-nowrap"
+            title={`${formatDate(startDate)} - ${formatDate(endDate)}`}
+          >
             <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-            {getPeriodLabel(endDate)}: {formatDate(startDate)} to {formatDate(endDate)}
+            {getPeriodLabel(endDate)}
           </div>
-          <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
+          <div
+            className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2 py-1 rounded-full font-semibold whitespace-nowrap"
+            title={`${formatDate(prevStart)} - ${formatDate(prevEnd)}`}
+          >
             <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-            {getPeriodLabel(prevEnd)}: {formatDate(prevStart)} to {formatDate(prevEnd)}
+            {getPeriodLabel(prevEnd)}
           </div>
           {hasPrev2 && (
-            <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
+            <div
+              className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2 py-1 rounded-full font-semibold whitespace-nowrap"
+              title={`${formatDate(prev2Start)} - ${formatDate(prev2End)}`}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-              {getPeriodLabel(prev2End)}: {formatDate(prev2Start)} to {formatDate(prev2End)}
+              {getPeriodLabel(prev2End)}
             </div>
           )}
           {hasPrev3 && (
-            <div className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2.5 py-1 rounded-full font-semibold">
+            <div
+              className="flex items-center gap-1.5 bg-surface-muted text-text-muted px-2 py-1 rounded-full font-semibold whitespace-nowrap"
+              title={`${formatDate(prev3Start)} - ${formatDate(prev3End)}`}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
-              {getPeriodLabel(prev3End)}: {formatDate(prev3Start)} to {formatDate(prev3End)}
+              {getPeriodLabel(prev3End)}
             </div>
           )}
         </div>
