@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
 import { useStore } from "../../store";
-import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
+import { AgentKPI, getCsatBadRatingCount, processKPIs } from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
 
 const DAILY_LIVECHAT_TARGET = 100;
@@ -118,15 +118,7 @@ const getTeamLeaderTier = (score: number) => {
 
 const getCsatStats = (agent: AgentKPI) => {
   const good = agent.csat4Count + agent.csat5Count;
-  const bad = agent.qaHistory.filter((entry) => {
-    const checkingType = String(entry.systemCheckingType || "").trim().toUpperCase();
-    const mistakeLevel = String(entry.mistakeLevel || "").trim().toUpperCase();
-    return (
-      checkingType === "CSAT" &&
-      mistakeLevel !== "" &&
-      !mistakeLevel.includes("NO MISTAKE")
-    );
-  }).length;
+  const bad = getCsatBadRatingCount(agent);
 
   return { good, bad, total: good + bad };
 };

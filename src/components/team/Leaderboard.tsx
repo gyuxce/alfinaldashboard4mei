@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
-import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
+import { AgentKPI, getCsatBadRatingCount, processKPIs } from "../../lib/dataProcessor";
 import { ArrowRight, Trophy, Users, User } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
@@ -101,19 +101,7 @@ const getPeriodBusinessDays = (startDate: string, endDate: string) => {
 const getLeaderboardComposite = (agent: AgentKPI) => {
   const baseComposite = calculateAgentCompositeScore(agent);
   const csatGood = agent.csat4Count + agent.csat5Count;
-  const csatBad = agent.qaHistory.filter((entry) => {
-    const checkingType = String(entry.systemCheckingType || "")
-      .trim()
-      .toUpperCase();
-    const mistakeLevel = String(entry.mistakeLevel || "")
-      .trim()
-      .toUpperCase();
-    return (
-      checkingType === "CSAT" &&
-      mistakeLevel !== "" &&
-      !mistakeLevel.includes("NO MISTAKE")
-    );
-  }).length;
+  const csatBad = getCsatBadRatingCount(agent);
   const csatTotal = csatGood + csatBad;
   const csatPct = csatTotal > 0 ? (csatGood / csatTotal) * 100 : null;
 

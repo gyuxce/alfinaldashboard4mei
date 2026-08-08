@@ -143,6 +143,43 @@ export interface AgentKPI {
   };
 }
 
+const normalizeQaIdentifier = (value: unknown) =>
+  String(value || "").trim().toLowerCase();
+
+export const isBadCsatQaEntry = (entry: Pick<QAEntry, "systemCheckingType" | "mistakeLevel">) => {
+  const checkingType = normalizeQaIdentifier(entry.systemCheckingType).toUpperCase();
+  const mistakeLevel = normalizeQaIdentifier(entry.mistakeLevel).toUpperCase();
+
+  return (
+    checkingType === "CSAT" &&
+    mistakeLevel !== "" &&
+    !mistakeLevel.includes("NO MISTAKE")
+  );
+};
+
+export const getCsatBadRatingCount = (agent: Pick<AgentKPI, "qaHistory">) => {
+  const seenCases = new Set<string>();
+
+  return agent.qaHistory.reduce((count, entry) => {
+    if (!isBadCsatQaEntry(entry)) return count;
+
+    const primaryCaseId = [entry.ticketId, entry.chatId, entry.uid, entry.caseDate]
+      .map(normalizeQaIdentifier)
+      .find(Boolean);
+    const fallbackCaseId = [
+      entry.normDate || entry.date,
+      entry.qcName,
+      entry.mistakeLevel,
+      entry.category,
+    ].map(normalizeQaIdentifier).join("|");
+    const caseKey = primaryCaseId || fallbackCaseId;
+
+    if (seenCases.has(caseKey)) return count;
+    seenCases.add(caseKey);
+    return count + 1;
+  }, 0);
+};
+
 export const getOfficialCsatAggregate = (data: AgentKPI[]) => {
   let points = 0;
   let respondents = 0;
