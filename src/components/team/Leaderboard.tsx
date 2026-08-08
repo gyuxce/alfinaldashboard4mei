@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
-import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
+import { AgentKPI, getCsatBadRatingCount, processKPIs } from "../../lib/dataProcessor";
 import { ArrowRight, Trophy, Users, User } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
@@ -101,9 +101,8 @@ const getPeriodBusinessDays = (startDate: string, endDate: string) => {
 const getLeaderboardComposite = (agent: AgentKPI) => {
   const baseComposite = calculateAgentCompositeScore(agent);
   const csatGood = agent.csat4Count + agent.csat5Count;
-  // Leaderboard CSAT follows the client table: Official CSAT scores 1-2
-  // are bad ratings, while scores 4-5 are good ratings.
-  const csatBad = agent.csat1Count + agent.csat2Count;
+  // Leaderboard bad ratings come from QC CSAT/DSAT tagging, not Official CSAT.
+  const csatBad = getCsatBadRatingCount(agent);
   const csatTotal = csatGood + csatBad;
   const csatPct = csatTotal > 0 ? (csatGood / csatTotal) * 100 : null;
 
