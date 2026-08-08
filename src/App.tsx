@@ -435,17 +435,11 @@ export default function App() {
     const filterOptionData = activeTab === 'incentive' ? simulationData : data;
 
     const applyFilters = (d: any[]) => {
-      let filtered = d;
-      if (selectedBpo && selectedBpo !== 'All BPO') {
-        filtered = filtered.filter(a => (a.bpo || '').toUpperCase() === selectedBpo.toUpperCase());
-      }
-      if (selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders') {
-        filtered = filtered.filter(a => (a.teamLeader || '').toUpperCase() === selectedTL.toUpperCase());
-      }
-      if (selectedGlobalAgent && selectedGlobalAgent !== 'All Agents') {
-        filtered = filtered.filter(a => a.name === selectedGlobalAgent || a.csId === selectedGlobalAgent);
-      }
-      return filtered;
+      return d.filter(a => matchesAgentScope(a, {
+        bpo: selectedBpo,
+        teamLeader: selectedTL,
+        agent: selectedGlobalAgent,
+      }));
     };
 
     const filteredData = applyFilters(data);
