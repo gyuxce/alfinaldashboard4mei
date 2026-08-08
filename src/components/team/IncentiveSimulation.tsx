@@ -109,9 +109,24 @@ const getTeamLeaderTier = (score: number) => {
   return { label: "-", incentive: 0 };
 };
 
+const getCsatStats = (agent: AgentKPI) => {
+  const good = agent.csat4Count + agent.csat5Count;
+  const bad = agent.qaHistory.filter((entry) => {
+    const checkingType = String(entry.systemCheckingType || "").trim().toUpperCase();
+    const mistakeLevel = String(entry.mistakeLevel || "").trim().toUpperCase();
+    return (
+      checkingType === "CSAT" &&
+      mistakeLevel !== "" &&
+      !mistakeLevel.includes("NO MISTAKE")
+    );
+  }).length;
+
+  return { good, bad, total: good + bad };
+};
+
 const getCsatPercent = (agent: AgentKPI) => {
-  if (agent.csatRespondents <= 0 || agent.csatAsli === null) return null;
-  return agent.csatAsli <= 5 ? (agent.csatAsli / 5) * 100 : agent.csatAsli;
+  const { good, total } = getCsatStats(agent);
+  return total > 0 ? (good / total) * 100 : null;
 };
 
 const buildIncentiveRow = (agent: AgentKPI): IncentiveRow => {
@@ -341,15 +356,23 @@ export const IncentiveSimulation: React.FC = () => {
         const teamAgents = filteredAgents.filter((agent) => (agent.teamLeader || "-") === teamLeader);
         const qaCount = teamAgents.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
         const qaSum = teamAgents.reduce((sum, agent) => sum + agent.qaScoreSum, 0);
-        const csatRespondents = teamAgents.reduce((sum, agent) => sum + agent.csatRespondents, 0);
-        const csatWeightedPct = teamAgents.reduce((sum, agent) => {
-          const csatPct = getCsatPercent(agent);
-          return sum + (csatPct === null ? 0 : csatPct * agent.csatRespondents);
-        }, 0);
+        const csatStats = teamAgents.reduce(
+          (totals, agent) => {
+            const stats = getCsatStats(agent);
+            return {
+              good: totals.good + stats.good,
+              bad: totals.bad + stats.bad,
+            };
+          },
+          { good: 0, bad: 0 },
+        );
         const totalDuty = teamAgents.reduce((sum, agent) => sum + agent.manDays, 0);
         const totalChat = teamAgents.reduce((sum, agent) => sum + agent.productivityTotal, 0);
         const finalQaPct = qaCount > 0 ? qaSum / qaCount : null;
-        const finalCsatPct = csatRespondents > 0 ? csatWeightedPct / csatRespondents : null;
+        const csatTotal = csatStats.good + csatStats.bad;
+        const finalCsatPct = csatTotal > 0
+          ? (csatStats.good / csatTotal) * 100
+          : null;
         const productivityTarget = totalDuty > 0 ? totalDuty * DAILY_LIVECHAT_TARGET : null;
         const finalProductivityPct = productivityTarget !== null
           ? (totalChat / productivityTarget) * 100
