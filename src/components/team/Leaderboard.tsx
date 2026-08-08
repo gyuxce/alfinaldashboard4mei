@@ -237,22 +237,10 @@ export const Leaderboard: React.FC = () => {
       string,
       {
         agents: Set<string>;
-        qaPctSum: number;
-        qaPctCount: number;
-        prodPctSum: number;
-        prodPctCount: number;
-        csatPctSum: number;
-        csatPctCount: number;
-        qaOrigSum: number;
-        qaOrigCount: number;
-        prodOrigSum: number;
-        prodOrigCount: number;
-        csatOrigSum: number;
-        csatOrigCount: number;
+        qaScoreSum: number;
+        qaScoreCount: number;
         csatGood: number;
         csatBad: number;
-        finalScoreSum: number;
-        finalScoreCount: number;
         totalDuty: number;
         totalChat: number;
       }
@@ -309,22 +297,10 @@ export const Leaderboard: React.FC = () => {
         if (!tlMap[tl]) {
           tlMap[tl] = {
             agents: new Set(),
-            qaPctSum: 0,
-            qaPctCount: 0,
-            prodPctSum: 0,
-            prodPctCount: 0,
-            csatPctSum: 0,
-            csatPctCount: 0,
-            qaOrigSum: 0,
-            qaOrigCount: 0,
-            prodOrigSum: 0,
-            prodOrigCount: 0,
-            csatOrigSum: 0,
-            csatOrigCount: 0,
+            qaScoreSum: 0,
+            qaScoreCount: 0,
             csatGood: 0,
             csatBad: 0,
-            finalScoreSum: 0,
-            finalScoreCount: 0,
             totalDuty: 0,
             totalChat: 0,
           };
@@ -334,29 +310,8 @@ export const Leaderboard: React.FC = () => {
         tlMap[tl].totalChat += agent.productivityTotal;
         tlMap[tl].csatGood += csatGood;
         tlMap[tl].csatBad += csatBad;
-        if (composite.score !== null) {
-          tlMap[tl].finalScoreSum += composite.score;
-          tlMap[tl].finalScoreCount += 1;
-        }
-
-        if (composite.qaPct !== null) {
-          tlMap[tl].qaPctSum += composite.qaPct;
-          tlMap[tl].qaPctCount++;
-          tlMap[tl].qaOrigSum += composite.qaOriginal!;
-          tlMap[tl].qaOrigCount++;
-        }
-        if (composite.productivityPct !== null) {
-          tlMap[tl].prodPctSum += composite.productivityPct;
-          tlMap[tl].prodPctCount++;
-          tlMap[tl].prodOrigSum += composite.productivityOriginal!;
-          tlMap[tl].prodOrigCount++;
-        }
-        if (composite.csatPct !== null) {
-          tlMap[tl].csatPctSum += composite.csatPct;
-          tlMap[tl].csatPctCount++;
-          tlMap[tl].csatOrigSum += composite.csatOriginal!;
-          tlMap[tl].csatOrigCount++;
-        }
+        tlMap[tl].qaScoreSum += agent.qaScoreSum;
+        tlMap[tl].qaScoreCount += agent.qaScoreCount;
       }
     });
 
@@ -364,29 +319,27 @@ export const Leaderboard: React.FC = () => {
     const tList: LeaderboardRow[] = [];
     Object.entries(tlMap).forEach(([tlName, stats]) => {
       const tl_qa_pct =
-        stats.qaPctCount > 0 ? stats.qaPctSum / stats.qaPctCount : null;
-      const tl_prod_pct =
-        stats.prodPctCount > 0 ? stats.prodPctSum / stats.prodPctCount : null;
+        stats.qaScoreCount > 0 ? (stats.qaScoreSum / stats.qaScoreCount) : null;
       const tlCsatTotal = stats.csatGood + stats.csatBad;
       const tl_csat_pct =
         tlCsatTotal > 0 ? (stats.csatGood / tlCsatTotal) * 100 : null;
 
-      const tl_qa_orig =
-        stats.qaOrigCount > 0 ? stats.qaOrigSum / stats.qaOrigCount : null;
-      const tl_prod_orig =
-        stats.prodOrigCount > 0
-          ? stats.prodOrigSum / stats.prodOrigCount
-          : null;
-      const tl_csat_orig = tl_csat_pct;
       const productivity = getProductivityColumns(
         stats.totalChat,
         stats.totalDuty,
       );
+      const tl_prod_pct = productivity.achievement;
+
+      const tl_qa_orig = tl_qa_pct;
+      const tl_prod_orig = tl_prod_pct;
+      const tl_csat_orig = tl_csat_pct;
 
       const tlFinalScore =
-        stats.finalScoreCount > 0
-          ? stats.finalScoreSum / stats.finalScoreCount
-          : null;
+        calculateCompositeScore({
+          qaPct: tl_qa_pct,
+          productivityPct: tl_prod_pct !== null ? Math.min(tl_prod_pct, 100) : null,
+          csatPct: tl_csat_pct,
+        }).score;
 
       if (tlFinalScore !== null) {
         tList.push({
@@ -688,7 +641,7 @@ export const Leaderboard: React.FC = () => {
                 <td className="border-r border-border-strong px-3 py-3 font-bold text-text-primary">{item.name}</td>
                 <td className="border-r border-border-strong px-3 py-3 text-center text-text-secondary">{item.agent_count ?? "-"}</td>
                 <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-text-secondary">{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
-                <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-text-secondary">{item.prod_pct !== null ? `${formatNum(item.prod_pct, 2)}%` : "-"}</td>
+                <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-text-secondary">{item.prod_pct !== null ? `${formatNum(Math.min(item.prod_pct, 100), 2)}%` : "-"}</td>
                 <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-text-secondary">{item.csat_pct !== null ? `${formatNum(item.csat_pct, 2)}%` : "-"}</td>
                 <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-success-text">100%</td>
                 <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-success-text">100%</td>
