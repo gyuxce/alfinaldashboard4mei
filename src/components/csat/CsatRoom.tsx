@@ -1178,34 +1178,82 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
     { name: getWeekLabel(0), 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
 
-  const dailyData = React.useMemo(() => {
-    const dates = new Map<string, { goodFull: number, totalFull: number, goodTakeout: number, totalTakeout: number }>();
+  const weeklyData = React.useMemo(() => {
+    const weeks = new Map<string, {
+      label: string,
+      startDate: string,
+      goodFull: number,
+      totalFull: number,
+      goodTakeout: number,
+      totalTakeout: number,
+    }>();
+
+    const getWeekBucket = (date: string) => {
+      const parsed = new Date(`${date}T00:00:00`);
+      if (isNaN(parsed.getTime())) {
+        return { key: date, label: date, startDate: date };
+      }
+
+      const start = new Date(parsed);
+      const day = start.getDay();
+      start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day));
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const toDateKey = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+      const formatDate = (value: Date) => new Intl.DateTimeFormat('id-ID', {
+        day: 'numeric',
+        month: 'short',
+      }).format(value);
+      const label = start.getMonth() === end.getMonth()
+        ? `${start.getDate()}-${end.getDate()} ${new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(start)}`
+        : `${formatDate(start)}-${formatDate(end)}`;
+
+      return {
+        key: toDateKey(start),
+        label,
+        startDate: toDateKey(start),
+      };
+    };
+
+    const ensureWeek = (date: string) => {
+      const bucket = getWeekBucket(date);
+      if (!weeks.has(bucket.key)) {
+        weeks.set(bucket.key, {
+          label: bucket.label,
+          startDate: bucket.startDate,
+          goodFull: 0,
+          totalFull: 0,
+          goodTakeout: 0,
+          totalTakeout: 0,
+        });
+      }
+      return weeks.get(bucket.key)!;
+    };
+
     (data || []).forEach(a => {
       a.dailyHistory?.csatScFull?.forEach(h => {
-        if (!dates.has(h.date)) dates.set(h.date, { goodFull: 0, totalFull: 0, goodTakeout: 0, totalTakeout: 0 });
         if (h.count > 0) {
-           dates.get(h.date)!.goodFull += h.score;
-           dates.get(h.date)!.totalFull += h.count;
+          const week = ensureWeek(h.date);
+          week.goodFull += h.score;
+          week.totalFull += h.count;
         }
       });
       a.dailyHistory?.csatScFair?.forEach(h => {
-        if (!dates.has(h.date)) dates.set(h.date, { goodFull: 0, totalFull: 0, goodTakeout: 0, totalTakeout: 0 });
         if (h.count > 0) {
-           dates.get(h.date)!.goodTakeout += h.score;
-           dates.get(h.date)!.totalTakeout += h.count;
+          const week = ensureWeek(h.date);
+          week.goodTakeout += h.score;
+          week.totalTakeout += h.count;
         }
       });
     });
     
-    return Array.from(dates.entries())
-      .map(([date, stats]) => {
-        const d = new Date(date);
-        const validDate = isNaN(d.getTime()) ? date : new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(d);
+    return Array.from(weeks.values())
+      .map(stats => {
         return {
-          date: validDate,
+          date: stats.label,
           'SC Full': stats.totalFull > 0 ? Number(((stats.goodFull / stats.totalFull) * 100).toFixed(2)) : 0,
           'SC After Takeout': stats.totalTakeout > 0 ? Number(((stats.goodTakeout / stats.totalTakeout) * 100).toFixed(2)) : 0,
-          rawDate: date
+          rawDate: stats.startDate,
         };
       })
       .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
@@ -1223,7 +1271,6 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
@@ -1241,12 +1288,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
         {/* Daily Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">Daily Trend ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">Weekly Average Trend ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <BarChart data={weeklyData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
