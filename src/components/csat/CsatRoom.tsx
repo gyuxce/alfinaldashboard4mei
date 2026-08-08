@@ -1753,7 +1753,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           <div className="flex items-center justify-center mb-4">
             <h4 className="text-xs font-bold text-text-secondary text-center">{comparisonMode === 'mom' ? '3-Month Respondents' : '4-Week Respondents'}</h4>
           </div>
-          <div className={cn('grid gap-4 h-full', comparisonMode === 'mom' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2')}>
+          <div className={cn('grid gap-4', comparisonMode === 'mom' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2')}>
             {weeksData.map((w, idx) => {
               const prevW = idx > 0 ? weeksData[idx - 1] : null;
               let diff = 0;
@@ -1841,7 +1841,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                     <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                {trendMode === 'daily' && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
                 <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} minTickGap={10} />
                 <YAxis tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{stroke: 'rgba(0,0,0,0.1)', strokeWidth: 2}} />
