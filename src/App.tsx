@@ -703,17 +703,15 @@ export default function App() {
                   placeholder="Search TL..."
                 />
               </div>
-              {activeTab !== 'leaderboard' && (
-                <div className="w-full sm:w-[150px]">
-                  <SearchableSelect 
-                    options={agentList}
-                    value={selectedGlobalAgent}
-                    onChange={setSelectedGlobalAgent}
-                    allOptionLabel="All Agents"
-                    placeholder="Search Agent..."
-                  />
-                </div>
-              )}
+              <div className="w-full sm:w-[150px]">
+                <SearchableSelect
+                  options={agentList}
+                  value={selectedGlobalAgent}
+                  onChange={setSelectedGlobalAgent}
+                  allOptionLabel="All Agents"
+                  placeholder="Search Agent..."
+                />
+              </div>
             </div>
             
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full 2xl:w-auto 2xl:border-r 2xl:border-border 2xl:pr-3">

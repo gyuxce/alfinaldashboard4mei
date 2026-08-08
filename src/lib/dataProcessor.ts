@@ -143,6 +143,51 @@ export interface AgentKPI {
   };
 }
 
+export interface AgentScopeFilters {
+  bpo?: string;
+  teamLeader?: string;
+  agent?: string;
+}
+
+const normalizeScopeValue = (value: unknown) =>
+  String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
+
+const matchesScopePersonName = (left: unknown, right: unknown) => {
+  const leftValue = normalizeScopeValue(left);
+  const rightValue = normalizeScopeValue(right);
+  if (!leftValue || !rightValue) return false;
+  if (leftValue === rightValue) return true;
+
+  const leftParts = leftValue.split(" ");
+  const rightParts = rightValue.split(" ");
+  return (leftParts.length === 1 && rightParts.includes(leftParts[0]))
+    || (rightParts.length === 1 && leftParts.includes(rightParts[0]));
+};
+
+const isAllScopeValue = (value: unknown, allValues: string[]) => {
+  const normalized = normalizeScopeValue(value);
+  return !normalized || allValues.includes(normalized);
+};
+
+export const matchesAgentScope = (
+  agent: Pick<AgentKPI, "bpo" | "teamLeader" | "name" | "csId">,
+  filters: AgentScopeFilters,
+) => {
+  const selectedBpo = normalizeScopeValue(filters.bpo);
+  const selectedTeamLeader = normalizeScopeValue(filters.teamLeader);
+  const selectedAgent = normalizeScopeValue(filters.agent);
+
+  const bpoMatches = isAllScopeValue(filters.bpo, ["ALL BPO"])
+    || normalizeScopeValue(agent.bpo) === selectedBpo;
+  const teamLeaderMatches = isAllScopeValue(filters.teamLeader, ["ALL TL", "ALL TEAM LEADERS"])
+    || matchesScopePersonName(agent.teamLeader, selectedTeamLeader);
+  const agentMatches = isAllScopeValue(filters.agent, ["ALL AGENTS"])
+    || normalizeScopeValue(agent.name) === selectedAgent
+    || normalizeScopeValue(agent.csId) === selectedAgent;
+
+  return bpoMatches && teamLeaderMatches && agentMatches;
+};
+
 const normalizeQaIdentifier = (value: unknown) =>
   String(value || "").trim().toLowerCase();
 

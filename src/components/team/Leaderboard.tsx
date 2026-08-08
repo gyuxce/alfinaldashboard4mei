@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
-import { AgentKPI, getCsatBadRatingCount, processKPIs } from "../../lib/dataProcessor";
+import { AgentKPI, getCsatBadRatingCount, matchesAgentScope, processKPIs } from "../../lib/dataProcessor";
 import { ArrowRight, Trophy, Users, User } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
@@ -202,6 +202,9 @@ export const Leaderboard: React.FC = () => {
     agentDictionaryByMonth,
     startDate,
     endDate,
+    selectedBpo,
+    selectedTL,
+    selectedGlobalAgent,
   } = useStore();
 
   const handleOpenFiles = () => {
@@ -236,6 +239,15 @@ export const Leaderboard: React.FC = () => {
       agentDictionaryByMonth,
     );
 
+    const scopedRawData = rawData.filter((agent) =>
+      !isAgentInactive(agent, endDate)
+      && matchesAgentScope(agent, {
+        bpo: selectedBpo,
+        teamLeader: selectedTL,
+        agent: selectedGlobalAgent,
+      }),
+    );
+
     // Prepare Agent List
     const aList: LeaderboardRow[] = [];
 
@@ -253,9 +265,7 @@ export const Leaderboard: React.FC = () => {
       }
     > = {};
 
-    rawData.forEach((agent) => {
-      if (isAgentInactive(agent, endDate)) return;
-
+    scopedRawData.forEach((agent) => {
       const { composite, csatGood, csatBad, csatPct } =
         getLeaderboardComposite(agent);
       const productivity = getProductivityColumns(
@@ -401,6 +411,9 @@ export const Leaderboard: React.FC = () => {
     agentDictionaryByMonth,
     startDate,
     endDate,
+    selectedBpo,
+    selectedTL,
+    selectedGlobalAgent,
   ]);
 
   if (!hasData) {
@@ -461,8 +474,25 @@ export const Leaderboard: React.FC = () => {
           Weighted Score: QA 50% &middot; Prod 20% &middot; CSAT 20% &middot; Training 5% &middot; Quiz 5%
         </p>
         <p className="text-[11px] text-text-muted italic mt-0.5">
-          Mengikuti periode aktif, ranking mencakup seluruh agent
+          Mengikuti periode aktif dan filter global yang sedang aktif
         </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] not-italic">
+            <span className="rounded-full border border-border bg-surface px-2 py-1 font-semibold text-text-secondary">
+              Periode: {startDate || "-"} s/d {endDate || "-"}
+            </span>
+            {(selectedBpo !== "All BPO" || selectedTL !== "All TL" || selectedGlobalAgent !== "All Agents") && (
+              <span className="font-bold uppercase tracking-wider text-text-muted">Filter aktif:</span>
+            )}
+            {selectedBpo !== "All BPO" && (
+              <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 font-semibold text-primary">BPO: {selectedBpo}</span>
+            )}
+            {selectedTL !== "All TL" && selectedTL !== "All Team Leaders" && (
+              <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 font-semibold text-primary">TL: {selectedTL}</span>
+            )}
+            {selectedGlobalAgent !== "All Agents" && (
+              <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 font-semibold text-primary">Agent: {selectedGlobalAgent}</span>
+            )}
+        </div>
       </div>
 
       <div className="inline-flex bg-surface-muted p-1 rounded-lg w-max gap-1">

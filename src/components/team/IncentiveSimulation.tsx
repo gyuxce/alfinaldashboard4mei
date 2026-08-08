@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
 import { useStore } from "../../store";
-import { AgentKPI, getCsatBadRatingCount, processKPIs } from "../../lib/dataProcessor";
+import { AgentKPI, getCsatBadRatingCount, matchesAgentScope, processKPIs } from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
 
 const DAILY_LIVECHAT_TARGET = 100;
@@ -303,27 +303,14 @@ export const IncentiveSimulation: React.FC = () => {
   );
 
   const filteredAgents = useMemo(() => {
-    let filtered = rawData.filter(
-      (agent) => !isInactiveAgent(agent, simulationPeriod.end),
+    return rawData.filter(
+      (agent) => !isInactiveAgent(agent, simulationPeriod.end)
+        && matchesAgentScope(agent, {
+          bpo: selectedBpo,
+          teamLeader: selectedTL,
+          agent: selectedGlobalAgent,
+        }),
     );
-
-    if (selectedBpo && selectedBpo !== "All BPO") {
-      filtered = filtered.filter(
-        (agent) => (agent.bpo || "").toUpperCase() === selectedBpo.toUpperCase(),
-      );
-    }
-    if (selectedTL && selectedTL !== "All TL" && selectedTL !== "All Team Leaders") {
-      filtered = filtered.filter(
-        (agent) => (agent.teamLeader || "").toUpperCase() === selectedTL.toUpperCase(),
-      );
-    }
-    if (selectedGlobalAgent && selectedGlobalAgent !== "All Agents") {
-      filtered = filtered.filter(
-        (agent) => agent.name === selectedGlobalAgent || agent.csId === selectedGlobalAgent,
-      );
-    }
-
-    return filtered;
   }, [
     rawData,
     selectedBpo,
@@ -342,17 +329,17 @@ export const IncentiveSimulation: React.FC = () => {
       }), [filteredAgents]);
 
   const teamLeaderRows = useMemo(() => {
-    const grouped = new Map<string, IncentiveRow[]>();
+    const grouped = new Map<string, AgentKPI[]>();
     filteredAgents.forEach((agent) => {
-      const teamLeader = agent.teamLeader || "-";
+      const teamLeader = String(agent.teamLeader || "-").trim() || "-";
       const current = grouped.get(teamLeader) || [];
-      current.push(buildIncentiveRow(agent));
+      current.push(agent);
       grouped.set(teamLeader, current);
     });
 
     const leaderRows = Array.from(grouped.entries())
-      .map(([teamLeader, agentRows]): TeamLeaderIncentiveRow => {
-        const teamAgents = filteredAgents.filter((agent) => (agent.teamLeader || "-") === teamLeader);
+      .map(([teamLeader, teamAgents]): TeamLeaderIncentiveRow => {
+        const agentRows = teamAgents.map(buildIncentiveRow);
         const qaCount = teamAgents.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
         const qaSum = teamAgents.reduce((sum, agent) => sum + agent.qaScoreSum, 0);
         const csatStats = teamAgents.reduce(
