@@ -1,11 +1,13 @@
 import React, { useMemo } from "react";
-import { Calculator, CheckCircle2, CircleAlert, FileText, Info, User, Users } from "lucide-react";
+import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
 import { useStore } from "../../store";
 import { AgentKPI, processKPIs } from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
 
 const DAILY_LIVECHAT_TARGET = 100;
 const LIVECHAT_PRODUCTIVITY_BONUS_PER_100 = 40000;
+const TEAM_LEADER_ACCESS_PIN = "170845";
+const TEAM_LEADER_BEST_BONUS = 500000;
 
 type IncentiveStatus = "eligible" | "ineligible" | "incomplete";
 
@@ -40,6 +42,7 @@ interface TeamLeaderIncentiveRow {
   tier: string;
   baseIncentive: number | null;
   productivityBonus: number;
+  bestLeaderBonus: number;
   totalIncentive: number | null;
   status: IncentiveStatus;
 }
@@ -95,6 +98,13 @@ const getQcPoints = (qaPct: number) => {
 const getTier = (score: number) => {
   if (score >= 96) return { label: "T1", incentive: 2000000 };
   if (score >= 88) return { label: "T2", incentive: 1250000 };
+  if (score >= 80) return { label: "T3", incentive: 750000 };
+  return { label: "-", incentive: 0 };
+};
+
+const getTeamLeaderTier = (score: number) => {
+  if (score >= 90) return { label: "T1", incentive: 2000000 };
+  if (score >= 85) return { label: "T2", incentive: 1250000 };
   if (score >= 80) return { label: "T3", incentive: 750000 };
   return { label: "-", incentive: 0 };
 };
@@ -206,6 +216,10 @@ const SummaryCard = ({
 
 export const IncentiveSimulation: React.FC = () => {
   const [viewMode, setViewMode] = React.useState<"agent" | "tl">("agent");
+  const [isTlUnlocked, setIsTlUnlocked] = React.useState(false);
+  const [isPinDialogOpen, setIsPinDialogOpen] = React.useState(false);
+  const [pinInput, setPinInput] = React.useState("");
+  const [pinError, setPinError] = React.useState("");
   const {
     productivityData,
     csatScData,
@@ -220,6 +234,29 @@ export const IncentiveSimulation: React.FC = () => {
     selectedTL,
     selectedGlobalAgent,
   } = useStore();
+
+  const openTlView = () => {
+    if (isTlUnlocked) {
+      setViewMode("tl");
+      return;
+    }
+    setPinInput("");
+    setPinError("");
+    setIsPinDialogOpen(true);
+  };
+
+  const unlockTlView = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (pinInput !== TEAM_LEADER_ACCESS_PIN) {
+      setPinError("PIN tidak sesuai.");
+      return;
+    }
+    setIsTlUnlocked(true);
+    setIsPinDialogOpen(false);
+    setPinInput("");
+    setPinError("");
+    setViewMode("tl");
+  };
 
   const simulationPeriod = useMemo(
     () => getPreviousCalendarMonthRange(endDate || startDate),
@@ -299,7 +336,7 @@ export const IncentiveSimulation: React.FC = () => {
       grouped.set(teamLeader, current);
     });
 
-    return Array.from(grouped.entries())
+    const leaderRows = Array.from(grouped.entries())
       .map(([teamLeader, agentRows]): TeamLeaderIncentiveRow => {
         const teamAgents = filteredAgents.filter((agent) => (agent.teamLeader || "-") === teamLeader);
         const qaCount = teamAgents.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
@@ -317,10 +354,17 @@ export const IncentiveSimulation: React.FC = () => {
         const finalProductivityPct = productivityTarget !== null
           ? (totalChat / productivityTarget) * 100
           : null;
-        const hasCompleteData = finalQaPct !== null && finalCsatPct !== null && finalProductivityPct !== null;
         const incompleteCount = agentRows.filter((row) => row.status === "incomplete").length;
+        const hasCompleteData = incompleteCount === 0
+          && agentRows.length > 0
+          && finalQaPct !== null
+          && finalCsatPct !== null
+          && finalProductivityPct !== null;
+        const finalScore = hasCompleteData
+          ? agentRows.reduce((sum, row) => sum + (row.totalScore || 0), 0) / agentRows.length
+          : null;
 
-        if (!hasCompleteData) {
+        if (finalScore === null) {
           return {
             teamLeader,
             agentCount: agentRows.length,
@@ -328,23 +372,18 @@ export const IncentiveSimulation: React.FC = () => {
             finalQaPct,
             finalCsatPct,
             finalProductivityPct,
-            finalScore: null,
+            finalScore,
             tier: "-",
             baseIncentive: null,
             productivityBonus: 0,
+            bestLeaderBonus: 0,
             totalIncentive: null,
             status: "incomplete",
           };
         }
 
-        const finalScore = getQcPoints(finalQaPct)
-          + (finalCsatPct / 100) * 25
-          + (Math.min(finalProductivityPct, 100) / 100) * 20;
-        const tier = getTier(finalScore);
+        const tier = getTeamLeaderTier(finalScore);
         const isEligible = tier.label !== "-";
-        const productivityBonus = isEligible && productivityTarget !== null
-          ? Math.max(0, totalChat - productivityTarget) / 100 * LIVECHAT_PRODUCTIVITY_BONUS_PER_100
-          : 0;
 
         return {
           teamLeader,
@@ -356,12 +395,33 @@ export const IncentiveSimulation: React.FC = () => {
           finalScore,
           tier: tier.label,
           baseIncentive: tier.incentive,
-          productivityBonus,
-          totalIncentive: isEligible ? tier.incentive + productivityBonus : 0,
+          productivityBonus: 0,
+          bestLeaderBonus: 0,
+          totalIncentive: isEligible ? tier.incentive : 0,
           status: isEligible ? "eligible" : "ineligible",
         };
       })
       .sort((a, b) => (b.finalScore || -1) - (a.finalScore || -1));
+
+    const eligibleScores = leaderRows
+      .filter((row) => row.status === "eligible" && row.finalScore !== null)
+      .map((row) => row.finalScore as number);
+    const bestLeaderScore = eligibleScores.length > 0 ? Math.max(...eligibleScores) : null;
+
+    return leaderRows.map((row) => {
+      const isBestLeader = bestLeaderScore !== null
+        && row.status === "eligible"
+        && row.finalScore !== null
+        && Math.abs(row.finalScore - bestLeaderScore) < 0.0001;
+      const bestLeaderBonus = isBestLeader ? TEAM_LEADER_BEST_BONUS : 0;
+      return {
+        ...row,
+        bestLeaderBonus,
+        totalIncentive: row.status === "eligible"
+          ? (row.baseIncentive || 0) + bestLeaderBonus
+          : row.totalIncentive,
+      };
+    });
   }, [filteredAgents]);
 
   const eligibleRows = rows.filter((row) => row.status === "eligible");
@@ -415,15 +475,54 @@ export const IncentiveSimulation: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setViewMode("tl")}
+              onClick={openTlView}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors",
                 viewMode === "tl" ? "bg-card text-primary shadow-sm" : "text-text-muted hover:text-text-primary",
               )}
             >
-              <Users className="h-3.5 w-3.5" /> Team Leaders
+              {isTlUnlocked ? <Users className="h-3.5 w-3.5" /> : <LockKeyhole className="h-3.5 w-3.5" />} Team Leaders
             </button>
           </div>
+
+          {isPinDialogOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+              <div className="w-full max-w-sm rounded-xl border border-border bg-card p-5 shadow-xl">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="flex items-center gap-2 text-sm font-bold text-text-primary">
+                      <KeyRound className="h-4 w-4 text-primary" />
+                      Akses Simulasi Team Leader
+                    </h3>
+                    <p className="mt-1 text-[11px] text-text-muted">Masukkan PIN untuk membuka simulasi khusus Team Leader.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPinDialogOpen(false)}
+                    className="rounded-md p-1 text-text-muted hover:bg-surface-muted hover:text-text-primary"
+                    aria-label="Tutup"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <form onSubmit={unlockTlView} className="mt-4 space-y-3">
+                  <input
+                    type="password"
+                    value={pinInput}
+                    onChange={(event) => setPinInput(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                    inputMode="numeric"
+                    autoFocus
+                    placeholder="PIN akses"
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                  {pinError && <p className="text-[11px] font-semibold text-danger">{pinError}</p>}
+                  <button type="submit" className="w-full rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary/90">
+                    Buka Simulasi TL
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {viewMode === "agent" ? (
@@ -438,7 +537,7 @@ export const IncentiveSimulation: React.FC = () => {
                 <SummaryCard label="TL disimulasikan" value={teamLeaderRows.length} detail="Mengikuti filter global" />
                 <SummaryCard label="Total agent" value={teamLeaderAgentCount} detail="Agent di bawah TL" />
                 <SummaryCard label="Tidak eligible" value={teamLeaderIneligibleCount} detail="Skor total di bawah 80" tone="warning" />
-                <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Tier TL + bonus produktivitas" tone="success" />
+                <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Tier TL + bonus TL terbaik" tone="success" />
               </>
             )}
           </div>
@@ -452,7 +551,7 @@ export const IncentiveSimulation: React.FC = () => {
                 <p className="mt-0.5 text-[11px] text-text-muted">
                   {viewMode === "agent"
                     ? "Nilai produktivitas di atas target menghasilkan bonus tambahan."
-                    : "Final KPI TL menentukan satu tier dan satu estimasi insentif untuk setiap TL."}
+                    : "Skor TL adalah rata-rata final score agent di dalam timnya."}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
@@ -554,7 +653,7 @@ export const IncentiveSimulation: React.FC = () => {
                   <tr>
                     {[
                       "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
-                      "Final KPI", "Tier TL", "Data Belum Lengkap", "Insentif TL", "Bonus Prod",
+                      "Final KPI", "Tier TL", "Data Belum Lengkap", "Insentif TL", "Bonus TL Terbaik",
                       "Total Estimasi", "Status",
                     ].map((label) => (
                       <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
@@ -576,7 +675,7 @@ export const IncentiveSimulation: React.FC = () => {
                       <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
                       <td className="px-2 py-2 font-semibold text-warning-text">{row.incompleteCount}</td>
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
-                      <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.productivityBonus)}</td>
+                      <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.bestLeaderBonus)}</td>
                       <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
                       <td className="px-2 py-2">
                         <span className={cn("inline-flex rounded-full px-2 py-1 text-[10px] font-bold", statusClass[row.status])}>
@@ -634,12 +733,20 @@ export const IncentiveSimulation: React.FC = () => {
                 Tier Insentif
               </h3>
               <div className="mt-3 space-y-2 text-[11px]">
-                {[
-                  ["T1", "96 ke atas", "Rp2.000.000"],
-                  ["T2", "88 - 95,99", "Rp1.250.000"],
-                  ["T3", "80 - 87,99", "Rp750.000"],
-                  ["-", "Di bawah 80", "Tidak eligible"],
-                ].map(([tier, range, amount]) => (
+                {(viewMode === "tl"
+                  ? [
+                    ["T1", "90 ke atas", "Rp2.000.000"],
+                    ["T2", "85 - 89,99", "Rp1.250.000"],
+                    ["T3", "80 - 84,99", "Rp750.000"],
+                    ["-", "Di bawah 80", "Tidak eligible"],
+                  ]
+                  : [
+                    ["T1", "96 ke atas", "Rp2.000.000"],
+                    ["T2", "88 - 95,99", "Rp1.250.000"],
+                    ["T3", "80 - 87,99", "Rp750.000"],
+                    ["-", "Di bawah 80", "Tidak eligible"],
+                  ]
+                ).map(([tier, range, amount]) => (
                   <div key={tier} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2">
                     <span className="font-bold text-primary">{tier}</span>
                     <span className="text-text-secondary">{range}</span>
@@ -655,7 +762,14 @@ export const IncentiveSimulation: React.FC = () => {
                 Aturan Tambahan
               </h3>
               <div className="mt-3 space-y-2 text-[11px] text-text-secondary">
-                <p className="rounded-lg bg-surface-muted p-3">Bonus Livechat: setiap 100 chat di atas target = <strong className="text-text-primary">Rp40.000</strong>.</p>
+                {viewMode === "agent" ? (
+                  <p className="rounded-lg bg-surface-muted p-3">Bonus Livechat: setiap 100 chat di atas target = <strong className="text-text-primary">Rp40.000</strong>.</p>
+                ) : (
+                  <>
+                    <p className="rounded-lg bg-surface-muted p-3">Skor TL dihitung dari rata-rata final score seluruh agent dalam tim.</p>
+                    <p className="rounded-lg bg-success-soft p-3 text-success-text">TL terbaik di channel Livechat mendapat bonus tambahan <strong>Rp500.000</strong>.</p>
+                  </>
+                )}
                 <p className="rounded-lg bg-surface-muted p-3">Kuis dan training wajib diselesaikan, tetapi tidak menambah skor insentif.</p>
                 <p className="rounded-lg bg-warning-soft p-3 text-warning-text">QA, CSAT, atau produktivitas yang belum tersedia akan berstatus <strong>Data belum lengkap</strong>.</p>
               </div>
