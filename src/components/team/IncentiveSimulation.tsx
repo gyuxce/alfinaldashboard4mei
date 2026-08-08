@@ -1,7 +1,14 @@
 import React, { useMemo } from "react";
 import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
 import { useStore } from "../../store";
-import { AgentKPI, getCsatBadRatingCount, matchesAgentScope, processKPIs } from "../../lib/dataProcessor";
+import {
+  AgentKPI,
+  applyAgentRoster,
+  getAgentDictionaryForPeriod,
+  getCsatBadRatingCount,
+  matchesAgentScope,
+  processKPIs,
+} from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
 
 const DAILY_LIVECHAT_TARGET = 100;
@@ -302,8 +309,14 @@ export const IncentiveSimulation: React.FC = () => {
     ],
   );
 
+  const activePeriodRoster = useMemo(
+    () => getAgentDictionaryForPeriod(startDate, agentDictionary, agentDictionaryByMonth),
+    [agentDictionary, agentDictionaryByMonth, startDate],
+  );
+
   const filteredAgents = useMemo(() => {
-    return rawData.filter(
+    const rosterData = applyAgentRoster(rawData, activePeriodRoster);
+    return rosterData.filter(
       (agent) => !isInactiveAgent(agent, simulationPeriod.end)
         && matchesAgentScope(agent, {
           bpo: selectedBpo,
@@ -313,6 +326,7 @@ export const IncentiveSimulation: React.FC = () => {
     );
   }, [
     rawData,
+    activePeriodRoster,
     selectedBpo,
     selectedGlobalAgent,
     selectedTL,
@@ -482,7 +496,7 @@ export const IncentiveSimulation: React.FC = () => {
           Skema Livechat berdasarkan data periode yang sudah selesai.
         </p>
         <p className="mt-1 text-[11px] text-text-muted">
-          Data simulasi: {simulationPeriod.start} s/d {simulationPeriod.end}; roster TL dan agent mengikuti periode simulasi.
+          KPI: {formatDateLabel(simulationPeriod.start)} s/d {formatDateLabel(simulationPeriod.end)}; roster TL dan agent: {formatDateLabel(startDate)} s/d {formatDateLabel(endDate)}.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
           <span className="rounded-full border border-border bg-surface px-2.5 py-1">

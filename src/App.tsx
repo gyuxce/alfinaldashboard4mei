@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from './store';
-import { matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from './lib/dataProcessor';
+import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from './lib/dataProcessor';
 import { getPreviousSheetMonthKey, getSheetMonthOption } from './lib/sheetsApi';
 
 import { 
@@ -420,7 +420,7 @@ export default function App() {
 
     const simulationRange = getPreviousMonthPeriod(startDate || '', endDate || startDate || '');
     const simulationData = activeTab === 'incentive'
-      ? processKPIs(
+      ? applyAgentRoster(processKPIs(
           productivityData,
           csatScData,
           slaData,
@@ -430,7 +430,7 @@ export default function App() {
           simulationRange.end,
           agentDictionary,
           agentDictionaryByMonth,
-        )
+        ), getAgentDictionaryForPeriod(startDate, agentDictionary, agentDictionaryByMonth))
       : [];
     const filterOptionData = activeTab === 'incentive' ? simulationData : data;
 

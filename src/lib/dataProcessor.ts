@@ -149,6 +149,11 @@ export interface AgentScopeFilters {
   agent?: string;
 }
 
+const PERIOD_MONTH_CODES = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+];
+
 const normalizeScopeValue = (value: unknown) =>
   String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
 
@@ -187,6 +192,41 @@ export const matchesAgentScope = (
 
   return bpoMatches && teamLeaderMatches && agentMatches;
 };
+
+export const getAgentDictionaryForPeriod = (
+  periodStart: string | undefined,
+  fallbackDictionary?: Record<string, { name: string; bpo: string; teamLeader: string }>,
+  dictionariesByMonth?: Record<string, Record<string, { name: string; bpo: string; teamLeader: string }>>,
+) => {
+  if (!dictionariesByMonth || Object.keys(dictionariesByMonth).length === 0) {
+    return fallbackDictionary;
+  }
+
+  const [year, month] = String(periodStart || "").split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) return fallbackDictionary;
+
+  const monthKey = `${PERIOD_MONTH_CODES[month - 1]}_${year}`;
+  return (
+    dictionariesByMonth[monthKey]
+    || (monthKey === "MAY_2026" ? dictionariesByMonth.legacy : undefined)
+    || fallbackDictionary
+  );
+};
+
+export const applyAgentRoster = (
+  agents: AgentKPI[],
+  roster?: Record<string, { name: string; bpo: string; teamLeader: string }>,
+) => agents.map((agent) => {
+  const rosterInfo = roster?.[agent.csId];
+  if (!rosterInfo) return agent;
+
+  return {
+    ...agent,
+    name: rosterInfo.name || agent.name,
+    bpo: rosterInfo.bpo || agent.bpo,
+    teamLeader: rosterInfo.teamLeader || agent.teamLeader,
+  };
+});
 
 const normalizeQaIdentifier = (value: unknown) =>
   String(value || "").trim().toLowerCase();
@@ -469,27 +509,11 @@ export const processKPIs = (
 ): AgentKPI[] => {
   const agents: Record<string, AgentKPI> = {};
 
-  const monthCodes = [
-    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
-  ];
-  const getPeriodDictionary = () => {
-    if (!agentDictionaryByMonth || Object.keys(agentDictionaryByMonth).length === 0) {
-      return agentDictionary;
-    }
-
-    const periodDate = startDate || endDate || "";
-    const [year, month] = periodDate.split("-").map(Number);
-    if (!year || !month || month < 1 || month > 12) return agentDictionary;
-
-    const monthKey = `${monthCodes[month - 1]}_${year}`;
-    return (
-      agentDictionaryByMonth[monthKey] ||
-      (monthKey === "MAY_2026" ? agentDictionaryByMonth.legacy : undefined) ||
-      agentDictionary
-    );
-  };
-  const periodDictionary = getPeriodDictionary();
+  const periodDictionary = getAgentDictionaryForPeriod(
+    startDate || endDate,
+    agentDictionary,
+    agentDictionaryByMonth,
+  );
 
   const isWithin = (dStr: string | null) => {
     if (!startDate && !endDate) return true;
