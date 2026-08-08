@@ -495,7 +495,7 @@ export const Leaderboard: React.FC = () => {
             <col className="w-[190px]" />
             <col className="w-[130px]" />
             <col className="w-[160px]" />
-            {Array.from({ length: 22 }).map((_, index) => (
+            {Array.from({ length: 21 }).map((_, index) => (
               <col key={`metric-column-${index}`} className="w-[96px]" />
             ))}
           </colgroup>
@@ -613,22 +613,43 @@ export const Leaderboard: React.FC = () => {
           </tbody>
         </table>
       ) : (
-        <table className="w-full min-w-[980px] table-fixed border-collapse whitespace-nowrap text-left text-[11px]">
+        <table className="w-full min-w-[2580px] table-fixed border-collapse whitespace-nowrap text-left text-[10px]">
           <colgroup>
             <col className="w-[52px]" />
-            <col className="w-[260px]" />
-            <col className="w-[110px]" />
-            <col className="w-[150px]" />
-            <col className="w-[150px]" />
-            <col className="w-[150px]" />
-            <col className="w-[150px]" />
-            <col className="w-[120px]" />
-            <col className="w-[120px]" />
+            <col className="w-[220px]" />
+            <col className="w-[80px]" />
+            {Array.from({ length: 22 }).map((_, index) => (
+              <col key={`tl-metric-column-${index}`} className="w-[105px]" />
+            ))}
+            <col className="w-[105px]" />
           </colgroup>
-          <thead className="sticky top-0 z-40 bg-primary text-white">
-            <tr>
-              {["#", "Team Leader", "Agents", "Final QA", "Final Prod", "Final CSAT", "Training", "Quiz", "Final Score"].map((label) => (
-                <th key={label} className="border-r border-white/40 px-3 py-3 text-center font-bold last:border-r-0">
+          <thead className="sticky top-0 z-40 text-white">
+            <tr className="bg-primary">
+              <th rowSpan={2} className="border-r border-white/40 p-2 text-center font-bold">#</th>
+              <th rowSpan={2} className="border-r border-white/40 p-2 text-left font-bold">Team Leader</th>
+              <th rowSpan={2} className="border-r border-white/40 p-2 text-center font-bold">Agents</th>
+              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 Points)</th>
+              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 Points)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 Points)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training Completion (5 Points)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz Score (5 Points)</th>
+              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Final Score</th>
+            </tr>
+            <tr className="border-t border-white/30 bg-primary">
+              {[
+                "% Ach", "Total Points",
+                "Daily Target", "Total Duty", "Target Chat", "Total Chat", "Total Points", "Final Points", "Difference",
+                "Total Good Rating", "Total Bad Rating", "Total CSAT", "Total Points",
+                "Total Training", "Agent Completion", "% Ach", "Total Points",
+                "Target", "Agent Score", "% Ach", "Total Points",
+              ].map((label, index) => (
+                <th
+                  key={`${label}-${index}`}
+                  className={cn(
+                    "overflow-hidden border-r border-white/40 px-2 py-1.5 text-center font-bold",
+                    [0, 2, 9, 13, 17].includes(index) && "border-l-2 border-l-white/60",
+                  )}
+                >
                   {label}
                 </th>
               ))}
@@ -637,22 +658,44 @@ export const Leaderboard: React.FC = () => {
           <tbody>
             {tlRows.map((item, idx) => (
               <tr key={item.name} className="border-b border-border-strong/70 hover:bg-surface-muted">
-                <td className="border-r border-border-strong px-3 py-3 text-center font-bold text-text-muted">#{idx + 1}</td>
-                <td className="border-r border-border-strong px-3 py-3 font-bold text-text-primary">{item.name}</td>
-                <td className="border-r border-border-strong px-3 py-3 text-center text-text-secondary">{item.agent_count ?? "-"}</td>
-                <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-text-secondary">{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
-                <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-text-secondary">{item.prod_pct !== null ? `${formatNum(Math.min(item.prod_pct, 100), 2)}%` : "-"}</td>
-                <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-text-secondary">{item.csat_pct !== null ? `${formatNum(item.csat_pct, 2)}%` : "-"}</td>
-                <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-success-text">100%</td>
-                <td className="border-r border-border-strong px-3 py-3 text-center font-semibold text-success-text">100%</td>
-                <td className="px-3 py-3 text-center">
+                <td className="border-r border-border-strong px-2 py-2 text-center font-bold text-text-muted">#{idx + 1}</td>
+                <td className="border-r border-border-strong px-2 py-2 font-bold text-text-primary">{item.name}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center text-text-secondary">{item.agent_count ?? "-"}</td>
+
+                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.qa_points !== null ? formatNum(item.qa_points, 2) : "-"}</td>
+
+                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_daily_target}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.prod_total_duty, 0)}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.prod_target_chat, 0)}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.prod_total_chat, 0)}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_points !== null ? formatNum(item.prod_points, 2) : "-"}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_final_points !== null ? formatNum(item.prod_final_points, 2) : "-"}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_difference !== null ? item.prod_difference : "-"}</td>
+
+                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.csat_good, 0)}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.csat_bad, 0)}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.csat_pct !== null ? `${formatNum(item.csat_pct, 2)}%` : "-"}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.csat_points !== null ? formatNum(item.csat_points, 2) : "-"}</td>
+
+                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.training_total ?? "-"}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.training_completion ?? "-"}</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-success-text">{formatNum(item.training_pct, 2)}%</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.training_points, 2)}</td>
+
+                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.quiz_target}%</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.quiz_score, 2)}%</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-success-text">{formatNum(item.quiz_pct, 2)}%</td>
+                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.quiz_points, 2)}</td>
+
+                <td className="border-l-2 border-border-strong px-2 py-2 text-center">
                   <span className={`text-[12px] ${getScoreColor(item.score)}`}>{formatNum(item.score, 2)}</span>
                 </td>
               </tr>
             ))}
             {tlRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-4">
+                <td colSpan={25} className="p-4">
                   <EmptyState
                     title="Tidak ada data Team Leader"
                     description="Pastikan data agent memiliki nama Team Leader pada periode aktif."
