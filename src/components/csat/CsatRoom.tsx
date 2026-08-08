@@ -1753,7 +1753,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           <div className="flex items-center justify-center mb-4">
             <h4 className="text-xs font-bold text-text-secondary text-center">{comparisonMode === 'mom' ? '3-Month Respondents' : '4-Week Respondents'}</h4>
           </div>
-          <div className="grid grid-cols-2 gap-4 h-full">
+          <div className={cn('grid gap-4 h-full', comparisonMode === 'mom' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2')}>
             {weeksData.map((w, idx) => {
               const prevW = idx > 0 ? weeksData[idx - 1] : null;
               let diff = 0;
