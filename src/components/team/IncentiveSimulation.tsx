@@ -8,6 +8,8 @@ const DAILY_LIVECHAT_TARGET = 100;
 const LIVECHAT_PRODUCTIVITY_BONUS_PER_100 = 40000;
 const TEAM_LEADER_ACCESS_PIN = "170845";
 const TEAM_LEADER_BEST_BONUS = 500000;
+// PKWT TL: gaji Rp2.828.000 + jabatan Rp1.000.000 + transport Rp500.000 per bulan.
+const TEAM_LEADER_GROSS_SALARY = 4328000;
 
 type IncentiveStatus = "eligible" | "ineligible" | "incomplete";
 
@@ -44,6 +46,8 @@ interface TeamLeaderIncentiveRow {
   productivityBonus: number;
   bestLeaderBonus: number;
   totalIncentive: number | null;
+  grossSalary: number;
+  grossThp: number | null;
   status: IncentiveStatus;
 }
 
@@ -401,6 +405,8 @@ export const IncentiveSimulation: React.FC = () => {
             productivityBonus: 0,
             bestLeaderBonus: 0,
             totalIncentive: null,
+            grossSalary: TEAM_LEADER_GROSS_SALARY,
+            grossThp: null,
             status: "incomplete",
           };
         }
@@ -421,6 +427,8 @@ export const IncentiveSimulation: React.FC = () => {
           productivityBonus: 0,
           bestLeaderBonus: 0,
           totalIncentive: isEligible ? tier.incentive : 0,
+          grossSalary: TEAM_LEADER_GROSS_SALARY,
+          grossThp: TEAM_LEADER_GROSS_SALARY + (isEligible ? tier.incentive : 0),
           status: isEligible ? "eligible" : "ineligible",
         };
       })
@@ -437,12 +445,14 @@ export const IncentiveSimulation: React.FC = () => {
         && row.finalScore !== null
         && Math.abs(row.finalScore - bestLeaderScore) < 0.0001;
       const bestLeaderBonus = isBestLeader ? TEAM_LEADER_BEST_BONUS : 0;
+      const totalIncentive = row.status === "eligible"
+        ? (row.baseIncentive || 0) + bestLeaderBonus
+        : row.totalIncentive;
       return {
         ...row,
         bestLeaderBonus,
-        totalIncentive: row.status === "eligible"
-          ? (row.baseIncentive || 0) + bestLeaderBonus
-          : row.totalIncentive,
+        totalIncentive,
+        grossThp: totalIncentive === null ? null : row.grossSalary + totalIncentive,
       };
     });
   }, [filteredAgents]);
@@ -460,6 +470,10 @@ export const IncentiveSimulation: React.FC = () => {
     0,
   );
   const teamLeaderTotalIncentive = teamLeaderRows.reduce((sum, row) => sum + (row.totalIncentive || 0), 0);
+  const teamLeaderTotalGrossThp = teamLeaderRows.reduce(
+    (sum, row) => sum + (row.grossThp || 0),
+    0,
+  );
   return (
     <div className="flex flex-col gap-5 p-2">
       <div>
@@ -547,7 +561,10 @@ export const IncentiveSimulation: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={cn(
+            "grid grid-cols-1 gap-3 sm:grid-cols-2",
+            viewMode === "tl" ? "xl:grid-cols-5" : "xl:grid-cols-4",
+          )}>
             {viewMode === "agent" ? (
               <>
                 <SummaryCard label="Agent disimulasikan" value={rows.length} detail="Mengikuti filter global" />
@@ -561,6 +578,7 @@ export const IncentiveSimulation: React.FC = () => {
                 <SummaryCard label="Total agent" value={teamLeaderAgentCount} detail="Agent di bawah TL" />
                 <SummaryCard label="Tidak eligible" value={teamLeaderIneligibleCount} detail="Skor total di bawah 80" tone="warning" />
                 <SummaryCard label="Total estimasi" value={formatCurrency(teamLeaderTotalIncentive)} detail="Tier TL + bonus TL terbaik" tone="success" />
+                <SummaryCard label="Total THP gross" value={formatCurrency(teamLeaderTotalGrossThp)} detail="Gaji gross + insentif TL" tone="success" />
               </>
             )}
           </div>
@@ -671,13 +689,13 @@ export const IncentiveSimulation: React.FC = () => {
             </div>
             ) : (
             <div className="max-h-[calc(100vh-350px)] overflow-auto">
-              <table className="min-w-[1100px] w-full border-collapse text-left text-[10px]">
+              <table className="min-w-[1280px] w-full border-collapse text-left text-[10px]">
                 <thead className="sticky top-0 z-20 bg-primary text-white">
                   <tr>
                     {[
                       "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
                       "Final KPI", "Tier TL", "Insentif TL", "Bonus TL Terbaik",
-                      "Total Estimasi", "Status",
+                      "Gaji Gross", "Total THP Gross", "Status",
                     ].map((label) => (
                       <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
                         {label}
@@ -698,7 +716,8 @@ export const IncentiveSimulation: React.FC = () => {
                       <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
                       <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.bestLeaderBonus)}</td>
-                      <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
+                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.grossSalary)}</td>
+                      <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.grossThp)}</td>
                       <td className="px-2 py-2">
                         <span className={cn("inline-flex rounded-full px-2 py-1 text-[10px] font-bold", statusClass[row.status])}>
                           {statusLabel[row.status]}
@@ -708,7 +727,7 @@ export const IncentiveSimulation: React.FC = () => {
                   ))}
                   {teamLeaderRows.length === 0 && (
                     <tr>
-                      <td colSpan={12} className="p-8 text-center text-xs text-text-muted">
+                      <td colSpan={13} className="p-8 text-center text-xs text-text-muted">
                         Tidak ada Team Leader pada filter yang dipilih.
                       </td>
                     </tr>
@@ -790,6 +809,8 @@ export const IncentiveSimulation: React.FC = () => {
                   <>
                     <p className="rounded-lg bg-surface-muted p-3">Skor TL dihitung dari rata-rata final score seluruh agent dalam tim.</p>
                     <p className="rounded-lg bg-success-soft p-3 text-success-text">TL terbaik di channel Livechat mendapat bonus tambahan <strong>Rp500.000</strong>.</p>
+                    <p className="rounded-lg bg-surface-muted p-3">Gaji gross TL per bulan <strong className="text-text-primary">Rp4.328.000</strong>. THP gross = gaji gross + insentif TL.</p>
+                    <p className="rounded-lg bg-warning-soft p-3 text-warning-text">THP gross belum dikurangi pajak/BPJS dan belum termasuk lembur, hari libur, atau shift malam.</p>
                   </>
                 )}
                 <p className="rounded-lg bg-surface-muted p-3">Kuis dan training wajib diselesaikan, tetapi tidak menambah skor insentif.</p>
