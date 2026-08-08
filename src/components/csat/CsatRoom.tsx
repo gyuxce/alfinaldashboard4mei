@@ -1189,10 +1189,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
     }>();
 
     const getWeekBucket = (date: string) => {
-      const parsed = new Date(`${date}T00:00:00`);
-      if (isNaN(parsed.getTime())) {
+      const parsedTimestamp = parseDateForSort(date);
+      if (!parsedTimestamp) {
         return { key: date, label: date, startDate: date };
       }
+      const parsed = new Date(parsedTimestamp);
 
       const start = new Date(parsed);
       const day = start.getDay();
