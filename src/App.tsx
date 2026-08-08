@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from './store';
-import { processKPIs, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from './lib/dataProcessor';
+import { matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from './lib/dataProcessor';
 import { getPreviousSheetMonthKey, getSheetMonthOption } from './lib/sheetsApi';
 
 import { 
@@ -418,6 +418,22 @@ export default function App() {
     let prevData2 = previousRawData2;
     let prevData3 = previousRawData3;
 
+    const simulationRange = getPreviousMonthPeriod(startDate || '', endDate || startDate || '');
+    const simulationData = activeTab === 'incentive'
+      ? processKPIs(
+          productivityData,
+          csatScData,
+          slaData,
+          scheduleData,
+          qaData,
+          simulationRange.start,
+          simulationRange.end,
+          agentDictionary,
+          agentDictionaryByMonth,
+        )
+      : [];
+    const filterOptionData = activeTab === 'incentive' ? simulationData : data;
+
     const applyFilters = (d: any[]) => {
       let filtered = d;
       if (selectedBpo && selectedBpo !== 'All BPO') {
@@ -438,9 +454,20 @@ export default function App() {
     const filteredPrevData3 = applyFilters(prevData3);
 
     const agents = new Set<string>();
-    filteredData.forEach(a => {
+    filterOptionData
+      .filter(a => matchesAgentScope(a, {
+        bpo: selectedBpo,
+        teamLeader: selectedTL,
+        agent: 'All Agents',
+      }))
+      .forEach(a => {
       if (a.name && a.name !== '-') agents.add(a.name);
       else agents.add(a.csId);
+    });
+
+    const optionTls = new Set<string>();
+    filterOptionData.forEach(a => {
+      if (a.teamLeader && a.teamLeader.trim() !== '') optionTls.add(a.teamLeader.trim());
     });
 
     return { 
@@ -448,10 +475,31 @@ export default function App() {
       previousKpiData: filteredPrevData,
       previousKpiData2: filteredPrevData2,
       previousKpiData3: filteredPrevData3,
-      tlList: baseTlList, 
+      tlList: activeTab === 'incentive'
+        ? Array.from(optionTls).sort((a, b) => a.localeCompare(b))
+        : baseTlList,
       agentList: Array.from(agents).sort((a,b) => a.localeCompare(b)) 
     };
-  }, [rawData, previousRawData, previousRawData2, previousRawData3, baseTlList, selectedBpo, selectedTL, selectedGlobalAgent]);
+  }, [
+    activeTab,
+    agentDictionary,
+    agentDictionaryByMonth,
+    baseTlList,
+    csatScData,
+    endDate,
+    previousRawData,
+    previousRawData2,
+    previousRawData3,
+    productivityData,
+    qaData,
+    rawData,
+    scheduleData,
+    selectedBpo,
+    selectedGlobalAgent,
+    selectedTL,
+    slaData,
+    startDate,
+  ]);
 
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },

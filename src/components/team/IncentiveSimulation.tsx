@@ -481,6 +481,9 @@ export const IncentiveSimulation: React.FC = () => {
         <p className="mt-1 text-[13px] text-text-secondary">
           Skema Livechat berdasarkan data periode yang sudah selesai.
         </p>
+        <p className="mt-1 text-[11px] text-text-muted">
+          Data simulasi: {simulationPeriod.start} s/d {simulationPeriod.end}; roster TL dan agent mengikuti periode simulasi.
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
           <span className="rounded-full border border-border bg-surface px-2.5 py-1">
             QC 55% + CSAT 25% + Produktivitas 20%
