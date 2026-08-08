@@ -80,6 +80,24 @@ const getProductivityColumns = (totalChat: number, totalDuty: number) => {
   };
 };
 
+const getPeriodBusinessDays = (startDate: string, endDate: string) => {
+  if (!startDate || !endDate) return null;
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return null;
+  }
+
+  let businessDays = 0;
+  for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) businessDays += 1;
+  }
+
+  return businessDays;
+};
+
 const getLeaderboardComposite = (agent: AgentKPI) => {
   const baseComposite = calculateAgentCompositeScore(agent);
   const csatGood = agent.csat4Count + agent.csat5Count;
@@ -317,17 +335,20 @@ export const Leaderboard: React.FC = () => {
 
     // Compute TL composite scores
     const tList: LeaderboardRow[] = [];
+    const defaultTlDuty = getPeriodBusinessDays(startDate, endDate);
     Object.entries(tlMap).forEach(([tlName, stats]) => {
+      const agentCount = stats.agents.size;
       const tl_qa_pct =
         stats.qaScoreCount > 0 ? (stats.qaScoreSum / stats.qaScoreCount) : null;
       const tlCsatTotal = stats.csatGood + stats.csatBad;
       const tl_csat_pct =
         tlCsatTotal > 0 ? (stats.csatGood / tlCsatTotal) * 100 : null;
 
-      const productivity = getProductivityColumns(
-        stats.totalChat,
-        stats.totalDuty,
-      );
+      // Client TL data reports team productivity as the average per agent,
+      // against the TL's period target rather than the team's summed target.
+      const tlDuty = defaultTlDuty || (agentCount > 0 ? stats.totalDuty / agentCount : 0);
+      const averageTotalChat = agentCount > 0 ? stats.totalChat / agentCount : 0;
+      const productivity = getProductivityColumns(averageTotalChat, tlDuty);
       const tl_prod_pct = productivity.achievement;
 
       const tl_qa_orig = tl_qa_pct;
@@ -344,7 +365,7 @@ export const Leaderboard: React.FC = () => {
       if (tlFinalScore !== null) {
         tList.push({
           name: tlName,
-          agent_count: stats.agents.size,
+          agent_count: agentCount,
           score: tlFinalScore,
           qa: tl_qa_orig,
           qa_pct: tl_qa_pct,
@@ -352,9 +373,9 @@ export const Leaderboard: React.FC = () => {
           prod: tl_prod_orig,
           prod_pct: tl_prod_pct,
           prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
-          prod_total_duty: stats.totalDuty,
+          prod_total_duty: tlDuty,
           prod_target_chat: productivity.targetChat,
-          prod_total_chat: stats.totalChat,
+          prod_total_chat: averageTotalChat,
           prod_points: productivity.points,
           prod_final_points: productivity.finalPoints,
           prod_difference: productivity.difference,
