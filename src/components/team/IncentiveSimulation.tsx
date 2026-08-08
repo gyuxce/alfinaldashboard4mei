@@ -40,6 +40,9 @@ interface TeamLeaderIncentiveRow {
   finalQaPct: number | null;
   finalCsatPct: number | null;
   finalProductivityPct: number | null;
+  averageQaPoints: number | null;
+  averageCsatPoints: number | null;
+  averageProductivityPoints: number | null;
   finalScore: number | null;
   tier: string;
   baseIncentive: number | null;
@@ -387,6 +390,15 @@ export const IncentiveSimulation: React.FC = () => {
           && finalQaPct !== null
           && finalCsatPct !== null
           && finalProductivityPct !== null;
+        const averageQaPoints = hasCompleteData
+          ? agentRows.reduce((sum, row) => sum + (row.qaPoints || 0), 0) / agentRows.length
+          : null;
+        const averageCsatPoints = hasCompleteData
+          ? agentRows.reduce((sum, row) => sum + (row.csatPoints || 0), 0) / agentRows.length
+          : null;
+        const averageProductivityPoints = hasCompleteData
+          ? agentRows.reduce((sum, row) => sum + (row.productivityPoints || 0), 0) / agentRows.length
+          : null;
         const finalScore = hasCompleteData
           ? agentRows.reduce((sum, row) => sum + (row.totalScore || 0), 0) / agentRows.length
           : null;
@@ -399,6 +411,9 @@ export const IncentiveSimulation: React.FC = () => {
             finalQaPct,
             finalCsatPct,
             finalProductivityPct,
+            averageQaPoints,
+            averageCsatPoints,
+            averageProductivityPoints,
             finalScore,
             tier: "-",
             baseIncentive: null,
@@ -421,6 +436,9 @@ export const IncentiveSimulation: React.FC = () => {
           finalQaPct,
           finalCsatPct,
           finalProductivityPct,
+          averageQaPoints,
+          averageCsatPoints,
+          averageProductivityPoints,
           finalScore,
           tier: tier.label,
           baseIncentive: tier.incentive,
@@ -694,7 +712,7 @@ export const IncentiveSimulation: React.FC = () => {
                   <tr>
                     {[
                       "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
-                      "Final KPI", "Tier TL", "Insentif TL", "Bonus TL Terbaik",
+                      "Breakdown Poin", "Final KPI", "Tier TL", "Insentif TL", "Bonus TL Terbaik",
                       "Gaji Gross", "Total THP Gross", "Status",
                     ].map((label) => (
                       <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
@@ -712,6 +730,11 @@ export const IncentiveSimulation: React.FC = () => {
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalQaPct, 2)}%</td>
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalCsatPct, 2)}%</td>
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalProductivityPct, 1)}%</td>
+                      <td className="px-2 py-2 text-[9px] leading-4 text-text-secondary">
+                        <div>QA: <strong className="text-text-primary">{formatNum(row.averageQaPoints, 2)} / 55</strong></div>
+                        <div>CSAT: <strong className="text-text-primary">{formatNum(row.averageCsatPoints, 2)} / 25</strong></div>
+                        <div>Prod: <strong className="text-text-primary">{formatNum(row.averageProductivityPoints, 2)} / 20</strong></div>
+                      </td>
                       <td className="px-2 py-2 font-bold text-text-primary">{formatNum(row.finalScore, 2)}</td>
                       <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
                       <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
@@ -727,7 +750,7 @@ export const IncentiveSimulation: React.FC = () => {
                   ))}
                   {teamLeaderRows.length === 0 && (
                     <tr>
-                      <td colSpan={13} className="p-8 text-center text-xs text-text-muted">
+                      <td colSpan={14} className="p-8 text-center text-xs text-text-muted">
                         Tidak ada Team Leader pada filter yang dipilih.
                       </td>
                     </tr>
@@ -735,6 +758,11 @@ export const IncentiveSimulation: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
+            {viewMode === "tl" && (
+              <div className="border-t border-border bg-surface-muted px-4 py-3 text-[11px] text-text-secondary">
+                <strong className="text-text-primary">Cara baca:</strong> persentase QA/CSAT/Prod adalah ringkasan tim, sedangkan Final KPI dihitung dari rata-rata Final KPI setiap agent. Breakdown poin menunjukkan rata-rata poin agent sebelum dijumlahkan menjadi Final KPI TL.
+              </div>
             )}
           </section>
 
