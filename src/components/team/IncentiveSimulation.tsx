@@ -676,7 +676,7 @@ export const IncentiveSimulation: React.FC = () => {
                   <tr>
                     {[
                       "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
-                      "Final KPI", "Tier TL", "Data Belum Lengkap", "Insentif TL", "Bonus TL Terbaik",
+                      "Final KPI", "Tier TL", "Agent KPI Kurang", "Insentif TL", "Bonus TL Terbaik",
                       "Total Estimasi", "Status",
                     ].map((label) => (
                       <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
