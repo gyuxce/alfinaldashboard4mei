@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
+import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useStore } from '../../store';
 
@@ -1140,9 +1140,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
     if (comparisonMode === 'mom') {
-      end.setMonth(end.getMonth() - offset);
-      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
-      return `${month} ${end.getFullYear()}`;
+      return getMonthOffsetLabel(startDate, offset);
     }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
@@ -1372,9 +1370,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
     if (comparisonMode === 'mom') {
-      end.setMonth(end.getMonth() - offset);
-      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
-      return `${month} ${end.getFullYear()}`;
+      return getMonthOffsetLabel(startDate, offset);
     }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
@@ -1566,9 +1562,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
     if (comparisonMode === 'mom') {
-      end.setMonth(end.getMonth() - offset);
-      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
-      return `${month} ${end.getFullYear()}`;
+      return getMonthOffsetLabel(startDate, offset);
     }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);

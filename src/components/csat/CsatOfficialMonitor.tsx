@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
+import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Users, TrendingDown, CalendarDays } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
@@ -265,9 +265,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
     const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
     const end = new Date(endDate);
     if (comparisonMode === 'mom') {
-      end.setMonth(end.getMonth() - offset);
-      const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);
-      return `${month} ${end.getFullYear()}`;
+      return getMonthOffsetLabel(startDate, offset);
     }
     end.setDate(end.getDate() - (offset * diff));
     const month = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(end);

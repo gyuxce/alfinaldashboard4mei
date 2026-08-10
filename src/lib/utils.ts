@@ -53,6 +53,20 @@ export function parseDateForSort(dateStr: string): number {
   return 0;
 }
 
+export function getMonthOffsetLabel(periodStart: string, offset = 0): string {
+  const match = String(periodStart || '').match(/^(\d{4})-(\d{2})-/);
+  if (!match) return '';
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!year || month < 1 || month > 12) return '';
+
+  // Start from day 1 so subtracting a month cannot overflow from June 31 to July.
+  const target = new Date(year, month - 1, 1);
+  target.setMonth(target.getMonth() - offset);
+  return new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(target) + ` ${target.getFullYear()}`;
+}
+
 
 const kpiColorCache = new Map<string, string>();
 
