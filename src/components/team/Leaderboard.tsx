@@ -5,6 +5,7 @@ import { ArrowRight, Trophy, Users, User } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
+import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
 
 const DAILY_PRODUCTIVITY_TARGET = 100;
@@ -522,9 +523,10 @@ export const Leaderboard: React.FC = () => {
       </div>
 
       <div className="flex flex-col gap-4">
+      <MobileScrollHint label="Geser → untuk lihat semua kolom" />
       <div className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
       {toggleMode === "agent" ? (
-        <table className="w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left text-[10px]">
+        <table className="kpi-data-table w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left">
           <colgroup>
             <col className="w-[52px]" />
             <col className="w-[190px]" />
@@ -649,7 +651,7 @@ export const Leaderboard: React.FC = () => {
           </tbody>
         </table>
       ) : (
-        <table className="w-full min-w-[2580px] table-fixed border-collapse whitespace-nowrap text-left text-[10px]">
+        <table className="kpi-data-table w-full min-w-[2580px] table-fixed border-collapse whitespace-nowrap text-left">
           <colgroup>
             <col className="w-[52px]" />
             <col className="w-[220px]" />

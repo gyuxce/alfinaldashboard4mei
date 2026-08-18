@@ -1,6 +1,7 @@
 import React from "react";
 import { formatNum, parseDateForSort } from "../../lib/utils";
 import { chart } from "../../lib/themeColors";
+import { ChartScrollArea } from "../ui/ChartScrollArea";
 import {
   AreaChart,
   Area,
@@ -116,8 +117,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
           </div>
         </div>
 
-        <div className="w-full overflow-x-auto pb-2">
-          <div className="h-[280px] min-w-[700px]">
+        <ChartScrollArea canvasClassName="h-[280px] min-w-[640px] sm:min-w-[700px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={[
@@ -239,8 +239,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        </div>
+        </ChartScrollArea>
       </div>
 
       {/* Weekly/Daily Trend Chart */}

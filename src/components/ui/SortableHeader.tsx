@@ -12,7 +12,7 @@ export const SortableHeader: React.FC<{
   const isActive = config?.key === sortKey;
   return (
     <th 
-      className={cn("p-2 font-bold cursor-pointer hover:bg-surface-muted transition-colors select-none", className)}
+      className={cn("px-2.5 py-2.5 font-medium cursor-pointer hover:bg-surface-muted transition-colors select-none", className)}
       onClick={() => onSort(sortKey)}
     >
       <div className={cn("flex items-center gap-1", className?.includes('text-center') ? 'justify-center' : '')}>

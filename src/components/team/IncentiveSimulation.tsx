@@ -619,7 +619,7 @@ export const IncentiveSimulation: React.FC = () => {
 
             {viewMode === "agent" ? (
             <div className="max-h-[calc(100vh-350px)] overflow-auto">
-              <table className="min-w-[1240px] w-full table-fixed border-collapse text-left text-[10px]">
+              <table className="kpi-data-table min-w-[1240px] w-full table-fixed border-collapse text-left">
                 <colgroup>
                   <col className="w-[34px]" />
                   <col className="w-[190px]" />
@@ -705,7 +705,7 @@ export const IncentiveSimulation: React.FC = () => {
             </div>
             ) : (
             <div className="max-h-[calc(100vh-350px)] overflow-auto">
-              <table className="min-w-[1280px] w-full border-collapse text-left text-[10px]">
+              <table className="kpi-data-table min-w-[1280px] w-full border-collapse text-left">
                 <thead className="sticky top-0 z-20 bg-primary text-white">
                   <tr>
                     {[
