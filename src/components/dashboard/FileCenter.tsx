@@ -834,9 +834,7 @@ export const FileCenter = () => {
   const syncStatusText = isFetchingSheets
     ? `Mengambil ${syncMonthLabel}...`
     : hasSuccessfulSync
-      ? previousSheetOption
-        ? `Data aktif: ${activeMonth.label}, pembanding: ${previousSheetOption.label}`
-        : `Data aktif: ${activeMonth.label}`
+      ? ''
       : `Sheet belum aktif: ${activeMonth.label}`;
   const syncIsStale = isStaleSync(lastSyncTime);
 
@@ -922,7 +920,7 @@ export const FileCenter = () => {
                 "font-bold",
                 isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-primary"
               )}>
-                {syncStatusText}
+                {syncStatusText || (syncIsStale ? 'Data perlu di-refresh' : 'Data tersinkron')}
               </p>
               <p className="text-xs text-text-muted mt-1">
                 {isFetchingSheets
