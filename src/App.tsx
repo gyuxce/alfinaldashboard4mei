@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
 import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, getPreviousCalendarMonthRange, normalizeDateStr } from './lib/dataProcessor';
 
@@ -327,15 +328,47 @@ export default function App() {
     }
   }, [theme]);
 
-  const { 
-    csidData, productivityData, csatScData, slaData, scheduleData, qaData, 
+  const {
+    csidData, productivityData, csatScData, slaData, scheduleData, qaData,
     startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, agentDictionary, agentDictionaryByMonth, selectedSheetMonth,
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, activeMonthRowCounts,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode,
     pendingTab, clearPendingTab,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    csidData: s.csidData,
+    productivityData: s.productivityData,
+    csatScData: s.csatScData,
+    slaData: s.slaData,
+    scheduleData: s.scheduleData,
+    qaData: s.qaData,
+    startDate: s.startDate,
+    endDate: s.endDate,
+    selectedBpo: s.selectedBpo,
+    selectedTL: s.selectedTL,
+    selectedGlobalAgent: s.selectedGlobalAgent,
+    agentDictionary: s.agentDictionary,
+    agentDictionaryByMonth: s.agentDictionaryByMonth,
+    selectedSheetMonth: s.selectedSheetMonth,
+    setDateRange: s.setDateRange,
+    setSelectedBpo: s.setSelectedBpo,
+    setSelectedTL: s.setSelectedTL,
+    setSelectedGlobalAgent: s.setSelectedGlobalAgent,
+    isHydrating: s.isHydrating,
+    hydrateFromStorage: s.hydrateFromStorage,
+    isFetchingSheets: s.isFetchingSheets,
+    fetchFromSheets: s.fetchFromSheets,
+    lastSyncTime: s.lastSyncTime,
+    sheetsFetchError: s.sheetsFetchError,
+    activeMonthRowCounts: s.activeMonthRowCounts,
+    isComparisonEnabled: s.isComparisonEnabled,
+    setIsComparisonEnabled: s.setIsComparisonEnabled,
+    comparisonMode: s.comparisonMode,
+    setComparisonMode: s.setComparisonMode,
+    pendingTab: s.pendingTab,
+    clearPendingTab: s.clearPendingTab,
+  })));
 
   useEffect(() => {
     hydrateFromStorage();

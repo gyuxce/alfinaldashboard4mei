@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from "../../store";
 import { AgentKPI, getCsatBadRatingCount } from "../../lib/dataProcessor";
 import { ArrowRight, Trophy, Users, User } from "lucide-react";
-import { formatNum } from "../../lib/utils";
-import { cn } from "../../lib/utils";
+import { formatNum, cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
@@ -204,7 +204,18 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     selectedBpo,
     selectedTL,
     selectedGlobalAgent,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    productivityData: s.productivityData,
+    csatScData: s.csatScData,
+    slaData: s.slaData,
+    scheduleData: s.scheduleData,
+    qaData: s.qaData,
+    startDate: s.startDate,
+    endDate: s.endDate,
+    selectedBpo: s.selectedBpo,
+    selectedTL: s.selectedTL,
+    selectedGlobalAgent: s.selectedGlobalAgent,
+  })));
   const openTab = useStore((s) => s.openTab);
 
   const handleOpenFiles = () => {

@@ -3,6 +3,7 @@ import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPrevious
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
 import { kpiThemeColor } from "../../lib/themeColors";
 import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
 import { DashboardAgentTable } from "./DashboardAgentTable";
@@ -18,7 +19,11 @@ interface Props {
 export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const [search, setSearch] = useState("");
   const [isRulesOpen, setIsRulesOpen] = useState(false);
-  const { startDate, endDate, comparisonMode } = useStore();
+  const { startDate, endDate, comparisonMode } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    comparisonMode: s.comparisonMode,
+  })));
 
   const tableData = useMemo(() => {
     return data.filter(

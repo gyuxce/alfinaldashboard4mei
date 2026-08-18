@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 
 import { SortableHeader } from '../ui/SortableHeader';
@@ -73,7 +74,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   };
 
   const dict = useStore(state => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore();
+  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    setDateRange: s.setDateRange,
+  })));
 
   const tableData = useMemo(() => {
     return data.filter(a => {
@@ -1180,8 +1185,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 };
 
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
-  const { startDate, endDate } = useStore();
-  const comparisonMode = useStore(state => state.comparisonMode);
+  const { startDate, endDate, comparisonMode } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    comparisonMode: s.comparisonMode,
+  })));
   const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('daily');
 
   const getWeekLabel = (offset: number) => {
@@ -1411,8 +1419,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
 };
 
 const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, viewMode, search, filterTL, type = 'all', onCategoryClick, onAgentClick }: any) => {
-  const { startDate, endDate } = useStore();
-  const comparisonMode = useStore(state => state.comparisonMode);
+  const { startDate, endDate, comparisonMode } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    comparisonMode: s.comparisonMode,
+  })));
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
@@ -1602,8 +1613,11 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
   );
 };
 const RespondentChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
-  const { startDate, endDate } = useStore();
-  const comparisonMode = useStore(state => state.comparisonMode);
+  const { startDate, endDate, comparisonMode } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    comparisonMode: s.comparisonMode,
+  })));
   const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('daily');
 
   const getWeekLabel = (offset: number) => {

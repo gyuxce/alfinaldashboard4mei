@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort } from '../../lib/utils';
 import { Search, Clock } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
@@ -21,7 +22,11 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   };
 
   const dict = useStore(state => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore();
+  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    setDateRange: s.setDateRange,
+  })));
 
   const tableData = useMemo(() => {
     let filtered = data.filter(a => {

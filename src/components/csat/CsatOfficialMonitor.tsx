@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Star, Users } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
@@ -25,7 +26,11 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
   };
 
   const dict = useStore(state => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore();
+  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    setDateRange: s.setDateRange,
+  })));
 
   const tableData = useMemo(() => {
     let filtered = data.filter(a => {
@@ -279,8 +284,11 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
 };
 
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
-  const { startDate, endDate } = useStore();
-  const comparisonMode = useStore(state => state.comparisonMode);
+  const { startDate, endDate, comparisonMode } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    comparisonMode: s.comparisonMode,
+  })));
   const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('daily');
 
   const getWeekLabel = (offset: number) => {

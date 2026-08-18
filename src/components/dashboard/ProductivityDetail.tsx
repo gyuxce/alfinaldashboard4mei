@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { AgentKPI, normalizeDateStr } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor } from "../../lib/utils";
 import { chart } from "../../lib/themeColors";
+import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
 import {
   Search,
@@ -39,7 +40,13 @@ export const ProductivityDetail: React.FC<{
   };
 
   const dict = useStore((state) => state.agentDictionary);
-  const { startDate, endDate, setDateRange, isComparisonEnabled, comparisonMode } = useStore();
+  const { startDate, endDate, setDateRange, isComparisonEnabled, comparisonMode } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    setDateRange: s.setDateRange,
+    isComparisonEnabled: s.isComparisonEnabled,
+    comparisonMode: s.comparisonMode,
+  })));
 
   const filteredData = useMemo(() => {
     return data.filter((a) => {

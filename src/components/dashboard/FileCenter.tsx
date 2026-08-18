@@ -1,5 +1,6 @@
 import React from 'react';
 import Papa from 'papaparse';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore, AppState } from '../../store';
 import { UploadCloud, CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -222,7 +223,16 @@ const getProductivityDuplicateHealth = (data: any[][]) => {
 };
 
 const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
-  const store = useStore() as any;
+  const store = useStore(useShallow((s) => ({
+    csidData: s.csidData,
+    productivityData: s.productivityData,
+    csatScData: s.csatScData,
+    slaData: s.slaData,
+    scheduleData: s.scheduleData,
+    qaData: s.qaData,
+    activeMonthRowCounts: s.activeMonthRowCounts,
+    fileValidations: s.fileValidations,
+  }))) as any;
 
   const healthItems = React.useMemo(() => {
     return dataSources.map((source) => {
@@ -703,7 +713,14 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
 };
 
 const UploadCard = ({ title, fileKey }: { title: string, fileKey: keyof AppState }) => {
-  const store = useStore() as any;
+  const store = useStore(useShallow((s) => ({
+    [fileKey]: (s as any)[fileKey],
+    setFile: s.setFile,
+    persistedKeys: s.persistedKeys,
+    fileValidations: s.fileValidations,
+    isPersisting: s.isPersisting,
+    fileNames: s.fileNames,
+  }))) as any;
   const file = store[fileKey] as File | null;
   const setFile = store.setFile;
   const persistedKeys = store.persistedKeys || [];
@@ -806,7 +823,15 @@ export const FileCenter = () => {
     lastSyncTime,
     selectedSheetMonth,
     setSelectedSheetMonth,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    clearFiles: s.clearFiles,
+    fetchFromSheets: s.fetchFromSheets,
+    isFetchingSheets: s.isFetchingSheets,
+    sheetsFetchError: s.sheetsFetchError,
+    lastSyncTime: s.lastSyncTime,
+    selectedSheetMonth: s.selectedSheetMonth,
+    setSelectedSheetMonth: s.setSelectedSheetMonth,
+  })));
 
   const [isConfirming, setIsConfirming] = React.useState(false);
 

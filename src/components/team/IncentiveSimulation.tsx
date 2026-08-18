@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
 import {
   AgentKPI,
@@ -230,7 +231,10 @@ export const IncentiveSimulation: React.FC<{
   const {
     startDate,
     endDate,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+  })));
 
   const openTlView = () => {
     if (isTlUnlocked) {

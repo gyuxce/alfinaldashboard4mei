@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { Search } from 'lucide-react';
 import { AgentKPI, normalizeDateStr } from '../../lib/dataProcessor';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 
 export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
-  const { startDate, endDate, setDateRange } = useStore();
+  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    setDateRange: s.setDateRange,
+  })));
 
   const tableData = data.filter(a => a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase()));
 

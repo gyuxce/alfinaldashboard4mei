@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AgentKPI, QAEntry } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 
 import { SortableHeader } from '../ui/SortableHeader';
@@ -57,7 +58,11 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const { startDate, endDate, setDateRange } = useStore();
+  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
+    startDate: s.startDate,
+    endDate: s.endDate,
+    setDateRange: s.setDateRange,
+  })));
 
   const tableData = useMemo(() => {
     return data.filter(a => {

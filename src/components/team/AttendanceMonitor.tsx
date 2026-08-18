@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
 import { Search, Users, HeartPulse, UserMinus, AlertTriangle } from 'lucide-react';
-import { useStore } from '../../store';
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 

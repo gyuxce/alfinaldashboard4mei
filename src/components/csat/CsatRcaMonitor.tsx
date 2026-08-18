@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -37,7 +38,10 @@ const CustomPieLabel = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
 };
 
 export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
-  const { selectedBpo, selectedTL } = useStore();
+  const { selectedBpo, selectedTL } = useStore(useShallow((s) => ({
+    selectedBpo: s.selectedBpo,
+    selectedTL: s.selectedTL,
+  })));
   const [agentSearch, setAgentSearch] = useState('');
   const [showIssueDetail, setShowIssueDetail] = useState(false);
 
