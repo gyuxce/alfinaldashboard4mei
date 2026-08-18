@@ -230,3 +230,19 @@
   }
 }
 
+/*
+  Visual scale default ~80% di laptop (bukan browser zoom).
+  Browser tidak mengizinkan web app mengubah Ctrl+/- zoom;
+  CSS zoom memberi efek tampilan mirip zoom 80% agar filter/layout muat.
+  Layar besar (>=1600px) dan mobile tetap 100%.
+*/
+html {
+  zoom: 0.8;
+}
+
+@media (max-width: 767px), (min-width: 1600px) {
+  html {
+    zoom: 1;
+  }
+}
+
