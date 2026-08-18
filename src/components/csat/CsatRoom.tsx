@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn } from '../../lib/utils';
+import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -924,6 +924,10 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 const totalCount = viewMode === 'full' ? agent.csatScFullCount : agent.csatScFairCount;
                 
                 const displayName = agent.name || agent.csId;
+                const dailyByDate = indexByDate(
+                  viewMode === 'full' ? agent.dailyHistory?.csatScFull : agent.dailyHistory?.csatScFair,
+                );
+                const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
 
                 return (
                 <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
@@ -940,9 +944,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                   
                   {uniqueDates.map(date => {
-                    const dailyArr = viewMode === 'full' ? agent.dailyHistory.csatScFull : agent.dailyHistory.csatScFair;
-                    const daily = dailyArr?.find(h => h.date === date);
-                    const sched = agent.dailyHistory?.schedule?.find(h => h.date === date);
+                    const daily = dailyByDate.get(date);
+                    const sched = scheduleByDate.get(date);
                     const status = sched?.status?.toUpperCase() || '';
                       
                     const isOff = status === 'OFF' || status === 'C';

@@ -94,65 +94,129 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
   };
 
   const generateDailyTrend = (dataset: AgentKPI[]) => {
-    const datesSet = new Set<string>();
-    const rawToNormDate = new Map<string, string>();
+    type DayAcc = {
+      totalProd: number;
+      sumCsat: number;
+      countCsat: number;
+      sumCsatFull: number;
+      countCsatFull: number;
+      sumCsatFair: number;
+      countCsatFair: number;
+      sumSla1m: number;
+      countSla1m: number;
+      sumSla3m: number;
+      countSla3m: number;
+      sumWhu: number;
+      countWhu: number;
+      sumQa: number;
+      countQa: number;
+      totalAttendancePresence: number;
+      totalAttendanceDuty: number;
+    };
 
-    dataset.forEach((a) => {
-      if (a.dailyHistory) {
-        a.dailyHistory.productivity.forEach((h) => {
-          const norm = h.date;
-          datesSet.add(norm);
-          rawToNormDate.set(h.date, norm);
-        });
+    const byDate = new Map<string, DayAcc>();
+    const ensure = (date: string): DayAcc => {
+      let acc = byDate.get(date);
+      if (!acc) {
+        acc = {
+          totalProd: 0,
+          sumCsat: 0,
+          countCsat: 0,
+          sumCsatFull: 0,
+          countCsatFull: 0,
+          sumCsatFair: 0,
+          countCsatFair: 0,
+          sumSla1m: 0,
+          countSla1m: 0,
+          sumSla3m: 0,
+          countSla3m: 0,
+          sumWhu: 0,
+          countWhu: 0,
+          sumQa: 0,
+          countQa: 0,
+          totalAttendancePresence: 0,
+          totalAttendanceDuty: 0,
+        };
+        byDate.set(date, acc);
       }
-    });
+      return acc;
+    };
 
-    const sortedDates = Array.from(datesSet).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+    // Single pass over histories — O(agents × entries), not O(dates × agents × entries).
+    dataset.forEach((a) => {
+      const hist = a.dailyHistory;
+      if (!hist) return;
 
-    return sortedDates.map((date) => {
-      let totalProd = 0, sumCsat = 0, countCsat = 0, sumCsatFull = 0, countCsatFull = 0;
-      let sumCsatFair = 0, countCsatFair = 0, sumSla1m = 0, countSla1m = 0, sumSla3m = 0, countSla3m = 0;
-      let sumWhu = 0, countWhu = 0, sumQa = 0, countQa = 0, totalAttendancePresence = 0, totalAttendanceDuty = 0;
-
-      dataset.forEach((a) => {
-        const prodEntry = a.dailyHistory.productivity.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (prodEntry && prodEntry.value) totalProd += prodEntry.value;
-
-        const csatEntry = a.dailyHistory.csat.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (csatEntry && csatEntry.value) {
-          const respondentCount = csatEntry.count || 1;
-          sumCsat += csatEntry.sum ?? csatEntry.value * respondentCount;
-          countCsat += respondentCount;
-        }
-
-        const sla1mEntry = a.dailyHistory.sla1m.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (sla1mEntry && sla1mEntry.value) { sumSla1m += sla1mEntry.value; countSla1m++; }
-
-        const sla3mEntry = a.dailyHistory.sla3m.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (sla3mEntry && sla3mEntry.value) { sumSla3m += sla3mEntry.value; countSla3m++; }
-
-        const whuEntry = a.dailyHistory.whu.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (whuEntry && whuEntry.value) { sumWhu += whuEntry.value; countWhu++; }
-
-        if (a.qaHistory) {
-          const qaEntries = a.qaHistory.filter(h => (h.normDate || rawToNormDate.get(h.date) || h.date) === date);
-          qaEntries.forEach(q => { if (q.score !== undefined) { sumQa += q.score; countQa++; } });
-        }
-
-        const sysCsatFullEntry = a.dailyHistory.csatScFull.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (sysCsatFullEntry && sysCsatFullEntry.count > 0) { sumCsatFull += sysCsatFullEntry.score; countCsatFull += sysCsatFullEntry.count; }
-
-        const sysCsatFairEntry = a.dailyHistory.csatScFair.find(h => (rawToNormDate.get(h.date) || h.date) === date);
-        if (sysCsatFairEntry && sysCsatFairEntry.count > 0) { sumCsatFair += sysCsatFairEntry.score; countCsatFair += sysCsatFairEntry.count; }
-
-        const schedEntry = a.dailyHistory.schedule.find(s => (s.normDate || s.date) === date);
-        if (schedEntry) {
-          if (schedEntry.isManDay || schedEntry.status === "PULLOUT") totalAttendanceDuty += 1;
-          const isNum = !isNaN(parseFloat(schedEntry.status.replace(",", "."))) && schedEntry.status !== "";
-          if (isNum || schedEntry.status === "PULLOUT") totalAttendancePresence += 1;
-        }
+      hist.productivity?.forEach((h) => {
+        if (!h.date || !h.value) return;
+        ensure(h.date).totalProd += h.value;
       });
 
+      hist.csat?.forEach((h) => {
+        if (!h.date || !h.value) return;
+        const acc = ensure(h.date);
+        const respondentCount = h.count || 1;
+        acc.sumCsat += h.sum ?? h.value * respondentCount;
+        acc.countCsat += respondentCount;
+      });
+
+      hist.sla1m?.forEach((h) => {
+        if (!h.date || !h.value) return;
+        const acc = ensure(h.date);
+        acc.sumSla1m += h.value;
+        acc.countSla1m += 1;
+      });
+
+      hist.sla3m?.forEach((h) => {
+        if (!h.date || !h.value) return;
+        const acc = ensure(h.date);
+        acc.sumSla3m += h.value;
+        acc.countSla3m += 1;
+      });
+
+      hist.whu?.forEach((h) => {
+        if (!h.date || !h.value) return;
+        const acc = ensure(h.date);
+        acc.sumWhu += h.value;
+        acc.countWhu += 1;
+      });
+
+      hist.csatScFull?.forEach((h) => {
+        if (!h.date || !(h.count > 0)) return;
+        const acc = ensure(h.date);
+        acc.sumCsatFull += h.score;
+        acc.countCsatFull += h.count;
+      });
+
+      hist.csatScFair?.forEach((h) => {
+        if (!h.date || !(h.count > 0)) return;
+        const acc = ensure(h.date);
+        acc.sumCsatFair += h.score;
+        acc.countCsatFair += h.count;
+      });
+
+      hist.schedule?.forEach((s) => {
+        const date = s.normDate || s.date;
+        if (!date) return;
+        const acc = ensure(date);
+        if (s.isManDay || s.status === "PULLOUT") acc.totalAttendanceDuty += 1;
+        const isNum = !isNaN(parseFloat(s.status.replace(",", "."))) && s.status !== "";
+        if (isNum || s.status === "PULLOUT") acc.totalAttendancePresence += 1;
+      });
+
+      a.qaHistory?.forEach((q) => {
+        const date = q.normDate || q.date;
+        if (!date || q.score === undefined) return;
+        const acc = ensure(date);
+        acc.sumQa += q.score;
+        acc.countQa += 1;
+      });
+    });
+
+    const sortedDates = Array.from(byDate.keys()).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+
+    return sortedDates.map((date) => {
+      const acc = byDate.get(date)!;
       let dateLabel = date;
       const parts = date.split("-");
       if (parts.length === 3) {
@@ -161,16 +225,18 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
       }
 
       return {
-        date, dateLabel, productivity: totalProd,
-        csat: countCsat > 0 ? Number((sumCsat / countCsat).toFixed(2)) : null,
-        csatScFull: countCsatFull > 0 ? Number(((sumCsatFull / countCsatFull) * 100).toFixed(2)) : null,
-        csatScFair: countCsatFair > 0 ? Number(((sumCsatFair / countCsatFair) * 100).toFixed(2)) : null,
-        sla1m: countSla1m > 0 ? Number((sumSla1m / countSla1m).toFixed(2)) : null,
-        sla3m: countSla3m > 0 ? Number((sumSla3m / countSla3m).toFixed(2)) : null,
-        whu: countWhu > 0 ? Number((sumWhu / countWhu).toFixed(2)) : null,
-        qa: countQa > 0 ? Number((sumQa / countQa).toFixed(2)) : null,
-        attendance: totalAttendanceDuty > 0 ? Number(((totalAttendancePresence / totalAttendanceDuty) * 100).toFixed(2)) : null,
-        avgProductivity: totalAttendanceDuty > 0 ? Number((totalProd / totalAttendanceDuty).toFixed(2)) : null,
+        date,
+        dateLabel,
+        productivity: acc.totalProd,
+        csat: acc.countCsat > 0 ? Number((acc.sumCsat / acc.countCsat).toFixed(2)) : null,
+        csatScFull: acc.countCsatFull > 0 ? Number(((acc.sumCsatFull / acc.countCsatFull) * 100).toFixed(2)) : null,
+        csatScFair: acc.countCsatFair > 0 ? Number(((acc.sumCsatFair / acc.countCsatFair) * 100).toFixed(2)) : null,
+        sla1m: acc.countSla1m > 0 ? Number((acc.sumSla1m / acc.countSla1m).toFixed(2)) : null,
+        sla3m: acc.countSla3m > 0 ? Number((acc.sumSla3m / acc.countSla3m).toFixed(2)) : null,
+        whu: acc.countWhu > 0 ? Number((acc.sumWhu / acc.countWhu).toFixed(2)) : null,
+        qa: acc.countQa > 0 ? Number((acc.sumQa / acc.countQa).toFixed(2)) : null,
+        attendance: acc.totalAttendanceDuty > 0 ? Number(((acc.totalAttendancePresence / acc.totalAttendanceDuty) * 100).toFixed(2)) : null,
+        avgProductivity: acc.totalAttendanceDuty > 0 ? Number((acc.totalProd / acc.totalAttendanceDuty).toFixed(2)) : null,
       };
     });
   };

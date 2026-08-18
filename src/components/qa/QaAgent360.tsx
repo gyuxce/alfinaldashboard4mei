@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI, QAEntry } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
+import { formatNum, getKpiColor, parseDateForSort, cn, indexByDate, groupByDate } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -386,6 +386,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               <tbody className="">
                 {sortedPerformanceData.map((agent, index) => {
                   const displayName = agent.name || agent.csId;
+                  const qaByDate = groupByDate(agent.qaHistory);
+                  const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
 
                   return (
                     <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
@@ -402,8 +404,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                       
                       {uniqueDates.map(date => {
-                        const dailyQA = agent.qaHistory?.filter(h => h.date === date);
-                        const sched = agent.dailyHistory?.schedule?.find(h => h.date === date);
+                        const dailyQA = qaByDate.get(date) || [];
+                        const sched = scheduleByDate.get(date);
                         const status = sched?.status?.toUpperCase() || '';
                         
                         const isOff = status === 'OFF' || status === 'C';
@@ -411,7 +413,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                         const bgClass = isOff ? 'text-text-muted' : '';
                         
                         const validQA = dailyQA.filter(h => h.hasScore);
-                        if (!dailyQA || dailyQA.length === 0) {
+                        if (dailyQA.length === 0) {
                           return <td key={date} className={`p-2 text-center text-text-disabled z-10 ${bgClass} `}>-</td>;
                         }
                         

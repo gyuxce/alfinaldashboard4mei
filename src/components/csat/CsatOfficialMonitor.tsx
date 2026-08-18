@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn } from '../../lib/utils';
+import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate } from '../../lib/utils';
 import { Search, Star, Users } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -222,6 +222,8 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
             <tbody className="">
               {tableData.map((agent, index) => {
                 const displayName = agent.name || agent.csId;
+                const csatByDate = indexByDate(agent.dailyHistory?.csat);
+                const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
 
                 return (
                   <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
@@ -237,8 +239,8 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                     </td>
                     <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                     {uniqueDates.map(date => {
-                      const daily = agent.dailyHistory?.csat?.find(h => h.date === date);
-                      const sched = agent.dailyHistory?.schedule?.find(h => h.date === date);
+                      const daily = csatByDate.get(date);
+                      const sched = scheduleByDate.get(date);
                       const status = sched?.status?.toUpperCase() || '';
                       
                       const isOff = status === 'OFF' || status === 'C';

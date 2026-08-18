@@ -67,6 +67,35 @@ export function getMonthOffsetLabel(periodStart: string, offset = 0): string {
   return new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(target) + ` ${target.getFullYear()}`;
 }
 
+/** O(n) index of dated entries → Map<date, entry> (last write wins). */
+export function indexByDate<T extends { date?: string; normDate?: string }>(
+  entries: T[] | null | undefined,
+): Map<string, T> {
+  const map = new Map<string, T>();
+  if (!entries) return map;
+  for (const entry of entries) {
+    const key = entry.normDate || entry.date;
+    if (key) map.set(key, entry);
+  }
+  return map;
+}
+
+/** O(n) group of dated entries → Map<date, entries[]>. */
+export function groupByDate<T extends { date?: string; normDate?: string }>(
+  entries: T[] | null | undefined,
+): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  if (!entries) return map;
+  for (const entry of entries) {
+    const key = entry.normDate || entry.date;
+    if (!key) continue;
+    const list = map.get(key);
+    if (list) list.push(entry);
+    else map.set(key, [entry]);
+  }
+  return map;
+}
+
 
 const kpiColorCache = new Map<string, string>();
 
