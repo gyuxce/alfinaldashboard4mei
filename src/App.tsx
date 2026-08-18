@@ -11,7 +11,6 @@ import {
   UserCircle, 
   FolderDown,
   CheckCircle,
-  Loader2,
   Menu,
   X,
   Trophy,
@@ -32,6 +31,7 @@ import {
 import { cn } from './lib/utils';
 
 import { SearchableSelect } from './components/ui/SearchableSelect';
+import { TabSkeleton } from './components/ui/TabSkeleton';
 
 const FileCenter = React.lazy(() => import('./components/dashboard/FileCenter').then(module => ({ default: module.FileCenter })));
 const DashboardSummary = React.lazy(() => import('./components/dashboard/DashboardSummary').then(module => ({ default: module.DashboardSummary })));
@@ -66,14 +66,7 @@ function isStaleSync(date: Date | null) {
 }
 
 function TabLoading() {
-  return (
-    <div className="flex min-h-[240px] items-center justify-center text-text-muted">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-        <span>Memuat tampilan...</span>
-      </div>
-    </div>
-  );
+  return <TabSkeleton />;
 }
 
 interface ActiveFilterChipProps {
@@ -205,6 +198,7 @@ interface MonthPickerProps {
 function MonthPicker({ value, options, onChange }: MonthPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const listId = React.useId();
   const selectedOption = options.find(option => option.value === value);
 
   useEffect(() => {
@@ -217,19 +211,36 @@ function MonthPicker({ value, options, onChange }: MonthPickerProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setIsOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen]);
+
   return (
     <div className="relative w-[140px] shrink-0" ref={wrapperRef}>
       <button
         type="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listId}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-8 w-full items-center justify-between rounded-lg border border-border bg-surface px-2.5 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+        className="flex h-8 w-full items-center justify-between rounded-lg border border-border bg-surface px-2.5 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-muted focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
       >
         <span className="truncate">{selectedOption?.label || 'Pilih bulan'}</span>
-        <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-text-muted" />
+        <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-text-muted" aria-hidden />
       </button>
 
       {isOpen && (
-        <div className="absolute z-[9999] mt-1 w-full min-w-[12rem] overflow-hidden rounded-lg border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+        <div
+          id={listId}
+          role="listbox"
+          aria-label="Pilih bulan"
+          className="absolute z-[9999] mt-1 w-full min-w-[12rem] overflow-hidden rounded-lg border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+        >
           <div className="max-h-64 overflow-y-auto p-1">
             {options.map(option => {
               const isSelected = option.value === value;
@@ -237,17 +248,19 @@ function MonthPicker({ value, options, onChange }: MonthPickerProps) {
                 <button
                   key={option.value}
                   type="button"
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => {
                     onChange(option.value);
                     setIsOpen(false);
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
                     isSelected ? "bg-primary-soft font-semibold text-primary" : "text-text-primary hover:bg-surface-muted"
                   )}
                 >
                   <span>{option.label}</span>
-                  {isSelected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                  {isSelected && <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                 </button>
               );
             })}
@@ -518,13 +531,11 @@ export default function App() {
 
   if (isHydrating) {
     return (
-      <div className="flex h-screen w-full bg-background items-center justify-center font-sans text-text-primary transition-colors duration-300">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white font-semibold text-xl">LC</div>
-          <div className="flex items-center gap-2 text-text-secondary mt-4">
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            <span className="font-medium tracking-tight">Memuat data tersimpan...</span>
-          </div>
+      <div className="flex h-screen w-full bg-background items-center justify-center font-sans text-text-primary transition-colors duration-300 px-6">
+        <div className="flex w-full max-w-3xl flex-col items-center gap-6">
+          <div className="w-14 h-14 rounded-lg bg-primary flex items-center justify-center text-white font-semibold text-lg">LC</div>
+          <p className="text-sm font-medium text-text-secondary">Memuat data tersimpan...</p>
+          <TabSkeleton className="w-full" />
         </div>
       </div>
     )
@@ -780,9 +791,9 @@ export default function App() {
                   options={monthOptions}
                   onChange={applyMonthFilter}
                 />
-                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
+                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
                 <span className="text-text-muted text-[10px] shrink-0">–</span>
-                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
+                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
               </div>
               
               {/* Quick nav */}
@@ -981,17 +992,25 @@ export default function App() {
         </div>
       </main>
 
-      {/* Loading overlay during initial fetch from sheets */}
+      {/* Soft overlay during initial sheets fetch */}
       {isFetchingSheets && productivityData.length === 0 && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mx-auto">
-              <RefreshCw className="w-6 h-6 text-white animate-spin"/>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-[2px] px-4">
+          <div
+            className="w-full max-w-2xl rounded-lg border border-border bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+            role="status"
+            aria-live="polite"
+            aria-label="Mengambil data terbaru"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-white">
+                <RefreshCw className="h-4 w-4 animate-spin" aria-hidden />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-text-primary">Mengambil data terbaru...</p>
+                <p className="text-xs text-text-muted mt-0.5">{syncStatusText}</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-text-primary text-lg">Mengambil data terbaru...</p>
-              <p className="text-sm text-text-muted mt-1">{syncStatusText}</p>
-            </div>
+            <TabSkeleton compact />
           </div>
         </div>
       )}
