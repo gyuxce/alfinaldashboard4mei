@@ -78,16 +78,16 @@ const RankCard: React.FC<RankCardProps> = ({ title, items, tone = 'neutral', emp
 export type KpiRankListsProps = {
   cards: KpiRankCardConfig[];
   className?: string;
-  /** Default collapsed to reduce first-open cognitive load */
+  /** Default expanded so highlight KPI tetap terlihat di first open */
   defaultOpen?: boolean;
   summaryLabel?: string;
 };
 
-/** Kartu ranking fleksibel (2–4 kolom) untuk highlight KPI — default tertutup. */
+/** Kartu ranking fleksibel (2–4 kolom) untuk highlight KPI — default terbuka. */
 export function KpiRankLists({
   cards,
   className,
-  defaultOpen = false,
+  defaultOpen = true,
   summaryLabel = 'Highlight KPI',
 }: KpiRankListsProps) {
   const [open, setOpen] = useState(defaultOpen);

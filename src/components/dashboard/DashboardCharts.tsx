@@ -67,7 +67,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
       }
 
       const week = weeks.get(bucket.key)!;
-      week.dayKeys.add(item.date);
+      // Only count days with real productivity so zero placeholder days
+      // do not suppress partial-week projection.
+      if ((item.productivity || 0) > 0) {
+        week.dayKeys.add(item.date);
+      }
       week.productivity += item.productivity || 0;
       if (item.prevProductivity !== null && item.prevProductivity !== undefined) {
         week.prevProductivity += item.prevProductivity;

@@ -82,7 +82,7 @@ const normalizeAgentName = (value: string) =>
 
 const isInactiveAgent = (agent: Pick<AgentKPI, "name">, periodEnd: string) =>
   normalizeAgentName(agent.name || "") === "edgar gasita adhigama" &&
-  periodEnd.slice(0, 7) >= "2026-06";
+  (periodEnd || "").slice(0, 7) >= "2026-06";
 
 const getQcPoints = (qaPct: number) => {
   if (qaPct >= 98) return 55;
@@ -260,9 +260,12 @@ export const IncentiveSimulation: React.FC<{
   };
 
   // App already ran processKPIs for the simulation month + applied roster/global filters.
+  const safeData = Array.isArray(data) ? data : [];
+  const safePeriod = simulationPeriod || { start: '', end: '' };
+
   const filteredAgents = useMemo(
-    () => data.filter((agent) => !isInactiveAgent(agent, simulationPeriod.end)),
-    [data, simulationPeriod.end],
+    () => safeData.filter((agent) => !isInactiveAgent(agent, safePeriod.end || '')),
+    [safeData, safePeriod.end],
   );
 
   const simulationRoster = filteredAgents;
@@ -408,7 +411,7 @@ export const IncentiveSimulation: React.FC<{
     (sum, row) => sum + (row.totalIncentive || 0),
     0,
   );
-  const hasData = productivityData.length > 0 || csatScData.length > 0 || qaData.length > 0 || scheduleData.length > 0;
+  const hasData = safeData.length > 0 || filteredAgents.length > 0;
   const teamLeaderAgentCount = teamLeaderRows.reduce((sum, row) => sum + row.agentCount, 0);
   const teamLeaderIneligibleCount = teamLeaderRows.reduce(
     (sum, row) => sum + (row.status === "ineligible" ? 1 : 0),
@@ -430,7 +433,7 @@ export const IncentiveSimulation: React.FC<{
           Skema Livechat berdasarkan data periode yang sudah selesai.
         </p>
         <p className="mt-1 text-[11px] text-text-muted">
-          KPI: {formatDateLabel(simulationPeriod.start)} s/d {formatDateLabel(simulationPeriod.end)}; roster TL dan agent: {formatDateLabel(startDate)} s/d {formatDateLabel(endDate)}.
+          KPI: {formatDateLabel(safePeriod.start)} s/d {formatDateLabel(safePeriod.end)}; roster TL dan agent: {formatDateLabel(startDate)} s/d {formatDateLabel(endDate)}.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
           <span className="rounded-full border border-border bg-surface px-2.5 py-1">

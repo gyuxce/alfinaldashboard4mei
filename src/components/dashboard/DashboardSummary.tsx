@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
-import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
+import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
 import { kpiThemeColor } from "../../lib/themeColors";
 import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
@@ -112,9 +112,15 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
       countQa: number;
       totalAttendancePresence: number;
       totalAttendanceDuty: number;
+      hasProductivity: boolean;
     };
 
     const byDate = new Map<string, DayAcc>();
+    const toKey = (raw?: string | null, norm?: string | null) => {
+      if (norm) return norm;
+      if (!raw) return '';
+      return normalizeDateStr(raw) || raw;
+    };
     const ensure = (date: string): DayAcc => {
       let acc = byDate.get(date);
       if (!acc) {
@@ -136,92 +142,107 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
           countQa: 0,
           totalAttendancePresence: 0,
           totalAttendanceDuty: 0,
+          hasProductivity: false,
         };
         byDate.set(date, acc);
       }
       return acc;
     };
 
-    // Single pass over histories — O(agents × entries), not O(dates × agents × entries).
+    // Normalize all series to ISO keys so label dates and schedule normDates merge.
     dataset.forEach((a) => {
       const hist = a.dailyHistory;
       if (!hist) return;
 
       hist.productivity?.forEach((h) => {
-        if (!h.date || !h.value) return;
-        ensure(h.date).totalProd += h.value;
+        const key = toKey(h.date, h.normDate);
+        if (!key || !h.value) return;
+        const acc = ensure(key);
+        acc.totalProd += h.value;
+        acc.hasProductivity = true;
       });
 
       hist.csat?.forEach((h) => {
-        if (!h.date || !h.value) return;
-        const acc = ensure(h.date);
+        const key = toKey(h.date, h.normDate);
+        if (!key || !h.value) return;
+        const acc = ensure(key);
         const respondentCount = h.count || 1;
         acc.sumCsat += h.sum ?? h.value * respondentCount;
         acc.countCsat += respondentCount;
       });
 
       hist.sla1m?.forEach((h) => {
-        if (!h.date || !h.value) return;
-        const acc = ensure(h.date);
+        const key = toKey(h.date, h.normDate);
+        if (!key || !h.value) return;
+        const acc = ensure(key);
         acc.sumSla1m += h.value;
         acc.countSla1m += 1;
       });
 
       hist.sla3m?.forEach((h) => {
-        if (!h.date || !h.value) return;
-        const acc = ensure(h.date);
+        const key = toKey(h.date, h.normDate);
+        if (!key || !h.value) return;
+        const acc = ensure(key);
         acc.sumSla3m += h.value;
         acc.countSla3m += 1;
       });
 
       hist.whu?.forEach((h) => {
-        if (!h.date || !h.value) return;
-        const acc = ensure(h.date);
+        const key = toKey(h.date, h.normDate);
+        if (!key || !h.value) return;
+        const acc = ensure(key);
         acc.sumWhu += h.value;
         acc.countWhu += 1;
       });
 
       hist.csatScFull?.forEach((h) => {
-        if (!h.date || !(h.count > 0)) return;
-        const acc = ensure(h.date);
+        const key = toKey(h.date, h.normDate);
+        if (!key || !(h.count > 0)) return;
+        const acc = ensure(key);
         acc.sumCsatFull += h.score;
         acc.countCsatFull += h.count;
       });
 
       hist.csatScFair?.forEach((h) => {
-        if (!h.date || !(h.count > 0)) return;
-        const acc = ensure(h.date);
+        const key = toKey(h.date, h.normDate);
+        if (!key || !(h.count > 0)) return;
+        const acc = ensure(key);
         acc.sumCsatFair += h.score;
         acc.countCsatFair += h.count;
       });
 
+      // Schedule/QA only enrich days that already have productivity — avoids zero-only days.
       hist.schedule?.forEach((s) => {
-        const date = s.normDate || s.date;
-        if (!date) return;
-        const acc = ensure(date);
+        const key = toKey(s.date, s.normDate);
+        if (!key || !byDate.has(key)) return;
+        const acc = byDate.get(key)!;
         if (s.isManDay || s.status === "PULLOUT") acc.totalAttendanceDuty += 1;
-        const isNum = !isNaN(parseFloat(s.status.replace(",", "."))) && s.status !== "";
+        const isNum = !isNaN(parseFloat(String(s.status || "").replace(",", "."))) && s.status !== "";
         if (isNum || s.status === "PULLOUT") acc.totalAttendancePresence += 1;
       });
 
       a.qaHistory?.forEach((q) => {
-        const date = q.normDate || q.date;
-        if (!date || q.score === undefined) return;
-        const acc = ensure(date);
+        const key = toKey(q.date, q.normDate);
+        if (!key || q.score === undefined || !byDate.has(key)) return;
+        const acc = byDate.get(key)!;
         acc.sumQa += q.score;
         acc.countQa += 1;
       });
     });
 
-    const sortedDates = Array.from(byDate.keys()).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+    const sortedDates = Array.from(byDate.keys())
+      .filter((date) => byDate.get(date)?.hasProductivity)
+      .sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
 
     return sortedDates.map((date) => {
       const acc = byDate.get(date)!;
       let dateLabel = date;
       const parts = date.split("-");
-      if (parts.length === 3) {
+      if (parts.length === 3 && parts[0].length === 4) {
         const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        if (!isNaN(d.getTime())) dateLabel = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" }).format(d);
+        if (!isNaN(d.getTime())) {
+          dateLabel = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" }).format(d);
+        }
       }
 
       return {

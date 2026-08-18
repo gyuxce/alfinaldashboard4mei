@@ -36,6 +36,7 @@ export interface QAEntry {
 
 export interface HistoryEntry {
   date: string;
+  normDate?: string | null;
   value: number;
   count?: number;
   sum?: number;
@@ -129,8 +130,8 @@ export interface AgentKPI {
   dailyHistory: {
     productivity: HistoryEntry[];
     csat: HistoryEntry[];
-    csatScFull: { date: string; score: number; count: number }[];
-    csatScFair: { date: string; score: number; count: number }[];
+    csatScFull: { date: string; normDate?: string | null; score: number; count: number }[];
+    csatScFair: { date: string; normDate?: string | null; score: number; count: number }[];
     sla1m: HistoryEntry[];
     sla3m: HistoryEntry[];
     whu: HistoryEntry[];
@@ -371,10 +372,13 @@ export function normalizeDateStr(raw: string): string | null {
       jun: 6,
       jul: 7,
       aug: 8,
+      agu: 8, // id-ID short (Intl)
       sep: 9,
       oct: 10,
+      okt: 10, // id-ID short
       nov: 11,
       dec: 12,
+      des: 12, // id-ID short
       januari: 1,
       februari: 2,
       maret: 3,
@@ -898,13 +902,15 @@ export const processKPIs = (
 
       agent.productivityBase += prodBase;
       let existingProd = agent.dailyHistory.productivity.find(
-        (h) => h.date === targetDateLabel,
+        (h) => h.normDate === normDate || h.date === targetDateLabel,
       );
       if (existingProd) {
         existingProd.value += prodBase;
+        if (!existingProd.normDate) existingProd.normDate = normDate;
       } else {
         agent.dailyHistory.productivity.push({
           date: targetDateLabel,
+          normDate,
           value: prodBase,
         });
       }
@@ -925,7 +931,7 @@ export const processKPIs = (
         totalProdCsatAsliSum[agent.csId].count += totalResAsli;
 
         let existingCsat = agent.dailyHistory.csat.find(
-          (h) => h.date === targetDateLabel,
+          (h) => h.normDate === normDate || h.date === targetDateLabel,
         );
         if (existingCsat) {
           const existingCount = existingCsat.count || 0;
@@ -933,9 +939,11 @@ export const processKPIs = (
           existingCsat.count = existingCount + totalResAsli;
           existingCsat.sum = existingSum + pointsAsli;
           existingCsat.value = existingCsat.sum / existingCsat.count;
+          if (!existingCsat.normDate) existingCsat.normDate = normDate;
         } else {
           agent.dailyHistory.csat.push({
             date: targetDateLabel,
+            normDate,
             value: csatDaily,
             count: totalResAsli,
             sum: pointsAsli,
@@ -956,12 +964,13 @@ export const processKPIs = (
         totalWhuSum[agent.csId].count += 1;
 
         let existingWhu = agent.dailyHistory.whu.find(
-          (h) => h.date === targetDateLabel,
+          (h) => h.normDate === normDate || h.date === targetDateLabel,
         );
         if (existingWhu) {
           existingWhu.value = (existingWhu.value + val) / 2;
+          if (!existingWhu.normDate) existingWhu.normDate = normDate;
         } else {
-          agent.dailyHistory.whu.push({ date: targetDateLabel, value: val });
+          agent.dailyHistory.whu.push({ date: targetDateLabel, normDate, value: val });
         }
       }
     }
@@ -1125,11 +1134,13 @@ export const processKPIs = (
 
 
           let fullDay = agent.dailyHistory.csatScFull.find(
-            (h) => h.date === targetDateLabel,
+            (h) => (normDate && h.normDate === normDate) || h.date === targetDateLabel,
           );
           if (!fullDay) {
-            fullDay = { date: targetDateLabel, score: 0, count: 0 };
+            fullDay = { date: targetDateLabel, normDate, score: 0, count: 0 };
             agent.dailyHistory.csatScFull.push(fullDay);
+          } else if (!fullDay.normDate && normDate) {
+            fullDay.normDate = normDate;
           }
           if (score >= 4) fullDay.score += 1;
           fullDay.count += 1;

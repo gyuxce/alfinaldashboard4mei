@@ -15,6 +15,13 @@ export type KpiType = 'productivity' | 'qa' | 'sla1m' | 'sla3m' | 'whu' | 'csatF
 
 export function parseDateForSort(dateStr: string): number {
   if (!dateStr) return 0;
+
+  // Prefer local Y-M-D parse — `new Date('YYYY-MM-DD')` is UTC and shifts week buckets in ID timezone.
+  const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10)).getTime();
+  }
   
   const slashMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slashMatch) {
@@ -27,7 +34,7 @@ export function parseDateForSort(dateStr: string): number {
     const [, day, monthStr, yearStr] = dashMatch;
     const monthMap: Record<string, number> = {
       jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+      jul: 6, aug: 7, agu: 7, sep: 8, oct: 9, okt: 9, nov: 10, dec: 11, des: 11,
       januari: 0, februari: 1, maret: 2, april: 3, mei: 4,
       juni: 5, juli: 6, agustus: 7, september: 8, oktober: 9,
       november: 10, desember: 11
