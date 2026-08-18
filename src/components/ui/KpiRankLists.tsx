@@ -7,14 +7,16 @@ export type KpiRankItem = {
   subLabel?: string;
 };
 
-type RankCardProps = {
+export type KpiRankCardConfig = {
   title: string;
   items: KpiRankItem[];
   tone?: 'good' | 'bad' | 'neutral';
   emptyText?: string;
 };
 
-function RankCard({ title, items, tone = 'neutral', emptyText = 'Belum ada data' }: RankCardProps) {
+type RankCardProps = KpiRankCardConfig;
+
+const RankCard: React.FC<RankCardProps> = ({ title, items, tone = 'neutral', emptyText = 'Belum ada data' }) => {
   const toneClass =
     tone === 'good'
       ? 'border-t-success'
@@ -25,7 +27,7 @@ function RankCard({ title, items, tone = 'neutral', emptyText = 'Belum ada data'
   return (
     <div
       className={cn(
-        'rounded-xl border border-border border-t-[3px] bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]',
+        'rounded-xl border border-border border-t-[3px] bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] min-w-0',
         toneClass,
       )}
     >
@@ -33,9 +35,9 @@ function RankCard({ title, items, tone = 'neutral', emptyText = 'Belum ada data'
       {items.length === 0 ? (
         <p className="text-xs text-text-muted">{emptyText}</p>
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="space-y-3">
           {items.map((item, idx) => (
-            <li key={`${item.label}-${idx}`} className="flex items-start gap-2 min-w-0">
+            <li key={`${item.label}-${idx}`} className="flex items-start gap-2.5 min-w-0">
               <span
                 className={cn(
                   'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-bold',
@@ -49,19 +51,20 @@ function RankCard({ title, items, tone = 'neutral', emptyText = 'Belum ada data'
                 {idx + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-text-primary" title={item.label}>
-                  {item.label}
+                <div className="flex items-start justify-between gap-2">
+                  <div
+                    className="text-[13px] font-semibold leading-snug text-text-primary break-words line-clamp-2"
+                    title={item.label}
+                  >
+                    {item.label}
+                  </div>
+                  <span className="shrink-0 pt-0.5 text-xs font-bold tabular-nums text-text-primary">{item.value}</span>
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  {item.subLabel ? (
-                    <span className="truncate text-[10px] text-text-muted" title={item.subLabel}>
-                      {item.subLabel}
-                    </span>
-                  ) : (
-                    <span />
-                  )}
-                  <span className="shrink-0 text-xs font-bold tabular-nums text-text-primary">{item.value}</span>
-                </div>
+                {item.subLabel ? (
+                  <div className="mt-0.5 truncate text-[10px] text-text-muted" title={item.subLabel}>
+                    {item.subLabel}
+                  </div>
+                ) : null}
               </div>
             </li>
           ))}
@@ -69,34 +72,33 @@ function RankCard({ title, items, tone = 'neutral', emptyText = 'Belum ada data'
       )}
     </div>
   );
-}
+};
 
 export type KpiRankListsProps = {
-  topCategories: KpiRankItem[];
-  bottomCategories: KpiRankItem[];
-  topAgents: KpiRankItem[];
-  bottomAgents: KpiRankItem[];
-  categoryLabel?: string;
-  agentLabel?: string;
+  cards: KpiRankCardConfig[];
   className?: string;
 };
 
-/** Empat kartu list: Top/Bottom 3 kategori + Top/Bottom 3 agent */
-export function KpiRankLists({
-  topCategories,
-  bottomCategories,
-  topAgents,
-  bottomAgents,
-  categoryLabel = 'Kategori',
-  agentLabel = 'Agent',
-  className,
-}: KpiRankListsProps) {
+/** Kartu ranking fleksibel (2–4 kolom) untuk highlight KPI */
+export function KpiRankLists({ cards, className }: KpiRankListsProps) {
+  const visible = cards.filter(Boolean);
   return (
-    <div className={cn('grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3', className)}>
-      <RankCard title={`Top 3 ${categoryLabel}`} items={topCategories} tone="good" />
-      <RankCard title={`Bottom 3 ${categoryLabel}`} items={bottomCategories} tone="bad" />
-      <RankCard title={`Top 3 ${agentLabel}`} items={topAgents} tone="good" />
-      <RankCard title={`Bottom 3 ${agentLabel}`} items={bottomAgents} tone="bad" />
+    <div
+      className={cn(
+        'grid grid-cols-1 sm:grid-cols-2 gap-3',
+        visible.length >= 4 ? 'xl:grid-cols-4' : visible.length === 3 ? 'xl:grid-cols-3' : '',
+        className,
+      )}
+    >
+      {visible.map((card) => (
+        <RankCard
+          key={card.title}
+          title={card.title}
+          items={card.items}
+          tone={card.tone}
+          emptyText={card.emptyText}
+        />
+      ))}
     </div>
   );
 }

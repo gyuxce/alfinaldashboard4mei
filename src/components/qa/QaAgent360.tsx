@@ -233,43 +233,60 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       .map(agent => ({
         agent,
         avg: agent.qaScoreSum / agent.qaScoreCount,
-        defects: defectData.find(d => d.csId === agent.csId)?.totalDefect || 0,
       }))
       .sort((a, b) => b.avg - a.avg);
 
-    const topCategories = categoriesByCount.slice(0, 3);
-    const bottomCategories =
-      categoriesByCount.length > 3
-        ? categoriesByCount.slice(Math.max(3, categoriesByCount.length - 3)).reverse()
-        : [];
-    const topAgents = agentsByQa.slice(0, 3);
-    const bottomAgents =
-      agentsByQa.length > 3
-        ? agentsByQa.slice(Math.max(3, agentsByQa.length - 3)).reverse()
-        : [];
+    const dailyMap = new Map<string, { scoreSum: number; scoreCount: number; mistakes: number }>();
+    tableData.forEach(agent => {
+      agent.qaHistory?.forEach(entry => {
+        const date = entry.normDate || entry.date;
+        if (!date) return;
+        const current = dailyMap.get(date) || { scoreSum: 0, scoreCount: 0, mistakes: 0 };
+        if (entry.hasScore && entry.score !== undefined) {
+          current.scoreSum += entry.score;
+          current.scoreCount += 1;
+        }
+        if (isQaDefect(entry)) current.mistakes += 1;
+        dailyMap.set(date, current);
+      });
+    });
+
+    const daysByQa = Array.from(dailyMap.entries())
+      .map(([date, stats]) => ({
+        date,
+        avg: stats.scoreCount > 0 ? stats.scoreSum / stats.scoreCount : null,
+        mistakes: stats.mistakes,
+        scoreCount: stats.scoreCount,
+      }))
+      .filter(d => d.avg !== null && d.scoreCount > 0)
+      .sort((a, b) => (a.avg || 0) - (b.avg || 0));
 
     return {
       totalEvaluations,
       totalMistakes,
       mistakeRate: totalEvaluations > 0 ? (totalMistakes / totalEvaluations) * 100 : 0,
-      topCategories: topCategories.map(c => ({
+      topCategories: categoriesByCount.slice(0, 3).map(c => ({
         label: c.category,
         value: `${formatNum(c.count, 0)} temuan`,
       })),
-      bottomCategories: bottomCategories.map(c => ({
-        label: c.category,
-        value: `${formatNum(c.count, 0)} temuan`,
+      bottomDays: daysByQa.slice(0, 3).map(d => ({
+        label: d.date,
+        subLabel: `${formatNum(d.mistakes, 0)} mistake · ${formatNum(d.scoreCount, 0)} evaluasi`,
+        value: `${formatNum(d.avg, 1)}%`,
       })),
-      topAgents: topAgents.map(a => ({
+      topAgents: agentsByQa.slice(0, 3).map(a => ({
         label: a.agent.name || a.agent.csId,
         subLabel: a.agent.teamLeader || a.agent.csId,
         value: `${formatNum(a.avg, 1)}%`,
       })),
-      bottomAgents: bottomAgents.map(a => ({
-        label: a.agent.name || a.agent.csId,
-        subLabel: a.agent.teamLeader || a.agent.csId,
-        value: `${formatNum(a.avg, 1)}%`,
-      })),
+      bottomAgents:
+        agentsByQa.length > 3
+          ? agentsByQa.slice(Math.max(3, agentsByQa.length - 3)).reverse().map(a => ({
+              label: a.agent.name || a.agent.csId,
+              subLabel: a.agent.teamLeader || a.agent.csId,
+              value: `${formatNum(a.avg, 1)}%`,
+            }))
+          : [],
     };
   }, [tableData, defectData]);
 
@@ -349,12 +366,12 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       </div>
 
       <KpiRankLists
-        categoryLabel="Mistake"
-        agentLabel="Agent (QA)"
-        topCategories={highlightStats.topCategories}
-        bottomCategories={highlightStats.bottomCategories}
-        topAgents={highlightStats.topAgents}
-        bottomAgents={highlightStats.bottomAgents}
+        cards={[
+          { title: 'Top 3 Mistake', items: highlightStats.topCategories, tone: 'bad' },
+          { title: 'Bottom 3 Hari', items: highlightStats.bottomDays, tone: 'bad' },
+          { title: 'Top 3 Agent (QA)', items: highlightStats.topAgents, tone: 'good' },
+          { title: 'Bottom 3 Agent (QA)', items: highlightStats.bottomAgents, tone: 'bad' },
+        ]}
       />
 
       {viewMode === 'performance' ? (

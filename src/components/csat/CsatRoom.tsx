@@ -134,32 +134,51 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       .filter((a): a is { agent: AgentKPI; pct: number; count: number } => a.pct !== null)
       .sort((a, b) => b.pct - a.pct);
 
-    const topCats = categories.slice(0, 3);
-    const bottomCats =
-      categories.length > 3 ? categories.slice(Math.max(3, categories.length - 3)).reverse() : [];
-    const topAgents = agentRows.slice(0, 3);
-    const bottomAgents =
-      agentRows.length > 3 ? agentRows.slice(Math.max(3, agentRows.length - 3)).reverse() : [];
+    const dailyMap = new Map<string, { good: number; total: number }>();
+    tableData.forEach(a => {
+      const dailyArr = viewMode === 'full' ? a.dailyHistory?.csatScFull : a.dailyHistory?.csatScFair;
+      dailyArr?.forEach(h => {
+        if (!h.count) return;
+        const current = dailyMap.get(h.date) || { good: 0, total: 0 };
+        dailyMap.set(h.date, {
+          good: current.good + h.score,
+          total: current.total + h.count,
+        });
+      });
+    });
+
+    const daysByScore = Array.from(dailyMap.entries())
+      .map(([date, stats]) => ({
+        date,
+        pct: stats.total > 0 ? (stats.good / stats.total) * 100 : 0,
+        count: stats.total,
+      }))
+      .filter(d => d.count > 0)
+      .sort((a, b) => a.pct - b.pct);
 
     return {
-      topCategories: topCats.map(c => ({
+      topCategories: categories.slice(0, 3).map(c => ({
         label: c.name,
         value: formatNum(c.count, 0),
       })),
-      bottomCategories: bottomCats.map(c => ({
-        label: c.name,
-        value: formatNum(c.count, 0),
+      bottomDays: daysByScore.slice(0, 3).map(d => ({
+        label: d.date,
+        subLabel: `${formatNum(d.count, 0)} rating`,
+        value: `${formatNum(d.pct, 1)}%`,
       })),
-      topAgents: topAgents.map(a => ({
+      topAgents: agentRows.slice(0, 3).map(a => ({
         label: a.agent.name || a.agent.csId,
         subLabel: a.agent.teamLeader || a.agent.csId,
         value: `${formatNum(a.pct, 1)}%`,
       })),
-      bottomAgents: bottomAgents.map(a => ({
-        label: a.agent.name || a.agent.csId,
-        subLabel: a.agent.teamLeader || a.agent.csId,
-        value: `${formatNum(a.pct, 1)}%`,
-      })),
+      bottomAgents:
+        agentRows.length > 3
+          ? agentRows.slice(Math.max(3, agentRows.length - 3)).reverse().map(a => ({
+              label: a.agent.name || a.agent.csId,
+              subLabel: a.agent.teamLeader || a.agent.csId,
+              value: `${formatNum(a.pct, 1)}%`,
+            }))
+          : [],
     };
   }, [tableData, viewMode]);
 
@@ -544,12 +563,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       </div>
 
       <KpiRankLists
-        categoryLabel="Kategori Survey"
-        agentLabel="Agent (CSAT %)"
-        topCategories={highlightRanks.topCategories}
-        bottomCategories={highlightRanks.bottomCategories}
-        topAgents={highlightRanks.topAgents}
-        bottomAgents={highlightRanks.bottomAgents}
+        cards={[
+          { title: 'Top 3 Kategori Survey', items: highlightRanks.topCategories, tone: 'good' },
+          { title: 'Bottom 3 Hari', items: highlightRanks.bottomDays, tone: 'bad' },
+          { title: 'Top 3 Agent (CSAT %)', items: highlightRanks.topAgents, tone: 'good' },
+          { title: 'Bottom 3 Agent (CSAT %)', items: highlightRanks.bottomAgents, tone: 'bad' },
+        ]}
       />
 
       {isComparisonEnabled && (

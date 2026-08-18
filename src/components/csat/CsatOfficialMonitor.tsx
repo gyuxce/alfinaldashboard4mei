@@ -179,12 +179,12 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
       </div>
 
       <KpiRankLists
-        categoryLabel="Hari"
-        agentLabel="Agent"
-        topCategories={highlightStats.topDays}
-        bottomCategories={highlightStats.bottomDays}
-        topAgents={highlightStats.topAgents}
-        bottomAgents={highlightStats.bottomAgents}
+        cards={[
+          { title: 'Top 3 Hari', items: highlightStats.topDays, tone: 'good' },
+          { title: 'Bottom 3 Hari', items: highlightStats.bottomDays, tone: 'bad' },
+          { title: 'Top 3 Agent', items: highlightStats.topAgents, tone: 'good' },
+          { title: 'Bottom 3 Agent', items: highlightStats.bottomAgents, tone: 'bad' },
+        ]}
       />
 
       {isComparisonEnabled && (
