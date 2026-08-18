@@ -12,7 +12,7 @@ type ChartScrollAreaProps = {
 
 /** Mobile-only scroll affordance for wide charts/tables. */
 export function MobileScrollHint({
-  label = 'Geser → untuk lihat semua',
+  label = 'Geser → untuk lihat semua kolom',
   className,
 }: {
   label?: string;
@@ -33,7 +33,7 @@ export function ChartScrollArea({
   children,
   className,
   canvasClassName = 'h-[280px] min-w-[700px]',
-  hint = 'Geser → untuk lihat semua',
+  hint = 'Geser → untuk lihat semua kolom',
 }: ChartScrollAreaProps) {
   return (
     <div className={cn('relative w-full min-w-0', className)}>

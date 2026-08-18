@@ -5,8 +5,9 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
 } from 'recharts';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { EmptyState } from '../ui/EmptyState';
+import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { chart } from '../../lib/themeColors';
 
 const COLORS = {
@@ -38,6 +39,7 @@ const CustomPieLabel = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
 export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const { selectedBpo, selectedTL } = useStore();
   const [agentSearch, setAgentSearch] = useState('');
+  const [showIssueDetail, setShowIssueDetail] = useState(false);
 
   const hasRcaData = useMemo(() => {
     return data.some(a =>
@@ -215,14 +217,14 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         {issueCategories.length > 0 && (
           <div className="mt-4 border-t border-border pt-3">
             <div className="text-[10px] font-medium text-text-muted tracking-wide mb-2">
-              Category per issue
+              Kategori per isu
             </div>
             <div className="overflow-hidden rounded-lg border border-border bg-card">
               <table className="kpi-data-table w-full table-fixed text-left">
                 <thead className="bg-surface-muted text-text-muted">
                   <tr>
-                    <th className="w-[38%] px-2.5 py-2 font-medium tracking-wide">Issue</th>
-                    <th className="px-2.5 py-2 font-medium tracking-wide">Top Categories</th>
+                    <th className="w-[38%] px-2.5 py-2 font-medium tracking-wide">Isu</th>
+                    <th className="px-2.5 py-2 font-medium tracking-wide">Top kategori</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -239,7 +241,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                             <span
                               key={`${row.issue}-${category.name}`}
                               className="min-w-0 break-words rounded border border-border bg-surface px-1.5 py-0.5 font-semibold leading-relaxed text-text-secondary"
-                              title={`${category.name}: ${category.count} cases`}
+                              title={`${category.name}: ${category.count} kasus`}
                             >
                               {category.name} - {category.count}
                             </span>
@@ -263,9 +265,9 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-bold text-text-primary">CSAT Root Cause Analysis</h2>
+        <h2 className="text-lg font-bold text-text-primary">Analisa akar masalah CSAT</h2>
         <p className="text-xs text-text-muted mt-0.5">
-          Analisa akar masalah berdasarkan kasus after-takeout | {activeFilterText || 'All Data'}
+          Berdasarkan kasus after-takeout | {activeFilterText || 'Semua data'}
         </p>
       </div>
 
@@ -352,18 +354,37 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         </div>
       </div>
 
-      {/* Tier 2: 3 Detail Bar Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <DetailBarChart data={agentDetailBar} color={COLORS.agent} title="Top Issue - Agent Area" issueCategories={agentIssueCategories} />
-        <DetailBarChart data={customerDetailBar} color={COLORS.customer} title="Top Issue - Customer Area" issueCategories={customerIssueCategories} />
-        <DetailBarChart data={akulakuDetailBar} color={COLORS.akulaku} title="Top Issue - Akulaku Process" issueCategories={akulakuIssueCategories} />
+      {/* Tier 2: detail isu — collapsed by default */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowIssueDetail((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          aria-expanded={showIssueDetail}
+        >
+          <div>
+            <h3 className="text-sm font-bold text-text-primary">Detail isu per area</h3>
+            <p className="text-[10px] text-text-muted mt-0.5">Top isu Agent / Customer / Akulaku</p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-text-muted">
+            {showIssueDetail ? 'Sembunyikan' : 'Tampilkan'}
+            {showIssueDetail ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+          </span>
+        </button>
+        {showIssueDetail ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-border p-4">
+            <DetailBarChart data={agentDetailBar} color={COLORS.agent} title="Top isu — Agent Area" issueCategories={agentIssueCategories} />
+            <DetailBarChart data={customerDetailBar} color={COLORS.customer} title="Top isu — Customer Area" issueCategories={customerIssueCategories} />
+            <DetailBarChart data={akulakuDetailBar} color={COLORS.akulaku} title="Top isu — Akulaku Process" issueCategories={akulakuIssueCategories} />
+          </div>
+        ) : null}
       </div>
 
       {/* Tier 3: Agent RCA Table */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h3 className="text-sm font-bold text-text-primary">Profil RCA Per Agent</h3>
+            <h3 className="text-sm font-bold text-text-primary">Profil RCA per agent</h3>
             <p className="text-[10px] text-text-muted mt-0.5">Ranking berdasarkan total kasus</p>
           </div>
           <input
@@ -383,13 +404,15 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
             showDataActions
           />
         ) : (
+          <>
+          <MobileScrollHint label="Geser → untuk lihat semua kolom" />
           <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full text-left text-[11px]">
+            <table className="kpi-data-table w-full text-left text-[11px]">
               <thead className="bg-surface/80 text-text-secondary border-b border-border">
                 <tr>
                   <th className="px-3 py-2.5 font-bold w-8 text-center">#</th>
-                  <th className="px-3 py-2.5 font-bold">Nama Agent</th>
-                  <th className="px-3 py-2.5 font-bold">Team Leader</th>
+                  <th className="px-3 py-2.5 font-bold">Nama agent</th>
+                  <th className="px-3 py-2.5 font-bold">TL</th>
                   <th className="px-3 py-2.5 font-bold text-center" style={{ color: COLORS.agent }}>Agent Area</th>
                   <th className="px-3 py-2.5 font-bold text-center" style={{ color: COLORS.customer }}>Customer Area</th>
                   <th className="px-3 py-2.5 font-bold text-center" style={{ color: COLORS.akulaku }}>Akulaku Process</th>
@@ -425,6 +448,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>

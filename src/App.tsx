@@ -548,7 +548,7 @@ export default function App() {
     { id: 'productivity', label: 'Productivity Detail', icon: Activity },
     { id: 'qa', label: 'QA Agent 360', icon: UserCircle },
     { id: 'csat_official', label: 'CSAT Official', icon: Star },
-    { id: 'csat', label: 'CSAT Room (Surveys)', icon: Star },
+    { id: 'csat', label: 'CSAT Room (Survey)', icon: Star },
     { id: 'csat_rca', label: 'CSAT Root Cause', icon: FileText },
     { id: 'sla', label: 'SLA Monitor', icon: CheckCircle },
     { id: 'whu', label: 'WHU Monitor', icon: Clock },

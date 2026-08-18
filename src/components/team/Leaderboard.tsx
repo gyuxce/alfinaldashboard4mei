@@ -467,10 +467,7 @@ export const Leaderboard: React.FC = () => {
           Leaderboard
         </h2>
         <p className="text-[13px] text-text-secondary mt-1">
-          Weighted Score: QA 50% &middot; Prod 20% &middot; CSAT 20% &middot; Training 5% &middot; Quiz 5%
-        </p>
-        <p className="text-[11px] text-text-muted italic mt-0.5">
-          Mengikuti periode aktif dan filter global yang sedang aktif
+          Bobot skor: QA 50% · Prod 20% · CSAT 20% · Training 5% · Quiz 5% · periode & filter global aktif
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] not-italic">
             <span className="rounded-full border border-border bg-surface px-2 py-1 font-semibold text-text-secondary">
@@ -504,7 +501,7 @@ export const Leaderboard: React.FC = () => {
               : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50",
           )}
         >
-          <User className="w-4 h-4" /> Agents
+          <User className="w-4 h-4" /> Agent
         </button>
         <button
           onClick={() => {
@@ -518,7 +515,7 @@ export const Leaderboard: React.FC = () => {
               : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50",
           )}
         >
-          <Users className="w-4 h-4" /> Team Leaders
+          <Users className="w-4 h-4" /> Team Leader
         </button>
       </div>
 
@@ -539,15 +536,15 @@ export const Leaderboard: React.FC = () => {
           <thead className="sticky top-0 z-40 text-white">
             <tr className="bg-primary">
               <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
-              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 font-bold md:sticky md:left-[52px] z-50 bg-primary">Name</th>
+              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 font-bold md:sticky md:left-[52px] z-50 bg-primary">Nama</th>
               <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 font-bold md:sticky md:left-[242px] z-50 bg-primary">Email / CS ID</th>
-              <th rowSpan={2} className="overflow-hidden border-r-2 border-white/60 p-2 font-bold md:sticky md:left-[372px] z-50 bg-primary shadow-[8px_0_12px_-8px_rgba(0,0,0,0.45)]">Leader Name</th>
-              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 Points)</th>
-              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 Points)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 Points)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training Completion (5 Points)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz Score (5 Points)</th>
-              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Final Score</th>
+              <th rowSpan={2} className="overflow-hidden border-r-2 border-white/60 p-2 font-bold md:sticky md:left-[372px] z-50 bg-primary shadow-[8px_0_12px_-8px_rgba(0,0,0,0.45)]">Nama leader</th>
+              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 poin)</th>
+              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 poin)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 poin)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training (5 poin)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz (5 poin)</th>
+              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Skor akhir</th>
             </tr>
             <tr className="bg-primary border-t border-white/30">
               {[
@@ -665,13 +662,13 @@ export const Leaderboard: React.FC = () => {
             <tr className="bg-primary">
               <th rowSpan={2} className="border-r border-white/40 p-2 text-center font-bold">#</th>
               <th rowSpan={2} className="border-r border-white/40 p-2 text-left font-bold">Team Leader</th>
-              <th rowSpan={2} className="border-r border-white/40 p-2 text-center font-bold">Agents</th>
-              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 Points)</th>
-              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 Points)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 Points)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training Completion (5 Points)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz Score (5 Points)</th>
-              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Final Score</th>
+              <th rowSpan={2} className="border-r border-white/40 p-2 text-center font-bold">Agent</th>
+              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 poin)</th>
+              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 poin)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 poin)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training (5 poin)</th>
+              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz (5 poin)</th>
+              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Skor akhir</th>
             </tr>
             <tr className="border-t border-white/30 bg-primary">
               {[
@@ -763,7 +760,7 @@ export const Leaderboard: React.FC = () => {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-                  KPI Analysis
+                  Analisis KPI
                 </h2>
                 <p className="text-text-secondary text-xs mt-0.5">
                   {selectedAgent.name} {selectedAgent.csId && `- ${selectedAgent.csId}`}
@@ -785,7 +782,7 @@ export const Leaderboard: React.FC = () => {
               <button 
                 onClick={() => setSelectedAgent(null)}
                 className="text-text-muted hover:text-text-primary transition-colors p-1 rounded hover:bg-surface-muted"
-                aria-label="Close modal"
+                aria-label="Tutup"
               >
                 X
               </button>

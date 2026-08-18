@@ -181,6 +181,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
       </div>
 
       <KpiRankLists
+        summaryLabel="Highlight KPI"
         cards={[
           { title: 'Top 3 Hari', items: highlightStats.topDays, tone: 'good' },
           { title: 'Bottom 3 Hari', items: highlightStats.bottomDays, tone: 'bad' },
@@ -204,13 +205,13 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
               <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
                 <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
-                <SortableHeader label="Name / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
+                <SortableHeader label="Nama / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
-                <SortableHeader label="Team Leader" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                <SortableHeader label="TL" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                 {uniqueDates.map(date => (
                   <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface ">{date}</th>
                 ))}
-                <SortableHeader label="Official CSAT (Avg)" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                <SortableHeader label="CSAT Official (Avg)" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
               </tr>
             </thead>
             <tbody className="">
@@ -402,7 +403,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         {/* Weekly Trend Panel */}
         <div className="flex flex-col">
           <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '3-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
+            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? 'Tren perbandingan 3 bulan' : 'Tren perbandingan 4 minggu'}</h3>
           </div>
           <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">

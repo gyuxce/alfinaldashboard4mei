@@ -36,7 +36,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     if (surveys.length > 0) {
       setWowModalData({
         title: `Category Analysis: ${categoryName}`,
-        subtitle: `Data filter: ${weekLabel} (${viewMode === 'full' ? 'Full Data' : 'After Take Out'})`,
+        subtitle: `Data filter: ${weekLabel} (${viewMode === 'full' ? 'Data penuh' : 'After Takeout'})`,
         surveys
       });
     }
@@ -47,7 +47,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     if (agent && agent.csatHistory.length > 0) {
       setWowModalData({
         title: `Historical Audit Trail: ${agentName || agent.csId}`,
-        subtitle: `CS ID: ${agent.csId} • Team Leader: ${agent.teamLeader || '-'} • Data filter: ${weekLabel} (${viewMode === 'full' ? 'Full Data' : 'After Take Out'})`,
+        subtitle: `CS ID: ${agent.csId} • TL: ${agent.teamLeader || '-'} • Data filter: ${weekLabel} (${viewMode === 'full' ? 'Data penuh' : 'After Takeout'})`,
         surveys: agent.csatHistory.filter(h => (viewMode === 'full' || !h.isTakeout) && h.score > 0)
       });
     }
@@ -469,7 +469,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
         <div className="flex flex-col xl:flex-row xl:items-center gap-4 w-full overflow-hidden">
-          <h1 className="text-lg font-bold text-text-primary whitespace-nowrap shrink-0">CSAT Room (Surveys)</h1>
+          <h1 className="text-lg font-bold text-text-primary whitespace-nowrap shrink-0">CSAT Room (Survey)</h1>
           <div className="flex flex-col md:flex-row gap-2 xl:gap-4 w-full overflow-hidden">
              <SegmentedControl
                value={viewMode}
@@ -489,10 +489,10 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  }
                }}
                options={[
-                 { value: 'agent', label: 'Agent Analysis', icon: BarChart2 },
-                 { value: 'defect', label: 'Defect Analysis', icon: AlertCircle },
-                 { value: 'category', label: 'Category Analysis', icon: Layers },
-                 { value: 'score', label: 'Score Analysis', icon: TrendingUp },
+                 { value: 'agent', label: 'Agent', icon: BarChart2 },
+                 { value: 'defect', label: 'Defect', icon: AlertCircle },
+                 { value: 'category', label: 'Kategori', icon: Layers },
+                 { value: 'score', label: 'Skor', icon: TrendingUp },
                ]}
              />
           </div>
@@ -513,6 +513,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       </div>
 
       <KpiRankLists
+        summaryLabel="Highlight KPI"
         cards={[
           { title: 'Top 3 Kategori Survey', items: highlightRanks.topCategories, tone: 'good' },
           { title: 'Bottom 3 Hari', items: highlightRanks.bottomDays, tone: 'bad' },
@@ -544,7 +545,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
         <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
           <div className="p-4 border-b border-border bg-surface-muted flex flex-col md:flex-row md:items-center justify-between gap-4">
              <div>
-               <h2 className="text-sm font-bold text-text-primary">Global Score Distribution</h2>
+               <h2 className="text-sm font-bold text-text-primary">Distribusi skor global</h2>
                <p className="text-xs text-text-muted mt-1 ">{totalScoreRows} total tickets processed</p>
              </div>
              
@@ -574,7 +575,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9 gap-3">
                {([
-                 { key: 'All', label: 'All Surveys', tone: 'neutral' },
+                 { key: 'All', label: 'Semua survey', tone: 'neutral' },
                  { key: 'No Survey', label: 'No Survey', tone: 'neutral' },
                  { key: 'Bad', label: 'Bad Survey', sub: 'Score 1 + 2', tone: 'bad' },
                  { key: '1', label: 'Score 1', tone: 'bad' },
@@ -631,21 +632,22 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
           <div className="border-t border-border mt-2 bg-surface">
              <div className="p-4 border-b border-border bg-surface-muted">
-               <h2 className="text-sm font-bold text-text-primary">Detailed Analysis: {scoreAnalysisLabel}</h2>
+               <h2 className="text-sm font-bold text-text-primary">Analisis detail: {scoreAnalysisLabel}</h2>
                <p className="text-xs text-text-muted mt-1">
                  {isAccumulatedScoreCase
                    ? `Akumulasi top category & agent dari ${scoreAnalysisLabel}. Breakdown per score tetap ditampilkan.`
-                   : 'Select a score card above to view cases and agents associated with that score'}
+                   : 'Pilih kartu skor di atas untuk melihat kasus dan agent terkait'}
                </p>
              </div>
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
                  <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                   <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top Cases</div>
+                   <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top kasus</div>
+                   <MobileScrollHint className="px-3 pt-2" />
                     <table className="kpi-data-table w-full text-left">
                      <thead className="bg-surface text-text-secondary border-b border-border">
                        <tr>
-                         <th className="p-2 font-bold w-12 text-center  min-w-[60px] max-w-[60px]">Rank</th>
-                         <th className="p-2 font-bold ">Case / Category Name</th>
+                         <th className="p-2 font-bold w-12 text-center  min-w-[60px] max-w-[60px]">Peringkat</th>
+                         <th className="p-2 font-bold ">Kasus / kategori</th>
                          {accumulatedScoreKeys?.map((sk) => (
                            <th key={sk} className="p-2 font-bold w-16 text-center">Score {sk}</th>
                          ))}
@@ -670,7 +672,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                        {scoreAnalysisTopCases.length === 0 && (
                          <tr>
                            <td colSpan={3 + (accumulatedScoreKeys?.length || 0)} className="p-8 text-center text-text-muted text-sm border-b border-border">
-                             No cases found.
+                             Tidak ada kasus.
                            </td>
                          </tr>
                        )}
@@ -679,11 +681,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  </div>
 
                  <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                   <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top Agents</div>
+                   <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top agent</div>
+                   <MobileScrollHint className="px-3 pt-2" />
                    <table className="kpi-data-table w-full text-left">
                      <thead className="bg-surface text-text-secondary border-b border-border">
                        <tr>
-                         <th className="p-2 font-bold w-12 text-center  min-w-[60px] max-w-[60px]">Rank</th>
+                         <th className="p-2 font-bold w-12 text-center  min-w-[60px] max-w-[60px]">Peringkat</th>
                          <th className="p-2 font-bold ">Agent Name</th>
                          {accumulatedScoreKeys?.map((sk) => (
                            <th key={sk} className="p-2 font-bold w-16 text-center">Score {sk}</th>
@@ -752,7 +755,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  <p className="text-xs text-text-muted mt-1 ">Identifies categories and top contributors for bad scores</p>
                </div>
                <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg tracking-wide">
-                 {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
+                 {viewMode === 'full' ? 'From Data penuh' : 'After Takeout'}
                </span>
             </div>
 
@@ -772,11 +775,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 />
               ) : (
                 <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                 <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top 10 Categories</div>
+                 <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Top 10 kategori</div>
+                 <MobileScrollHint className="px-3 pt-2" />
                 <table className="kpi-data-table w-full text-left">
                  <thead className="bg-surface text-text-secondary border-b border-border">
                    <tr>
-                     <th className="p-2 font-bold w-12 text-center min-w-[60px] max-w-[60px]">Rank</th>
+                     <th className="p-2 font-bold w-12 text-center min-w-[60px] max-w-[60px]">Peringkat</th>
                      <th className="p-2 font-bold ">Category Name</th>
                      <th className="p-2 font-bold w-16 text-center">Freq</th>
                      {isComparisonEnabled && <th className="p-2 font-bold w-16 text-center">{comparisonMode === 'mom' ? 'MoM' : 'WoW'}</th>}
@@ -796,7 +800,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                       const isDown = diff < 0;
                       
                       return (
-                        <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group cursor-pointer" onClick={() => handleCategoryClick(cat.name, viewMode === 'full' ? 'From Full Data' : 'After Take Out', data)}>
+                        <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group cursor-pointer" onClick={() => handleCategoryClick(cat.name, viewMode === 'full' ? 'From Data penuh' : 'After Takeout', data)}>
                           <td className="p-2 text-center text-text-muted font-medium">{cat.rank}</td>
                           <td className={`p-2 font-medium max-w-[200px] truncate ${isTakeoutCategory ? 'text-danger' : 'text-text-primary'}`} title={cat.name}>{cat.name}</td>
                           <td className="p-2 text-center font-bold text-[11px] text-text-secondary">{formatNum(cat.count, 0)}</td>
@@ -836,7 +840,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  <p className="text-xs text-text-muted mt-1 ">Identifies agents with the highest bad scores</p>
                </div>
                <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg tracking-wide">
-                 {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
+                 {viewMode === 'full' ? 'From Data penuh' : 'After Takeout'}
                </span>
             </div>
 
@@ -856,11 +860,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 />
               ) : (
                 <div className="overflow-x-auto border border-border rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-               <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Critical Agents</div>
+               <div className="p-3 bg-surface-muted border-b border-border font-bold text-xs text-text-secondary">Agent kritis</div>
+               <MobileScrollHint className="px-3 pt-2" />
                <table className="kpi-data-table w-full text-left">
                  <thead className="bg-surface text-text-secondary border-b border-border">
                    <tr>
-                     <th className="p-2 font-bold w-12 text-center min-w-[60px] max-w-[60px]">Rank</th>
+                     <th className="p-2 font-bold w-12 text-center min-w-[60px] max-w-[60px]">Peringkat</th>
                      <th className="p-2 font-bold ">Agent Name</th>
                      <th className="p-2 font-bold w-24 text-center">Freq</th>
                    </tr>
@@ -876,7 +881,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                    {agentRankings.critical.length === 0 && (
                      <tr>
                        <td colSpan={3} className="p-8 text-center text-text-muted text-sm border-b border-border">
-                         No critical agents found.
+                         Tidak ada agent kritis.
                        </td>
                      </tr>
                    )}
@@ -895,17 +900,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
                 <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
-                <SortableHeader label="Name / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
+                <SortableHeader label="Nama / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
-                <SortableHeader label="Team Leader" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                <SortableHeader label="TL" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                 {uniqueDates.map(date => (
                   <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface `}>
                     {date}
                   </th>
                 ))}
-                <SortableHeader label="Average" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
                 <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                  Action
+                  Aksi
                 </th>
               </tr>
             </thead>
@@ -1032,17 +1037,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
                 <th className="p-2 font-bold text-center border-b border-border md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
-                <SortableHeader label="Name / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
+                <SortableHeader label="Nama / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
-                <SortableHeader label="Team Leader" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                <SortableHeader label="TL" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                 <SortableHeader label="Score 1" sortKey="score1" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 2" sortKey="score2" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 3" sortKey="score3" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 4" sortKey="score4" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 5" sortKey="score5" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
-                <SortableHeader label="Most Frequent Category" sortKey="category" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border bg-surface w-full" />
+                <SortableHeader label="Kategori tersering" sortKey="category" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border bg-surface w-full" />
                 <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-b border-border border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                  Action
+                  Aksi
                 </th>
               </tr>
             </thead>
@@ -1138,7 +1143,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       {selectedAgent && (
         <CsatDetailModal
           title={<>Historical Audit Trail: {selectedAgent.agent.name || selectedAgent.agent.csId}</>}
-          subtitle={<>CS ID: <span className="font-semibold text-text-primary">{selectedAgent.agent.csId}</span> &nbsp;&bull;&nbsp; Team Leader: <span className="font-semibold text-text-primary">{selectedAgent.agent.teamLeader || '-'}</span></>}
+          subtitle={<>CS ID: <span className="font-semibold text-text-primary">{selectedAgent.agent.csId}</span> &nbsp;&bull;&nbsp; TL: <span className="font-semibold text-text-primary">{selectedAgent.agent.teamLeader || '-'}</span></>}
           surveys={selectedAgent.date ? selectedAgent.agent.csatHistory.filter((h: any) => h.date === selectedAgent.date) : selectedAgent.agent.csatHistory}
           agentType={selectedAgent.type}
           onClose={() => setSelectedAgent(null)}
@@ -1800,7 +1805,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
     <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
       <div className="flex items-center justify-center mb-4">
         <h3 className="text-sm font-bold text-text-primary text-center">
-          Respondent Volume Trend ({viewMode === 'full' ? 'Full Data' : 'After Takeout'})
+          Respondent Volume Trend ({viewMode === 'full' ? 'Data penuh' : 'After Takeout'})
         </h3>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
