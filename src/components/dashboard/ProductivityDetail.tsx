@@ -220,7 +220,6 @@ export const ProductivityDetail: React.FC<{
       .map((a) => ({
         agent: a,
         avg: a.productivityTotal / a.manDays,
-        gap: a.productivityTotal - a.manDays * 100,
       }))
       .sort((a, b) => b.avg - a.avg);
 
@@ -233,6 +232,15 @@ export const ProductivityDetail: React.FC<{
       });
     });
 
+    const hourProd = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      total: data
+        .filter((a) => a.productivityBase > 0)
+        .reduce((sum, agent) => sum + (agent.hourlyProductivity?.[hour] || 0), 0),
+    }))
+      .filter((h) => h.total > 0)
+      .sort((a, b) => b.total - a.total);
+
     const categories = Object.entries(categoryCounts)
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => b.count - a.count);
@@ -240,9 +248,6 @@ export const ProductivityDetail: React.FC<{
     const topAgents = agents.slice(0, 3);
     const bottomAgents =
       agents.length > 3 ? agents.slice(Math.max(3, agents.length - 3)).reverse() : [];
-    const topCategories = categories.slice(0, 3);
-    const bottomCategories =
-      categories.length > 3 ? categories.slice(Math.max(3, categories.length - 3)).reverse() : [];
 
     return {
       topAgents: topAgents.map((a) => ({
@@ -255,13 +260,14 @@ export const ProductivityDetail: React.FC<{
         subLabel: a.agent.teamLeader || a.agent.csId,
         value: `${formatNum(a.avg, 1)} /hari`,
       })),
-      topCategories: topCategories.map((c) => ({
+      topCategories: categories.slice(0, 3).map((c) => ({
         label: c.category,
         value: formatNum(c.count, 0),
       })),
-      bottomCategories: bottomCategories.map((c) => ({
-        label: c.category,
-        value: formatNum(c.count, 0),
+      topIntervals: hourProd.slice(0, 3).map((h) => ({
+        label: `${String(h.hour).padStart(2, '0')}:00 – ${String((h.hour + 1) % 24).padStart(2, '0')}:00`,
+        subLabel: 'Interval tersibuk',
+        value: formatNum(h.total, 0),
       })),
     };
   }, [data]);
@@ -362,12 +368,12 @@ export const ProductivityDetail: React.FC<{
       </div>
 
       <KpiRankLists
-        categoryLabel="Kategori Chat"
-        agentLabel="Agent (Avg/hari)"
-        topCategories={highlightRanks.topCategories}
-        bottomCategories={highlightRanks.bottomCategories}
-        topAgents={highlightRanks.topAgents}
-        bottomAgents={highlightRanks.bottomAgents}
+        cards={[
+          { title: 'Top 3 Kategori Chat', items: highlightRanks.topCategories, tone: 'good' },
+          { title: 'Top 3 Interval Rame', items: highlightRanks.topIntervals, tone: 'neutral' },
+          { title: 'Top 3 Agent (Avg/hari)', items: highlightRanks.topAgents, tone: 'good' },
+          { title: 'Bottom 3 Agent (Avg/hari)', items: highlightRanks.bottomAgents, tone: 'bad' },
+        ]}
       />
 
       {/* HOURLY PRODUCTIVITY CHART */}

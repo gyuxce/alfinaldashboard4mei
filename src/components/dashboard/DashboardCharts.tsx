@@ -29,6 +29,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
       productivity: number,
       prevProductivity: number,
       hasPrevious: boolean,
+      dayKeys: Set<string>,
     }>();
 
     const getWeekBucket = (date: string) => {
@@ -38,6 +39,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
       const start = new Date(parsedTimestamp);
       const day = start.getDay();
       start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day));
+      start.setHours(0, 0, 0, 0);
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
       const toDateKey = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
@@ -58,10 +60,12 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
           productivity: 0,
           prevProductivity: 0,
           hasPrevious: false,
+          dayKeys: new Set(),
         });
       }
 
       const week = weeks.get(bucket.key)!;
+      week.dayKeys.add(item.date);
       week.productivity += item.productivity || 0;
       if (item.prevProductivity !== null && item.prevProductivity !== undefined) {
         week.prevProductivity += item.prevProductivity;
@@ -69,13 +73,23 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
       }
     });
 
+    // Minggu lintas bulan / period filter sering hanya punya 1–2 hari → total terkesan anjlok.
+    // Proyeksikan ke setara 7 hari agar perbandingan antar minggu adil.
     return Array.from(weeks.values())
-      .map(week => ({
-        date: week.startDate,
-        dateLabel: week.label,
-        productivity: week.productivity,
-        prevProductivity: week.hasPrevious ? week.prevProductivity : null,
-      }))
+      .map(week => {
+        const dayCount = week.dayKeys.size;
+        const isPartial = dayCount > 0 && dayCount < 7;
+        const scale = isPartial ? 7 / dayCount : 1;
+        return {
+          date: week.startDate,
+          dateLabel: isPartial ? `${week.label}*` : week.label,
+          productivity: week.productivity * scale,
+          prevProductivity: week.hasPrevious ? week.prevProductivity * scale : null,
+          dayCount,
+          isPartial,
+        };
+      })
+      .filter(week => week.dayCount >= 2)
       .sort((a, b) => parseDateForSort(a.date) - parseDateForSort(b.date));
   }, [dailyTrend]);
 
@@ -250,6 +264,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
             ))}
           </div>
         </div>
+        {trendMode === 'weekly' && weeklyTrend.some(w => w.isPartial) && (
+          <p className="mb-3 text-[10px] text-text-muted">
+            * Minggu tidak penuh (lintas bulan / data period belum lengkap) diproyeksikan ke setara 7 hari agar perbandingan adil.
+          </p>
+        )}
 
         <div className="w-full h-[280px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
