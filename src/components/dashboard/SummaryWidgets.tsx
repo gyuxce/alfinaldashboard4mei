@@ -88,14 +88,14 @@ export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({
   return (
     <div className={containerClassName}>
       {/* Kartu 1: Overall Average */}
-      <div className="bg-surface rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-5 flex flex-col min-h-[160px] h-full">
-        <div className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">Overall Average</div>
-        <div className="text-3xl font-extrabold text-text-primary mt-auto">{totalCount > 0 ? formatFn(overallAvg) : '-'}</div>
+      <div className="bg-surface rounded-lg border border-border p-5 flex flex-col min-h-[160px] h-full">
+        <div className="text-xs tracking-wide text-text-muted font-medium mb-1">Overall Average</div>
+        <div className="text-3xl font-semibold text-text-primary mt-auto">{totalCount > 0 ? formatFn(overallAvg) : '-'}</div>
       </div>
 
       {/* Kartu 2: BPO Performance */}
       <div className="flex h-full min-h-[160px]">
-        <div className="w-full h-full rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border border-t-[3px] overflow-hidden flex flex-col bg-card"
+        <div className="w-full h-full rounded-lg border border-border border-t-[3px] overflow-hidden flex flex-col bg-card"
              style={{ borderTopColor: `rgb(var(--kpi-${theme}))` }}>
           <BpoPerformanceCard 
             data={bpoEntries.map(b => ({ name: b.bpo, value: b.avg, type: kpiType as KpiType }))} 
@@ -105,9 +105,9 @@ export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({
       </div>
 
       {/* Kartu 3: Top Team Leaders */}
-      <div className="bg-surface rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border border-t-[3px] border-t-success p-5 flex flex-col min-h-[160px] h-full relative overflow-hidden group">
-        <div className="text-xs uppercase tracking-wider text-text-muted font-bold flex items-center justify-between mb-4">
-           TOP TEAM LEADERS
+      <div className="bg-surface rounded-lg border border-border border-t-[3px] border-t-success p-5 flex flex-col min-h-[160px] h-full relative overflow-hidden group">
+        <div className="text-xs tracking-wide text-text-muted font-medium flex items-center justify-between mb-4">
+           Top Team Leaders
            <div className="w-2 h-2 rounded-full bg-success"></div>
         </div>
         <div className="flex flex-col gap-1.5 mt-auto">
@@ -135,9 +135,9 @@ export const SummaryWidgets: React.FC<SummaryWidgetsProps> = ({
       </div>
 
       {/* Kartu 4: Underperform TL */}
-      <div className="bg-surface rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border border-t-[3px] border-t-danger p-5 flex flex-col min-h-[160px] h-full relative overflow-hidden group">
-        <div className="text-xs uppercase tracking-wider text-text-muted font-bold flex items-center justify-between mb-4">
-           UNDERPERFORM TL
+      <div className="bg-surface rounded-lg border border-border border-t-[3px] border-t-danger p-5 flex flex-col min-h-[160px] h-full relative overflow-hidden group">
+        <div className="text-xs tracking-wide text-text-muted font-medium flex items-center justify-between mb-4">
+           Underperform TL
            <div className="w-2 h-2 rounded-full bg-danger"></div>
         </div>
         <div className="flex flex-col gap-1.5 mt-auto">

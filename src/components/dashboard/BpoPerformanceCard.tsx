@@ -16,7 +16,7 @@ export const BpoPerformanceCard: React.FC<BpoPerformanceProps> = ({ data, format
   return (
     <div className="flex flex-col h-full bg-transparent">
       <div className="px-3 pt-3 pb-2 border-b border-border/50 bg-surface/50">
-         <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest">BPO Performance</div>
+         <div className="text-[11px] text-text-muted font-medium tracking-wide">BPO Performance</div>
       </div>
       
       <div className={cn("grid gap-0 flex-1", gridColsClass)}>

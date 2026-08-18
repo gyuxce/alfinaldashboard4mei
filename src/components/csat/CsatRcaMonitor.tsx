@@ -7,11 +7,12 @@ import {
 } from 'recharts';
 import { AlertCircle } from 'lucide-react';
 import { EmptyState } from '../ui/EmptyState';
+import { chart } from '../../lib/themeColors';
 
 const COLORS = {
-  agent: '#f43f5e',
-  customer: '#3b82f6',
-  akulaku: '#f59e0b',
+  agent: chart.danger,
+  customer: chart.kpiNeutral,
+  akulaku: chart.warning,
 };
 
 type IssueCategoryRow = {
@@ -168,9 +169,9 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const grandTotal = totalAgent + totalCustomer + totalAkulaku;
 
   const legendItems = [
-    { key: 'agent', label: 'Agent Area', count: totalAgent, color: COLORS.agent, bg: 'rgba(244,63,94,0.08)', border: 'rgba(244,63,94,0.25)', items: agentDetailBar },
-    { key: 'customer', label: 'Customer Area', count: totalCustomer, color: COLORS.customer, bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)', items: customerDetailBar },
-    { key: 'akulaku', label: 'Akulaku Process', count: totalAkulaku, color: COLORS.akulaku, bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', items: akulakuDetailBar },
+    { key: 'agent', label: 'Agent Area', count: totalAgent, color: COLORS.agent, bg: 'color-mix(in srgb, var(--color-danger) 8%, transparent)', border: 'color-mix(in srgb, var(--color-danger) 25%, transparent)', items: agentDetailBar },
+    { key: 'customer', label: 'Customer Area', count: totalCustomer, color: COLORS.customer, bg: 'color-mix(in srgb, var(--color-kpi-neutral) 8%, transparent)', border: 'color-mix(in srgb, var(--color-kpi-neutral) 25%, transparent)', items: customerDetailBar },
+    { key: 'akulaku', label: 'Akulaku Process', count: totalAkulaku, color: COLORS.akulaku, bg: 'color-mix(in srgb, var(--color-warning) 8%, transparent)', border: 'color-mix(in srgb, var(--color-warning) 25%, transparent)', items: akulakuDetailBar },
   ];
 
   const DetailBarChart = ({

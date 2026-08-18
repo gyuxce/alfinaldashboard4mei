@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPreviousPeriod } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
+import { kpiThemeColor } from "../../lib/themeColors";
 import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
 import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
@@ -600,36 +601,26 @@ const StatCard = ({
   else if (kpiTheme === 'whu') Icon = Activity;
   else if (kpiTheme === 'qa') Icon = CheckCircle;
 
-  const colorMap: Record<string, string> = {
-    'productivity': '#E31E24',
-    'productivity-avg': '#EF4444',
-    'csat': '#F59E0B',
-    'qa': '#F59E0B',
-    'sla': '#22C55E',
-    'whu': '#22C55E',
-    'neutral': '#3B82F6',
-  };
-
-  const color = colorMap[kpiTheme] || '#3B82F6';
+  const color = kpiThemeColor(kpiTheme);
   const isCompareMode = previousValue !== undefined;
 
   return (
-    <div className={`bg-card w-full border border-border rounded-xl p-4 lg:p-5 flex flex-col justify-start hover:shadow-md transition-all ${ isCompareMode ? 'h-36' : 'h-28' } relative overflow-visible`}>
+    <div className={`bg-card w-full border border-border rounded-lg p-4 lg:p-5 flex flex-col justify-start hover:border-border-strong transition-colors ${ isCompareMode ? 'h-36' : 'h-28' } relative overflow-visible`}>
       <div className="flex items-center gap-2 mb-1.5 w-full">
-        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-surface-muted border border-border/50">
+        <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-surface-muted border border-border">
           <Icon size={12} style={{ color }} />
         </div>
-        <p className="min-w-0 flex-1 text-xs font-semibold text-text-secondary uppercase tracking-wide truncate">{title}</p>
+        <p className="min-w-0 flex-1 text-xs font-medium text-text-secondary tracking-wide truncate">{title}</p>
         <FormulaTooltip title={title} />
       </div>
 
       {/* Current Period */}
       <div className="flex items-baseline justify-between mt-auto">
-        <span className="text-[26px] font-bold tracking-tight leading-none" style={{ color }}>
+        <span className="text-[26px] font-semibold tracking-tight leading-none" style={{ color }}>
           <CountUpValue value={value} />
         </span>
         {delta !== undefined && delta !== 0 && (
-          <div className={`flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
+          <div className={`flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${
             delta > 0 ? 'text-success bg-success/10' : 'text-danger bg-danger/10'
           }`}>
             {delta > 0 ? '+' : '-'} {Math.abs(delta).toFixed(1)}
@@ -647,7 +638,7 @@ const StatCard = ({
       {/* Previous Period - always visible when compare mode is ON */}
       {isCompareMode && (
         <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-border/60">
-          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Prev:</span>
+          <span className="text-[9px] font-medium text-text-muted tracking-wide">Prev:</span>
           <span className="text-sm font-semibold text-text-muted">{previousValue}</span>
         </div>
       )}

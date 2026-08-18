@@ -7,6 +7,7 @@ import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
 import { KpiRankLists } from '../ui/KpiRankLists';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 const isQaDefect = (entry: QAEntry) => {
   const level = (entry.mistakeLevel || '').toUpperCase();
@@ -296,32 +297,14 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold text-text-primary">QA Agent 360</h1>
           
-          <div className="flex overflow-x-auto no-scrollbar bg-surface-muted p-1 rounded-lg w-full md:w-max gap-1">
-             <button 
-               onClick={() => setViewMode('performance')}
-               className={cn(
-                 "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                 viewMode === 'performance'
-                   ? "bg-blue-600 text-white font-medium shadow-sm"
-                   : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-               )}
-             >
-                <BarChart2 className="w-3.5 h-3.5" />
-                Performance Overview
-             </button>
-             <button 
-               onClick={() => setViewMode('defect')}
-               className={cn(
-                 "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                 viewMode === 'defect'
-                   ? "bg-blue-600 text-white font-medium shadow-sm"
-                   : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-               )}
-             >
-                <AlertCircle className="w-3.5 h-3.5" />
-                Defect Analysis
-             </button>
-          </div>
+          <SegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { value: 'performance', label: 'Performance Overview', icon: BarChart2 },
+              { value: 'defect', label: 'Defect Analysis', icon: AlertCircle },
+            ]}
+          />
         </div>
         
         <div className="flex items-center gap-4">
