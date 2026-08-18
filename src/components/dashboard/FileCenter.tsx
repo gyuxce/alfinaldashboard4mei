@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { useStore, AppState } from '../../store';
 import { UploadCloud, CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, getSheetMonthOptions } from '../../lib/sheetsApi';
+import { getSheetConfigForMonth, getSheetMonthOption, getSheetMonthOptions } from '../../lib/sheetsApi';
 import { 
   countDataRows,
   validateCsidFile, 
@@ -826,13 +826,8 @@ export const FileCenter = () => {
   const sheetMonthOptions = getSheetMonthOptions();
   const failedSheetName = sheetsFetchError?.match(/"([^"]+)"/)?.[1] || null;
   const hasSuccessfulSync = !!lastSyncTime && !sheetsFetchError;
-  const previousSheetMonthKey = getPreviousSheetMonthKey(selectedSheetMonth);
-  const previousSheetOption = previousSheetMonthKey ? getSheetMonthOption(previousSheetMonthKey) : null;
-  const syncMonthLabel = previousSheetOption
-    ? `${activeMonth.label} + ${previousSheetOption.label}`
-    : activeMonth.label;
   const syncStatusText = isFetchingSheets
-    ? `Mengambil ${syncMonthLabel}...`
+    ? 'Menyinkronkan data...'
     : hasSuccessfulSync
       ? ''
       : `Sheet belum aktif: ${activeMonth.label}`;
@@ -1006,7 +1001,7 @@ export const FileCenter = () => {
         {isFetchingSheets && (
           <div className="flex flex-col items-center justify-center py-12 text-text-muted bg-card/50 rounded-xl border border-border mt-4">
             <Loader2 className="w-8 h-8 animate-spin mb-3 text-primary"/>
-            <p className="font-medium text-text-primary">Mengambil data dari Google Sheets...</p>
+            <p className="font-medium text-text-primary">Menyinkronkan data dari Google Sheets...</p>
             <p className="text-xs mt-1">Mohon tunggu sebentar</p>
           </div>
         )}

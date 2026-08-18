@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from './store';
 import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from './lib/dataProcessor';
-import { getPreviousSheetMonthKey, getSheetMonthOption } from './lib/sheetsApi';
 
 import { 
   LayoutDashboard, 
@@ -32,6 +32,7 @@ import { cn } from './lib/utils';
 
 import { SearchableSelect } from './components/ui/SearchableSelect';
 import { TabSkeleton } from './components/ui/TabSkeleton';
+import { BrandLoading } from './components/ui/BrandLoading';
 
 const FileCenter = React.lazy(() => import('./components/dashboard/FileCenter').then(module => ({ default: module.FileCenter })));
 const DashboardSummary = React.lazy(() => import('./components/dashboard/DashboardSummary').then(module => ({ default: module.DashboardSummary })));
@@ -197,36 +198,65 @@ interface MonthPickerProps {
 
 function MonthPicker({ value, options, onChange }: MonthPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const listId = React.useId();
   const selectedOption = options.find(option => option.value === value);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+  const updateMenuPos = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.max(rect.width, 192);
+    let left = rect.left;
+    if (left + width > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - width - 8);
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    setMenuPos({ top: rect.bottom + 4, left, width });
+  };
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setMenuPos(null);
+      return;
+    }
+    updateMenuPos();
+    const onScrollOrResize = () => updateMenuPos();
+    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    return () => {
+      window.removeEventListener('resize', onScrollOrResize);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (wrapperRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setIsOpen(false);
+    }
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') setIsOpen(false);
     }
+    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [isOpen]);
 
   return (
     <div className="relative w-[140px] shrink-0" ref={wrapperRef}>
       <button
+        ref={buttonRef}
         type="button"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-controls={listId}
+        aria-controls={isOpen ? listId : undefined}
         onClick={() => setIsOpen(!isOpen)}
         className="flex h-8 w-full items-center justify-between rounded-lg border border-border bg-surface px-2.5 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-muted focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
       >
@@ -234,39 +264,44 @@ function MonthPicker({ value, options, onChange }: MonthPickerProps) {
         <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-text-muted" aria-hidden />
       </button>
 
-      {isOpen && (
-        <div
-          id={listId}
-          role="listbox"
-          aria-label="Pilih bulan"
-          className="absolute z-[9999] mt-1 w-full min-w-[12rem] overflow-hidden rounded-lg border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-        >
-          <div className="max-h-64 overflow-y-auto p-1">
-            {options.map(option => {
-              const isSelected = option.value === value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-                    isSelected ? "bg-primary-soft font-semibold text-primary" : "text-text-primary hover:bg-surface-muted"
-                  )}
-                >
-                  <span>{option.label}</span>
-                  {isSelected && <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {isOpen &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={listId}
+            role="listbox"
+            aria-label="Pilih bulan"
+            className="fixed z-[200] overflow-hidden rounded-lg border border-border bg-card shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+            style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
+          >
+            <div className="max-h-64 overflow-y-auto p-1">
+              {options.map(option => {
+                const isSelected = option.value === value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      onChange(option.value);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                      isSelected ? "bg-primary-soft font-semibold text-primary" : "text-text-primary hover:bg-surface-muted"
+                    )}
+                  >
+                    <span>{option.label}</span>
+                    {isSelected && <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -279,7 +314,8 @@ export default function App() {
   const hasAutoFetchedSheetsRef = useRef(false);
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+    const stored = localStorage.getItem('theme');
+    return stored === 'light' || stored === 'dark' ? stored : 'dark';
   });
 
   useEffect(() => {
@@ -320,17 +356,11 @@ export default function App() {
     void fetchFromSheets();
   }, [fetchFromSheets, isFetchingSheets, isHydrating, productivityData.length]);
 
-  const activeSheetOption = getSheetMonthOption(selectedSheetMonth);
-  const previousSheetMonthKey = getPreviousSheetMonthKey(selectedSheetMonth);
-  const previousSheetOption = previousSheetMonthKey ? getSheetMonthOption(previousSheetMonthKey) : null;
-  const syncMonthLabel = previousSheetOption
-    ? `${activeSheetOption.label} + ${previousSheetOption.label}`
-    : activeSheetOption.label;
   const syncStatusText = isFetchingSheets
-    ? `Mengambil ${syncMonthLabel}...`
+    ? 'Menyinkronkan data...'
     : lastSyncTime
       ? ''
-      : `Menunggu sync`;
+      : 'Menunggu sync';
   const syncIsStale = isStaleSync(lastSyncTime);
   const dataQuality = useMemo(() => {
     const sourceRows = [
@@ -531,14 +561,12 @@ export default function App() {
 
   if (isHydrating) {
     return (
-      <div className="flex h-screen w-full bg-background items-center justify-center font-sans text-text-primary transition-colors duration-300 px-6">
-        <div className="flex w-full max-w-3xl flex-col items-center gap-6">
-          <div className="w-14 h-14 rounded-lg bg-primary flex items-center justify-center text-white font-semibold text-lg">LC</div>
-          <p className="text-sm font-medium text-text-secondary">Memuat data tersimpan...</p>
-          <TabSkeleton className="w-full" />
-        </div>
-      </div>
-    )
+      <BrandLoading
+        fullscreen
+        title="Mohon menunggu..."
+        subtitle="Sedang menyiapkan dashboard"
+      />
+    );
   }
 
   const navigateWeek = (dir: 'prev' | 'next' | 'current') => {
@@ -750,7 +778,7 @@ export default function App() {
             "flex-col gap-2",
             isMobileFilterOpen ? "flex" : "hidden md:flex"
           )}>
-            <div className="flex flex-col md:flex-row md:flex-nowrap md:items-center gap-2 md:gap-2 md:overflow-x-auto no-scrollbar">
+            <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 md:overflow-visible">
               {/* Scope */}
               <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
                 <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide w-10 shrink-0">Scope</span>
@@ -994,24 +1022,12 @@ export default function App() {
 
       {/* Soft overlay during initial sheets fetch */}
       {isFetchingSheets && productivityData.length === 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-[2px] px-4">
-          <div
-            className="w-full max-w-2xl rounded-lg border border-border bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-            role="status"
-            aria-live="polite"
-            aria-label="Mengambil data terbaru"
-          >
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-white">
-                <RefreshCw className="h-4 w-4 animate-spin" aria-hidden />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-text-primary">Mengambil data terbaru...</p>
-                <p className="text-xs text-text-muted mt-0.5">{syncStatusText}</p>
-              </div>
-            </div>
-            <TabSkeleton compact />
-          </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-[2px] px-4">
+          <BrandLoading
+            title="Mohon menunggu..."
+            subtitle="Sedang mengambil data terbaru"
+            className="rounded-xl border border-border bg-card px-10 py-8 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+          />
         </div>
       )}
 
