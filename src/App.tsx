@@ -33,7 +33,9 @@ import { cn } from './lib/utils';
 
 import { SearchableSelect } from './components/ui/SearchableSelect';
 import { TabSkeleton } from './components/ui/TabSkeleton';
-import { BrandLoading } from './components/ui/BrandLoading';
+import { BootLoadingPanel } from './components/ui/BootLoadingPanel';
+import { TabErrorBoundary } from './components/ui/TabErrorBoundary';
+import { useProcessedKpis } from './hooks/useProcessedKpis';
 
 const FileCenter = React.lazy(() => import('./components/dashboard/FileCenter').then(module => ({ default: module.FileCenter })));
 const DashboardSummary = React.lazy(() => import('./components/dashboard/DashboardSummary').then(module => ({ default: module.DashboardSummary })));
@@ -333,7 +335,7 @@ export default function App() {
     startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, agentDictionary, agentDictionaryByMonth, selectedSheetMonth,
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
     isHydrating, hydrateFromStorage,
-    isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, activeMonthRowCounts,
+    isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, sheetsSyncProgress, activeMonthRowCounts,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode,
     pendingTab, clearPendingTab,
   } = useStore(useShallow((s) => ({
@@ -361,6 +363,7 @@ export default function App() {
     fetchFromSheets: s.fetchFromSheets,
     lastSyncTime: s.lastSyncTime,
     sheetsFetchError: s.sheetsFetchError,
+    sheetsSyncProgress: s.sheetsSyncProgress,
     activeMonthRowCounts: s.activeMonthRowCounts,
     isComparisonEnabled: s.isComparisonEnabled,
     setIsComparisonEnabled: s.setIsComparisonEnabled,
@@ -472,42 +475,6 @@ export default function App() {
     || activeTab === 'csat';
   const needsComparisonData = isComparisonEnabled && comparisonTabs;
 
-  // Current period only — independent of Bandingkan so toggle/filter-tab changes
-  // do not redo the heaviest pass unnecessarily.
-  const { rawData, tlList: baseTlList } = useMemo(() => {
-    const raw = processKPIs(
-      productivityData,
-      csatScData,
-      slaData,
-      scheduleData,
-      qaData,
-      startDate,
-      endDate,
-      agentDictionary,
-      agentDictionaryByMonth,
-    );
-
-    const tls = new Set<string>();
-    raw.forEach(a => {
-      if (a.teamLeader && a.teamLeader.trim() !== '') tls.add(a.teamLeader.trim());
-    });
-
-    return {
-      rawData: raw,
-      tlList: Array.from(tls).sort((a, b) => a.localeCompare(b)),
-    };
-  }, [
-    productivityData,
-    csatScData,
-    slaData,
-    scheduleData,
-    qaData,
-    startDate,
-    endDate,
-    agentDictionary,
-    agentDictionaryByMonth,
-  ]);
-
   const comparisonRanges = useMemo(() => {
     if (!needsComparisonData || !startDate || !endDate) {
       return { prev1: null, prev2: null, prev3: null } as const;
@@ -519,80 +486,39 @@ export default function App() {
     return { prev1, prev2, prev3 } as const;
   }, [needsComparisonData, comparisonMode, startDate, endDate]);
 
-  const previousRawData = useMemo(() => {
-    if (!comparisonRanges.prev1) return [] as ReturnType<typeof processKPIs>;
-    const range = comparisonRanges.prev1;
-    return processKPIs(
-      productivityData,
-      csatScData,
-      slaData,
-      scheduleData,
-      qaData,
-      range.start,
-      range.end,
-      agentDictionary,
-      agentDictionaryByMonth,
-    );
-  }, [
-    comparisonRanges.prev1,
-    productivityData,
-    csatScData,
-    slaData,
-    scheduleData,
-    qaData,
-    agentDictionary,
-    agentDictionaryByMonth,
-  ]);
+  const hasSourceData =
+    productivityData.length > 0
+    || csatScData.length > 0
+    || slaData.length > 0
+    || scheduleData.length > 0
+    || qaData.length > 0
+    || csidData.length > 0;
 
-  const previousRawData2 = useMemo(() => {
-    if (!comparisonRanges.prev2) return [] as ReturnType<typeof processKPIs>;
-    const range = comparisonRanges.prev2;
-    return processKPIs(
-      productivityData,
-      csatScData,
-      slaData,
-      scheduleData,
-      qaData,
-      range.start,
-      range.end,
-      agentDictionary,
-      agentDictionaryByMonth,
-    );
-  }, [
-    comparisonRanges.prev2,
+  // Yield between KPI passes so boot UI does not freeze/"patah".
+  const { bundle: kpiRawBundle, isProcessing: isProcessingKpis } = useProcessedKpis({
     productivityData,
     csatScData,
     slaData,
     scheduleData,
     qaData,
+    startDate,
+    endDate,
     agentDictionary,
     agentDictionaryByMonth,
-  ]);
+    needsComparisonData,
+    prev1: comparisonRanges.prev1,
+    prev2: comparisonRanges.prev2,
+    prev3: comparisonRanges.prev3,
+    enabled: !isHydrating && hasSourceData,
+  });
 
-  const previousRawData3 = useMemo(() => {
-    if (!comparisonRanges.prev3) return [] as ReturnType<typeof processKPIs>;
-    const range = comparisonRanges.prev3;
-    return processKPIs(
-      productivityData,
-      csatScData,
-      slaData,
-      scheduleData,
-      qaData,
-      range.start,
-      range.end,
-      agentDictionary,
-      agentDictionaryByMonth,
-    );
-  }, [
-    comparisonRanges.prev3,
-    productivityData,
-    csatScData,
-    slaData,
-    scheduleData,
-    qaData,
-    agentDictionary,
-    agentDictionaryByMonth,
-  ]);
+  const {
+    rawData,
+    previousRawData,
+    previousRawData2,
+    previousRawData3,
+    baseTlList,
+  } = kpiRawBundle;
 
   const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, tlList, agentList } = useMemo(() => {
     let data = rawData;
@@ -683,6 +609,27 @@ export default function App() {
     startDate,
   ]);
 
+  const showBootLoading =
+    isHydrating
+    || (isFetchingSheets && !hasSourceData)
+    || (isProcessingKpis && rawData.length === 0);
+
+  const bootTitle = isHydrating
+    ? 'Mohon menunggu...'
+    : isFetchingSheets && !hasSourceData
+      ? 'Menyinkronkan data...'
+      : 'Menyiapkan KPI...';
+
+  const bootSubtitle = isHydrating
+    ? 'Sedang menyiapkan dashboard'
+    : isFetchingSheets && !hasSourceData
+      ? (sheetsSyncProgress?.message || 'Sedang mengambil data terbaru')
+      : 'Menghitung metrik tanpa membekukan layar';
+
+  const bootSteps = isFetchingSheets && !hasSourceData && sheetsSyncProgress?.steps
+    ? sheetsSyncProgress.steps
+    : undefined;
+
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },
     { id: 'productivity', label: 'Productivity Detail', icon: Activity },
@@ -699,15 +646,7 @@ export default function App() {
     { id: 'files', label: 'File Center', icon: FolderDown },
   ];
 
-  if (isHydrating) {
-    return (
-      <BrandLoading
-        fullscreen
-        title="Mohon menunggu..."
-        subtitle="Sedang menyiapkan dashboard"
-      />
-    );
-  }
+  const activeNavLabel = navItems.find((item) => item.id === activeTab)?.label || 'tab';
 
   const navigateWeek = (dir: 'prev' | 'next' | 'current') => {
     if (dir === 'current') {
@@ -1142,36 +1081,37 @@ export default function App() {
         </div>
 
         <div className="w-full pb-8">
-          <React.Suspense fallback={<TabLoading />}>
-            {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-            {activeTab === 'leaderboard' && <Leaderboard data={kpiData} />}
-            {activeTab === 'incentive' && (
-              <IncentiveSimulation data={incentiveKpiData} period={incentivePeriod} />
-            )}
-            {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-            {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-            {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-            {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
-            {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
-            {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
-            {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
-            {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
-            {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} />}
-            {activeTab === 'files' && <FileCenter />}
-          </React.Suspense>
+          {showBootLoading ? (
+            <BootLoadingPanel
+              title={bootTitle}
+              subtitle={bootSubtitle}
+              steps={bootSteps}
+            />
+          ) : (
+            <div key={activeTab}>
+              <TabErrorBoundary label={activeNavLabel}>
+                <React.Suspense fallback={<TabLoading />}>
+                  {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+                  {activeTab === 'leaderboard' && <Leaderboard data={kpiData} />}
+                  {activeTab === 'incentive' && (
+                    <IncentiveSimulation data={incentiveKpiData} period={incentivePeriod} />
+                  )}
+                  {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+                  {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+                  {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
+                  {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
+                  {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
+                  {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
+                  {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
+                  {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
+                  {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} />}
+                  {activeTab === 'files' && <FileCenter />}
+                </React.Suspense>
+              </TabErrorBoundary>
+            </div>
+          )}
         </div>
       </main>
-
-      {/* Soft overlay during initial sheets fetch */}
-      {isFetchingSheets && productivityData.length === 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-[2px] px-4">
-          <BrandLoading
-            title="Mohon menunggu..."
-            subtitle="Sedang mengambil data terbaru"
-            className="rounded-xl border border-border bg-card px-10 py-8 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
-          />
-        </div>
-      )}
 
     </div>
   );

@@ -306,4 +306,15 @@
   .brand-dot {
     animation: brand-dot 1s ease-in-out infinite;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand-walk-logo,
+    .brand-dot {
+      animation: none !important;
+    }
+
+    .brand-walk-logo {
+      transform: none;
+    }
+  }
 }

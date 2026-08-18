@@ -27,6 +27,11 @@ export interface AppState {
   // Loading & error state untuk Sheets fetch
   isFetchingSheets: boolean;
   sheetsFetchError: string | null;
+  /** Soft progress for boot/sync panel (single-phase loading). */
+  sheetsSyncProgress: {
+    message: string;
+    steps: Array<{ id: string; label: string; state: 'pending' | 'active' | 'done' | 'error' }>;
+  } | null;
   lastSyncTime: Date | null;
   selectedSheetMonth: string;
   activeMonthRowCounts: Record<string, number> | null;
@@ -100,6 +105,7 @@ export const useStore = create<AppState>((set, get) => ({
   dataSource: 'csv',
   isFetchingSheets: false,
   sheetsFetchError: null,
+  sheetsSyncProgress: null,
   lastSyncTime: null,
   selectedSheetMonth: getCurrentSheetMonthKey(),
   activeMonthRowCounts: null,
@@ -338,16 +344,65 @@ export const useStore = create<AppState>((set, get) => ({
   setSelectedSheetMonth: (monthKey) => set({ selectedSheetMonth: monthKey }),
 
   fetchFromSheets: async () => {
-    set({ isFetchingSheets: true, sheetsFetchError: null });
+    type StepState = 'pending' | 'active' | 'done' | 'error';
+    const sourceSteps: Array<{ id: string; label: string; state: StepState }> = [
+      { id: 'month', label: 'Data bulan aktif', state: 'pending' },
+      { id: 'history', label: 'Riwayat 3 bulan sebelumnya', state: 'pending' },
+      { id: 'master', label: 'Master CSID', state: 'pending' },
+      { id: 'productivity', label: 'Productivity', state: 'pending' },
+      { id: 'csat', label: 'CSAT SC', state: 'pending' },
+      { id: 'sla', label: 'SLA / WHU', state: 'pending' },
+      { id: 'schedule', label: 'Schedule', state: 'pending' },
+      { id: 'qa', label: 'QA', state: 'pending' },
+      { id: 'assemble', label: 'Menyusun dataset', state: 'pending' },
+    ];
+
+    const patchProgress = (
+      message: string,
+      patch: Partial<Record<string, StepState>>,
+    ) => {
+      set({
+        sheetsSyncProgress: {
+          message,
+          steps: sourceSteps.map((step) => ({
+            ...step,
+            state: patch[step.id] ?? step.state,
+          })),
+        },
+      });
+      // Keep local step states in sync for subsequent patches.
+      sourceSteps.forEach((step) => {
+        const next = patch[step.id];
+        if (next) step.state = next;
+      });
+    };
+
+    set({
+      isFetchingSheets: true,
+      sheetsFetchError: null,
+      sheetsSyncProgress: { message: 'Menyiapkan sync...', steps: [...sourceSteps] },
+    });
     
     try {
       const selectedMonth = get().selectedSheetMonth;
       const sheetConfig = getSheetConfigForMonth(selectedMonth);
       const monthOption = getSheetMonthOption(selectedMonth);
+
+      patchProgress(`Mengambil data ${monthOption.label}...`, { month: 'active' });
       const currentMonthData = await fetchAllSheets(
         sheetConfig,
         getSpreadsheetIdForMonth(selectedMonth),
       );
+      patchProgress(`Bulan ${monthOption.label} siap`, {
+        month: 'done',
+        master: 'done',
+        productivity: 'done',
+        csat: 'done',
+        sla: 'done',
+        schedule: 'done',
+        qa: 'done',
+      });
+
       const currentMonthRows = {
         csidData: countDataRows(sheetDataToParseResult(currentMonthData.csid).data),
         productivityData: countDataRows(sheetDataToParseResult(currentMonthData.productivity).data),
@@ -359,6 +414,7 @@ export const useStore = create<AppState>((set, get) => ({
       // Cap history: selected month + 3 prior (MoM×3 / Incentive). Avoid unbounded RAM growth.
       const historyMonthKeys = getSheetMonthHistoryKeys(selectedMonth);
 
+      patchProgress('Mengambil riwayat bulan sebelumnya...', { history: 'active' });
       const historicalSheets = await Promise.all(
         historyMonthKeys.map(monthKey =>
           monthKey === selectedMonth
@@ -369,6 +425,8 @@ export const useStore = create<AppState>((set, get) => ({
               ),
         ),
       );
+      patchProgress('Riwayat siap', { history: 'done', assemble: 'active' });
+
       const allData = historicalSheets.reduce(
         (merged, monthData) =>
           merged ? mergeAllSheetsData(merged, monthData) : monthData,
@@ -432,6 +490,8 @@ export const useStore = create<AppState>((set, get) => ({
         );
         return result;
       }, {} as Record<string, Record<string, { name: string; bpo: string; teamLeader: string }>>);
+
+      patchProgress('Dataset siap', { assemble: 'done' });
       
       set({
         // We set dummy files so the UI knows data is "present"
@@ -454,12 +514,14 @@ export const useStore = create<AppState>((set, get) => ({
         activeMonthRowCounts: currentMonthRows,
         lastSyncTime: new Date(),
         isFetchingSheets: false,
+        sheetsSyncProgress: null,
         dataSource: 'sheets',
       });
       
     } catch (error) {
       set({ 
         isFetchingSheets: false,
+        sheetsSyncProgress: null,
         sheetsFetchError: error instanceof Error ? error.message : 'Gagal mengambil data dari Google Sheets',
       });
     }
