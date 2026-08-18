@@ -309,10 +309,8 @@ export default function App() {
   const syncStatusText = isFetchingSheets
     ? `Mengambil ${syncMonthLabel}...`
     : lastSyncTime
-      ? previousSheetOption
-        ? `Data aktif: ${activeSheetOption.label}, pembanding: ${previousSheetOption.label}`
-        : `Data aktif: ${activeSheetOption.label}`
-      : `Menunggu sync ${activeSheetOption.label}`;
+      ? ''
+      : `Menunggu sync`;
   const syncIsStale = isStaleSync(lastSyncTime);
   const dataQuality = useMemo(() => {
     const sourceRows = [
@@ -697,7 +695,6 @@ export default function App() {
              >
                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
              </button>
-            <span className={cn("text-sidebar-text/60 text-xs text-right transition-all duration-300 whitespace-nowrap", isSidebarMinimized ? "md:opacity-0 md:w-0 md:hidden" : "opacity-100")}>v2.4</span>
           </div>
         </div>
       </aside>
@@ -857,12 +854,14 @@ export default function App() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-1.5">
               {import.meta.env.VITE_SHEETS_API_KEY && (
                 <div className="flex min-w-0 flex-col text-[10px] leading-tight">
-                  <span className={cn(
-                    "font-bold",
-                    isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-secondary"
-                  )}>
-                    {syncStatusText}
-                  </span>
+                  {syncStatusText ? (
+                    <span className={cn(
+                      "font-bold",
+                      isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-secondary"
+                    )}>
+                      {syncStatusText}
+                    </span>
+                  ) : null}
                   {lastSyncTime && (
                     <span className={cn("text-text-muted", syncIsStale && "text-warning")}>
                       {syncIsStale ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Refresh untuk update.` : `Synced ${formatRelativeTime(lastSyncTime)}`}
