@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn } from '../../lib/utils';
-import { Search, Star, Users, TrendingDown, CalendarDays } from 'lucide-react';
+import { Search, Star, Users } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
+import { KpiRankLists } from '../ui/KpiRankLists';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 
 export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
@@ -76,9 +77,9 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
 
   const highlightStats = useMemo(() => {
     const aggregate = getOfficialCsatAggregate(tableData);
-    const lowestAgent = [...tableData]
-      .filter(agent => agent.csatAsli !== null)
-      .sort((a, b) => (a.csatAsli || 0) - (b.csatAsli || 0))[0];
+    const agentsByScore = [...tableData]
+      .filter(agent => agent.csatAsli !== null && agent.csatAsli !== undefined)
+      .sort((a, b) => (b.csatAsli || 0) - (a.csatAsli || 0));
 
     const dailyMap = new Map<string, { sum: number; count: number }>();
     tableData.forEach(agent => {
@@ -92,11 +93,45 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
       });
     });
 
-    const lowestDay = Array.from(dailyMap.entries())
-      .map(([date, stats]) => ({ date, score: stats.count > 0 ? stats.sum / stats.count : 0 }))
-      .sort((a, b) => a.score - b.score)[0];
+    const daysByScore = Array.from(dailyMap.entries())
+      .map(([date, stats]) => ({ date, score: stats.count > 0 ? stats.sum / stats.count : 0, count: stats.count }))
+      .filter(d => d.count > 0)
+      .sort((a, b) => b.score - a.score);
 
-    return { aggregate, lowestAgent, lowestDay };
+    const topAgents = agentsByScore.slice(0, 3);
+    const bottomAgents =
+      agentsByScore.length > 3
+        ? agentsByScore.slice(Math.max(3, agentsByScore.length - 3)).reverse()
+        : [];
+    const topDays = daysByScore.slice(0, 3);
+    const bottomDays =
+      daysByScore.length > 3
+        ? daysByScore.slice(Math.max(3, daysByScore.length - 3)).reverse()
+        : [];
+
+    return {
+      aggregate,
+      topAgents: topAgents.map(a => ({
+        label: a.name || a.csId,
+        subLabel: a.teamLeader || a.csId,
+        value: `${formatNum(a.csatAsli, 2)} / 5`,
+      })),
+      bottomAgents: bottomAgents.map(a => ({
+        label: a.name || a.csId,
+        subLabel: a.teamLeader || a.csId,
+        value: `${formatNum(a.csatAsli, 2)} / 5`,
+      })),
+      topDays: topDays.map(d => ({
+        label: d.date,
+        subLabel: `${formatNum(d.count, 0)} responden`,
+        value: `${formatNum(d.score, 2)} / 5`,
+      })),
+      bottomDays: bottomDays.map(d => ({
+        label: d.date,
+        subLabel: `${formatNum(d.count, 0)} responden`,
+        value: `${formatNum(d.score, 2)} / 5`,
+      })),
+    };
   }, [tableData]);
 
   return (
@@ -122,7 +157,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
         </div>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Skor CSAT</span>
@@ -141,33 +176,16 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
           <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.aggregate.respondents, 0)}</div>
           <p className="mt-1 text-[11px] text-text-muted">Pada periode terpilih</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Hari Terendah</span>
-            <CalendarDays className="h-4 w-4 text-danger" />
-          </div>
-          <div className="mt-2 truncate text-lg font-black text-text-primary" title={highlightStats.lowestDay?.date || '-'}>
-            {highlightStats.lowestDay?.date || '-'}
-          </div>
-          <p className="mt-1 text-[11px] text-text-muted">
-            {highlightStats.lowestDay ? `${formatNum(highlightStats.lowestDay.score, 2)} / 5` : 'Belum ada data'}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Skor Terendah</span>
-            <TrendingDown className="h-4 w-4 text-danger" />
-          </div>
-          <div className="mt-2 truncate text-lg font-black text-text-primary" title={highlightStats.lowestAgent?.name || '-'}>
-            {highlightStats.lowestAgent?.name || '-'}
-          </div>
-          <p className="mt-1 text-[11px] text-text-muted">
-            {highlightStats.lowestAgent?.csatAsli !== null && highlightStats.lowestAgent?.csatAsli !== undefined
-              ? `${formatNum(highlightStats.lowestAgent.csatAsli, 2)} / 5`
-              : 'Belum ada data'}
-          </p>
-        </div>
       </div>
+
+      <KpiRankLists
+        categoryLabel="Hari"
+        agentLabel="Agent"
+        topCategories={highlightStats.topDays}
+        bottomCategories={highlightStats.bottomDays}
+        topAgents={highlightStats.topAgents}
+        bottomAgents={highlightStats.bottomAgents}
+      />
 
       {isComparisonEnabled && (
         <WoWChartPanel 
@@ -258,7 +276,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
   const { startDate, endDate } = useStore();
   const comparisonMode = useStore(state => state.comparisonMode);
-  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('weekly');
+  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('daily');
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
