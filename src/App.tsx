@@ -229,7 +229,7 @@ function MonthPicker({ value, options, onChange }: MonthPickerProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute z-[9999] mt-1 w-full min-w-[12rem] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div className="absolute z-[9999] mt-1 w-full min-w-[12rem] overflow-hidden rounded-lg border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <div className="max-h-64 overflow-y-auto p-1">
             {options.map(option => {
               const isSelected = option.value === value;
@@ -243,7 +243,7 @@ function MonthPicker({ value, options, onChange }: MonthPickerProps) {
                   }}
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                    isSelected ? "bg-primary-soft font-bold text-primary" : "text-text-primary hover:bg-surface-muted"
+                    isSelected ? "bg-primary-soft font-semibold text-primary" : "text-text-primary hover:bg-surface-muted"
                   )}
                 >
                   <span>{option.label}</span>
@@ -513,7 +513,7 @@ export default function App() {
     return (
       <div className="flex h-screen w-full bg-background items-center justify-center font-sans text-text-primary transition-colors duration-300">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-xl shadow-xl shadow-primary/20">LC</div>
+          <div className="w-16 h-16 rounded-lg bg-primary flex items-center justify-center text-white font-semibold text-xl">LC</div>
           <div className="flex items-center gap-2 text-text-secondary mt-4">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <span className="font-medium tracking-tight">Memuat data tersimpan...</span>
@@ -598,10 +598,10 @@ export default function App() {
     <div className="flex h-[100dvh] w-full bg-background font-sans text-text-primary overflow-hidden relative transition-colors duration-300">
       
       {/* Mobile Top Bar */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-sidebar-bg text-sidebar-text border-b border-sidebar-border absolute top-0 left-0 w-full z-40 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-colors duration-300">
+      <div className="md:hidden flex items-center justify-between p-4 bg-sidebar-bg text-sidebar-text border-b border-sidebar-border absolute top-0 left-0 w-full z-40 transition-colors duration-300">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold shrink-0 shadow-lg shadow-primary/20">LC</div>
-          <span className="font-bold text-sidebar-text-hover tracking-tight">LIVE DASHBOARD</span>
+          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-white font-semibold shrink-0 text-sm">LC</div>
+          <span className="font-semibold text-sidebar-text-hover tracking-tight text-sm">LIVE DASHBOARD</span>
         </div>
         <button 
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -625,26 +625,26 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed md:relative top-0 left-0 h-full bg-sidebar-bg text-sidebar-text flex flex-col border-r border-sidebar-border z-[70] shadow-[0_10px_30px_rgba(0,0,0,0.05)] transition-all duration-300 ease-out will-change-transform shrink-0 group/sidebar",
+        "fixed md:relative top-0 left-0 h-full bg-sidebar-bg text-sidebar-text flex flex-col border-r border-sidebar-border z-[70] transition-all duration-300 ease-out will-change-transform shrink-0 group/sidebar",
         isSidebarOpen ? "translate-x-0 w-60" : "-translate-x-full md:translate-x-0",
         isSidebarMinimized ? "md:w-[72px] w-60" : "w-60"
       )}>
         {/* Toggle Button for Desktop */}
         <button
           onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
-          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-12 bg-card border border-border rounded-r-lg items-center justify-center text-text-muted hover:text-text-primary shadow-sm z-50 cursor-pointer"
+          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-12 bg-card border border-border rounded-r-md items-center justify-center text-text-muted hover:text-text-primary z-50 cursor-pointer"
           title={isSidebarMinimized ? "Expand Sidebar" : "Minimize Sidebar"}
         >
           {isSidebarMinimized ? <ChevronRight className="w-4 h-4 ml-0.5" /> : <ChevronLeft className="w-4 h-4 ml-0.5" />}
         </button>
 
-        <div className={cn("p-5 border-b border-sidebar-border overflow-hidden", isSidebarMinimized ? "md:px-4" : "")}>
+        <div className={cn("p-4 border-b border-sidebar-border overflow-hidden", isSidebarMinimized ? "md:px-4" : "")}>
         <div className={cn("flex items-center gap-3 relative z-10 group cursor-default", isSidebarMinimized ? "md:justify-center" : "")}>
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold shrink-0 shadow-md shadow-primary/20 group-hover:shadow-lg group-hover:shadow-primary/30 transition-shadow duration-200">LC</div>
-          <span className={cn("font-bold tracking-tight text-sidebar-text-hover transition-all duration-300 whitespace-nowrap", isSidebarMinimized ? "md:opacity-0 md:w-0" : "opacity-100")}>LIVE DASHBOARD</span>
+          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-white font-semibold shrink-0 text-sm">LC</div>
+          <span className={cn("font-semibold tracking-tight text-sidebar-text-hover text-sm transition-all duration-300 whitespace-nowrap", isSidebarMinimized ? "md:opacity-0 md:w-0" : "opacity-100")}>LIVE DASHBOARD</span>
         </div>
       </div>
-        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto no-scrollbar">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -653,7 +653,7 @@ export default function App() {
                 key={item.id}
                 onClick={() => { setActiveTab(item.id); setIsSidebarOpen(false); }}
                 className={cn(
-                  "group relative w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ease-out overflow-hidden cursor-pointer",
+                  "group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors duration-150 ease-out overflow-hidden cursor-pointer",
                   isActive 
                     ? "bg-sidebar-bg-active text-sidebar-text-active" 
                     : "text-sidebar-text hover:bg-sidebar-bg-hover hover:text-sidebar-text-hover",
@@ -662,35 +662,32 @@ export default function App() {
                 title={isSidebarMinimized ? item.label : undefined}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-0 w-1 h-full bg-sidebar-accent rounded-r-full shadow-[0_0_8px_rgba(var(--primary),0.4)]" />
-                )}
-                {!isActive && (
-                  <div className="absolute left-0 top-0 w-0.5 h-full bg-sidebar-text-hover/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                  <div className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-sidebar-accent rounded-full" />
                 )}
                 <Icon className={cn(
-                  "w-4 h-4 transition-all duration-200 ease-out shrink-0", 
-                  isActive ? "text-sidebar-accent stroke-2 scale-105" : "text-sidebar-text group-hover:text-sidebar-text-hover group-hover:scale-105"
+                  "w-4 h-4 transition-colors duration-150 ease-out shrink-0", 
+                  isActive ? "text-sidebar-accent" : "text-sidebar-text group-hover:text-sidebar-text-hover"
                 )} />
                 <span className={cn("relative z-10 transition-all duration-300 whitespace-nowrap", isSidebarMinimized ? "md:opacity-0 md:w-0" : "opacity-100")}>{item.label}</span>
               </button>
             )
           })}
         </nav>
-        <div className={cn("py-3 bg-black/5 dark:bg-black/40 text-[10px] text-text-muted border-t border-sidebar-border flex items-center transition-colors duration-300 overflow-hidden", isSidebarMinimized ? "md:flex-col md:px-2 md:gap-3 md:justify-center" : "justify-between px-4")}>
+        <div className={cn("py-3 text-[10px] text-text-muted border-t border-sidebar-border flex items-center transition-colors duration-300 overflow-hidden", isSidebarMinimized ? "md:flex-col md:px-2 md:gap-3 md:justify-center" : "justify-between px-4")}>
           <span className={cn("flex items-center text-sidebar-text transition-all duration-300 whitespace-nowrap", isSidebarMinimized ? "md:opacity-0 md:w-0 md:hidden" : "opacity-100")}>
-            System Status: 
+            Status
             <span className="flex items-center text-success font-medium ml-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse mr-1.5"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-success mr-1.5"></span>
               Live
             </span>
           </span>
           <span className={cn("items-center justify-center text-success hidden", isSidebarMinimized ? "md:flex" : "")}>
-             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+             <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
           </span>
           <div className={cn("flex items-center", isSidebarMinimized ? "md:flex-col md:gap-3" : "gap-2")}>
             <button
                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-               className="p-1 rounded-full hover:bg-sidebar-bg-hover text-sidebar-text transition-colors cursor-pointer shrink-0"
+               className="p-1.5 rounded-md hover:bg-sidebar-bg-hover text-sidebar-text transition-colors cursor-pointer shrink-0"
                aria-label="Toggle Theme"
              >
                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
@@ -701,10 +698,10 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col p-3 pt-20 md:p-6 gap-6 overflow-y-auto overflow-x-hidden w-full relative">
-        <div className="bg-card/60 backdrop-blur-xl border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-3 py-2 flex flex-col relative z-50 overflow-visible">
+        <div className="bg-card border border-border rounded-lg px-3 py-2 flex flex-col relative z-50 overflow-visible">
           {/* Mobile Filter Toggle */}
           <div className="flex md:hidden items-center justify-between w-full mb-2">
-            <span className="text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Filters</span>
+            <span className="text-[11px] font-medium text-text-muted tracking-wide pl-1">Filters</span>
             <button
               onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-surface border border-border hover:bg-surface-muted transition-colors cursor-pointer"
@@ -725,7 +722,7 @@ export default function App() {
             <div className="flex flex-col md:flex-row md:flex-nowrap md:items-center gap-2 md:gap-2 md:overflow-x-auto no-scrollbar">
               {/* Scope */}
               <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
-                <span className="hidden lg:inline text-[9px] font-bold text-text-muted uppercase tracking-widest w-10 shrink-0">Scope</span>
+                <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide w-10 shrink-0">Scope</span>
                 <div className="w-[100px] shrink-0 [&_button]:h-8 [&_button]:rounded-lg [&_button]:text-xs [&_button]:px-2.5">
                   <SearchableSelect 
                     options={['TIN', 'TCID', 'TCID x TIN']}
@@ -757,7 +754,7 @@ export default function App() {
               
               {/* Period */}
               <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
-                <span className="hidden lg:inline text-[9px] font-bold text-text-muted uppercase tracking-widest w-10 shrink-0">Period</span>
+                <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide w-10 shrink-0">Period</span>
                 <MonthPicker
                   value={selectedMonthFilter || getCurrentMonthValue()}
                   options={monthOptions}
@@ -796,20 +793,20 @@ export default function App() {
 
               {/* Compare */}
               <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 shrink-0">
-                <span className="hidden lg:inline text-[9px] font-bold text-text-muted uppercase tracking-widest shrink-0">Cmp</span>
+                <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide shrink-0">Cmp</span>
                 <div 
-                  className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card/40 px-2 transition-all hover:bg-card group cursor-pointer" 
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2 transition-colors hover:bg-surface-muted group cursor-pointer" 
                   onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
                 >
                   <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
                     <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
                   </div>
-                  <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare</span>
+                  <span className="text-[10px] font-medium text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare</span>
                 </div>
 
                 <div className={cn(
-                  "flex h-8 items-center rounded-lg border p-0.5 gap-0.5 shadow-sm transition-opacity",
-                  isComparisonEnabled ? "border-primary/30 bg-primary-soft opacity-100" : "border-border bg-surface/60 opacity-80"
+                  "flex h-8 items-center rounded-md border p-0.5 gap-0.5 transition-opacity",
+                  isComparisonEnabled ? "border-primary/30 bg-primary-soft opacity-100" : "border-border bg-surface opacity-80"
                 )}>
                   <button
                     type="button"
@@ -818,8 +815,8 @@ export default function App() {
                       setIsComparisonEnabled(true);
                     }}
                     className={cn(
-                      "text-[10px] px-2 py-1 rounded-md font-bold transition-colors cursor-pointer",
-                      comparisonMode === 'wow' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
+                      "text-[10px] px-2 py-1 rounded font-medium transition-colors cursor-pointer",
+                      comparisonMode === 'wow' && isComparisonEnabled ? "bg-primary text-white" : "text-primary hover:bg-primary/10"
                     )}
                     title="WoW membandingkan dengan periode sebelumnya dengan durasi yang sama"
                   >
@@ -832,8 +829,8 @@ export default function App() {
                       setIsComparisonEnabled(true);
                     }}
                     className={cn(
-                      "text-[10px] px-2 py-1 rounded-md font-bold transition-colors cursor-pointer",
-                      comparisonMode === 'mom' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
+                      "text-[10px] px-2 py-1 rounded font-medium transition-colors cursor-pointer",
+                      comparisonMode === 'mom' && isComparisonEnabled ? "bg-primary text-white" : "text-primary hover:bg-primary/10"
                     )}
                     title="MoM membandingkan dengan bulan sebelumnya"
                   >
@@ -843,8 +840,8 @@ export default function App() {
               </div>
 
               {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
-                <div className="inline-flex h-8 items-center px-2.5 rounded-full bg-primary-soft text-primary-text text-[10px] font-semibold border border-primary-soft-hover shrink-0 whitespace-nowrap">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mr-1.5 animate-pulse"></span>
+                <div className="inline-flex h-8 items-center px-2.5 rounded-md bg-primary-soft text-primary-text text-[10px] font-medium border border-primary-soft-hover shrink-0 whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary mr-1.5"></span>
                   Tim {selectedTL}
                 </div>
               )}
@@ -856,7 +853,7 @@ export default function App() {
                 <div className="flex min-w-0 flex-col text-[10px] leading-tight">
                   {syncStatusText ? (
                     <span className={cn(
-                      "font-bold",
+                      "font-medium",
                       isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-secondary"
                     )}>
                       {syncStatusText}
@@ -875,7 +872,7 @@ export default function App() {
                   onClick={() => setActiveTab('files')}
                   title={dataQuality.detail}
                   className={cn(
-                    "inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[10px] font-bold transition-colors",
+                    "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-[10px] font-medium transition-colors",
                     dataQuality.status === 'ok'
                       ? "border-success/30 bg-success/10 text-success hover:bg-success/15"
                       : dataQuality.status === 'warning'
@@ -915,7 +912,7 @@ export default function App() {
 
           {activeFilters.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+              <span className="text-[10px] font-medium tracking-wide text-text-muted">
                 Active Filters
               </span>
               {activeFilters.map((filter) => (
@@ -961,7 +958,7 @@ export default function App() {
       {isFetchingSheets && productivityData.length === 0 && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="text-center space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto shadow-lg shadow-primary/20">
+            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mx-auto">
               <RefreshCw className="w-6 h-6 text-white animate-spin"/>
             </div>
             <div>
