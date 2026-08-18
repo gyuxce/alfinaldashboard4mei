@@ -74,31 +74,40 @@ export function getMonthOffsetLabel(periodStart: string, offset = 0): string {
   return new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(target) + ` ${target.getFullYear()}`;
 }
 
-/** O(n) index of dated entries → Map<date, entry> (last write wins). */
-export function indexByDate<T extends { date?: string; normDate?: string }>(
-  entries: T[] | null | undefined,
-): Map<string, T> {
-  const map = new Map<string, T>();
+type DatedEntry = { date?: string; normDate?: string };
+
+/**
+ * O(n) index of dated entries → Map<raw date | normalized date, entry>.
+ *
+ * Views display human labels (e.g. `1 Agustus 2026`) while the processor
+ * commonly stores ISO `normDate` (`2026-08-01`). Index both forms so tables
+ * can reliably look up entries with either representation.
+ */
+export function indexByDate<T extends readonly DatedEntry[]>(
+  entries: T | null | undefined,
+): Map<string, T[number]> {
+  const map = new Map<string, T[number]>();
   if (!entries) return map;
   for (const entry of entries) {
-    const key = entry.normDate || entry.date;
-    if (key) map.set(key, entry);
+    if (entry.date) map.set(entry.date, entry);
+    if (entry.normDate) map.set(entry.normDate, entry);
   }
   return map;
 }
 
-/** O(n) group of dated entries → Map<date, entries[]>. */
-export function groupByDate<T extends { date?: string; normDate?: string }>(
-  entries: T[] | null | undefined,
-): Map<string, T[]> {
-  const map = new Map<string, T[]>();
+/** O(n) group of dated entries → Map<raw date | normalized date, entries[]>. */
+export function groupByDate<T extends readonly DatedEntry[]>(
+  entries: T | null | undefined,
+): Map<string, Array<T[number]>> {
+  const map = new Map<string, Array<T[number]>>();
   if (!entries) return map;
   for (const entry of entries) {
-    const key = entry.normDate || entry.date;
-    if (!key) continue;
-    const list = map.get(key);
-    if (list) list.push(entry);
-    else map.set(key, [entry]);
+    const keys = new Set([entry.date, entry.normDate].filter(Boolean) as string[]);
+    for (const key of keys) {
+      const list = map.get(key);
+      if (list) list.push(entry);
+      else map.set(key, [entry]);
+    }
   }
   return map;
 }
