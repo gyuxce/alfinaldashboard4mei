@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
+import { KpiRankLists } from '../ui/KpiRankLists';
 
 const isQaDefect = (entry: QAEntry) => {
   const level = (entry.mistakeLevel || '').toUpperCase();
@@ -223,14 +224,52 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       });
     });
 
-    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
+    const categoriesByCount = Object.entries(categoryCounts)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const agentsByQa = [...tableData]
+      .filter(agent => agent.qaScoreCount > 0)
+      .map(agent => ({
+        agent,
+        avg: agent.qaScoreSum / agent.qaScoreCount,
+        defects: defectData.find(d => d.csId === agent.csId)?.totalDefect || 0,
+      }))
+      .sort((a, b) => b.avg - a.avg);
+
+    const topCategories = categoriesByCount.slice(0, 3);
+    const bottomCategories =
+      categoriesByCount.length > 3
+        ? categoriesByCount.slice(Math.max(3, categoriesByCount.length - 3)).reverse()
+        : [];
+    const topAgents = agentsByQa.slice(0, 3);
+    const bottomAgents =
+      agentsByQa.length > 3
+        ? agentsByQa.slice(Math.max(3, agentsByQa.length - 3)).reverse()
+        : [];
 
     return {
       totalEvaluations,
       totalMistakes,
       mistakeRate: totalEvaluations > 0 ? (totalMistakes / totalEvaluations) * 100 : 0,
-      topCategory: topCategory ? topCategory[0] : '-',
-      topCategoryCount: topCategory ? topCategory[1] : 0,
+      topCategories: topCategories.map(c => ({
+        label: c.category,
+        value: `${formatNum(c.count, 0)} temuan`,
+      })),
+      bottomCategories: bottomCategories.map(c => ({
+        label: c.category,
+        value: `${formatNum(c.count, 0)} temuan`,
+      })),
+      topAgents: topAgents.map(a => ({
+        label: a.agent.name || a.agent.csId,
+        subLabel: a.agent.teamLeader || a.agent.csId,
+        value: `${formatNum(a.avg, 1)}%`,
+      })),
+      bottomAgents: bottomAgents.map(a => ({
+        label: a.agent.name || a.agent.csId,
+        subLabel: a.agent.teamLeader || a.agent.csId,
+        value: `${formatNum(a.avg, 1)}%`,
+      })),
     };
   }, [tableData, defectData]);
 
@@ -282,7 +321,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Evaluasi</span>
@@ -307,17 +346,16 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.mistakeRate, 1)}%</div>
           <p className="mt-1 text-[11px] text-text-muted">Dibandingkan total evaluasi</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Top Mistake</span>
-            <AlertCircle className="h-4 w-4 text-danger" />
-          </div>
-          <div className="mt-2 truncate text-lg font-black text-text-primary" title={highlightStats.topCategory}>
-            {highlightStats.topCategory}
-          </div>
-          <p className="mt-1 text-[11px] text-text-muted">{formatNum(highlightStats.topCategoryCount, 0)} temuan</p>
-        </div>
       </div>
+
+      <KpiRankLists
+        categoryLabel="Mistake"
+        agentLabel="Agent (QA)"
+        topCategories={highlightStats.topCategories}
+        bottomCategories={highlightStats.bottomCategories}
+        topAgents={highlightStats.topAgents}
+        bottomAgents={highlightStats.bottomAgents}
+      />
 
       {viewMode === 'performance' ? (
         <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">

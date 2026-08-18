@@ -6,6 +6,7 @@ import { useStore } from '../../store';
 
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
+import { KpiRankLists } from '../ui/KpiRankLists';
 import { CsatDetailModal } from "./CsatDetailModal";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, AreaChart, Area } from 'recharts';
 
@@ -102,6 +103,64 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       .sort((a,b) => b[1] - a[1])
       .slice(0, 10)
       .map((entry, idx) => ({ rank: idx+1, name: entry[0], count: entry[1] }));
+  }, [tableData, viewMode]);
+
+  const highlightRanks = useMemo(() => {
+    const categoryAgg: Record<string, number> = {};
+    tableData.forEach(a => {
+      const cats = viewMode === 'full' ? (a.csatScCategoriesFull || {}) : (a.csatScCategoriesFair || {});
+      for (const cat in cats) {
+        categoryAgg[cat] = (categoryAgg[cat] || 0) + cats[cat];
+      }
+    });
+
+    const categories = Object.entries(categoryAgg)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const agentRows = tableData
+      .map(a => {
+        const pct =
+          viewMode === 'full'
+            ? a.csatScTotalValid > 0
+              ? (a.csatScGoodCount / a.csatScTotalValid) * 100
+              : null
+            : a.csatScFairTotalValid > 0
+              ? (a.csatScFairGoodCount / a.csatScFairTotalValid) * 100
+              : null;
+        const count = viewMode === 'full' ? a.csatScFullCount : a.csatScFairCount;
+        return { agent: a, pct, count };
+      })
+      .filter((a): a is { agent: AgentKPI; pct: number; count: number } => a.pct !== null)
+      .sort((a, b) => b.pct - a.pct);
+
+    const topCats = categories.slice(0, 3);
+    const bottomCats =
+      categories.length > 3 ? categories.slice(Math.max(3, categories.length - 3)).reverse() : [];
+    const topAgents = agentRows.slice(0, 3);
+    const bottomAgents =
+      agentRows.length > 3 ? agentRows.slice(Math.max(3, agentRows.length - 3)).reverse() : [];
+
+    return {
+      topCategories: topCats.map(c => ({
+        label: c.name,
+        value: formatNum(c.count, 0),
+      })),
+      bottomCategories: bottomCats.map(c => ({
+        label: c.name,
+        value: formatNum(c.count, 0),
+      })),
+      topAgents: topAgents.map(a => ({
+        label: a.agent.name || a.agent.csId,
+        subLabel: a.agent.teamLeader || a.agent.csId,
+        value: `${formatNum(a.pct, 1)}%`,
+      })),
+      bottomAgents: bottomAgents.map(a => ({
+        label: a.agent.name || a.agent.csId,
+        subLabel: a.agent.teamLeader || a.agent.csId,
+        value: `${formatNum(a.pct, 1)}%`,
+      })),
+    };
   }, [tableData, viewMode]);
 
   const prevTopCategories = useMemo(() => {
@@ -483,6 +542,15 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
           </div>
         </div>
       </div>
+
+      <KpiRankLists
+        categoryLabel="Kategori Survey"
+        agentLabel="Agent (CSAT %)"
+        topCategories={highlightRanks.topCategories}
+        bottomCategories={highlightRanks.bottomCategories}
+        topAgents={highlightRanks.topAgents}
+        bottomAgents={highlightRanks.bottomAgents}
+      />
 
       {isComparisonEnabled && (
         <>
@@ -1133,7 +1201,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
   const { startDate, endDate } = useStore();
   const comparisonMode = useStore(state => state.comparisonMode);
-  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('weekly');
+  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('daily');
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;
@@ -1555,7 +1623,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
 const RespondentChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
   const { startDate, endDate } = useStore();
   const comparisonMode = useStore(state => state.comparisonMode);
-  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('weekly');
+  const [trendMode, setTrendMode] = useState<'weekly' | 'daily'>('daily');
 
   const getWeekLabel = (offset: number) => {
     if (!startDate || !endDate) return `Week -${offset}`;

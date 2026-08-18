@@ -10,6 +10,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from "recharts";
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from "../ui/EmptyState";
+import { KpiRankLists } from '../ui/KpiRankLists';
 
 export const ProductivityDetail: React.FC<{ 
   data: AgentKPI[];
@@ -213,6 +214,58 @@ export const ProductivityDetail: React.FC<{
     };
   }, [data]);
 
+  const highlightRanks = useMemo(() => {
+    const agents = data
+      .filter((a) => a.productivityBase > 0 && a.manDays > 0)
+      .map((a) => ({
+        agent: a,
+        avg: a.productivityTotal / a.manDays,
+        gap: a.productivityTotal - a.manDays * 100,
+      }))
+      .sort((a, b) => b.avg - a.avg);
+
+    const categoryCounts: Record<string, number> = {};
+    agents.forEach(({ agent }) => {
+      (agent.hourlyCategoryCounts || []).forEach((hourMap) => {
+        Object.entries(hourMap || {}).forEach(([category, count]) => {
+          categoryCounts[category] = (categoryCounts[category] || 0) + Number(count);
+        });
+      });
+    });
+
+    const categories = Object.entries(categoryCounts)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const topAgents = agents.slice(0, 3);
+    const bottomAgents =
+      agents.length > 3 ? agents.slice(Math.max(3, agents.length - 3)).reverse() : [];
+    const topCategories = categories.slice(0, 3);
+    const bottomCategories =
+      categories.length > 3 ? categories.slice(Math.max(3, categories.length - 3)).reverse() : [];
+
+    return {
+      topAgents: topAgents.map((a) => ({
+        label: a.agent.name || a.agent.csId,
+        subLabel: a.agent.teamLeader || a.agent.csId,
+        value: `${formatNum(a.avg, 1)} /hari`,
+      })),
+      bottomAgents: bottomAgents.map((a) => ({
+        label: a.agent.name || a.agent.csId,
+        subLabel: a.agent.teamLeader || a.agent.csId,
+        value: `${formatNum(a.avg, 1)} /hari`,
+      })),
+      topCategories: topCategories.map((c) => ({
+        label: c.category,
+        value: formatNum(c.count, 0),
+      })),
+      bottomCategories: bottomCategories.map((c) => ({
+        label: c.category,
+        value: formatNum(c.count, 0),
+      })),
+    };
+  }, [data]);
+
   const hourlyDataWow = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
     
@@ -307,6 +360,15 @@ export const ProductivityDetail: React.FC<{
           </div>
         </div>
       </div>
+
+      <KpiRankLists
+        categoryLabel="Kategori Chat"
+        agentLabel="Agent (Avg/hari)"
+        topCategories={highlightRanks.topCategories}
+        bottomCategories={highlightRanks.bottomCategories}
+        topAgents={highlightRanks.topAgents}
+        bottomAgents={highlightRanks.bottomAgents}
+      />
 
       {/* HOURLY PRODUCTIVITY CHART */}
       <div className="bg-card border border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl p-4 flex flex-col gap-4">

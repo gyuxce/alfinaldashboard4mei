@@ -20,7 +20,7 @@ interface DashboardChartsProps {
 }
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTrend }) => {
-  const [trendMode, setTrendMode] = React.useState<'weekly' | 'daily'>('weekly');
+  const [trendMode, setTrendMode] = React.useState<'weekly' | 'daily'>('daily');
 
   const weeklyTrend = React.useMemo(() => {
     const weeks = new Map<string, {
