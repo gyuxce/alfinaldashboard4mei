@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate } from '../../lib/utils';
 import { Search, Star, Users } from 'lucide-react';
@@ -10,6 +10,8 @@ import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { KpiRankLists } from '../ui/KpiRankLists';
 import { chart } from '../../lib/themeColors';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
@@ -81,6 +83,14 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
     });
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
+
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableVirtual = useVirtualRows({
+    count: tableData.length,
+    rowHeight: 52,
+    scrollRef: tableScrollRef,
+  });
+  const tableColSpan = 5 + uniqueDates.length;
 
   const highlightStats = useMemo(() => {
     const aggregate = getOfficialCsatAggregate(tableData);
@@ -205,7 +215,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
       )}
 
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
               <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
@@ -219,8 +229,14 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                 <SortableHeader label="CSAT Official (Avg)" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
               </tr>
             </thead>
-            <tbody className="">
-              {tableData.map((agent, index) => {
+            <VirtualizedTbody
+              colSpan={tableColSpan}
+              paddingTop={tableVirtual.paddingTop}
+              paddingBottom={tableVirtual.paddingBottom}
+            >
+              {tableVirtual.virtualIndexes.map((index) => {
+                const agent = tableData[index];
+                if (!agent) return null;
                 const displayName = agent.name || agent.csId;
                 const csatByDate = indexByDate(agent.dailyHistory?.csat);
                 const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
@@ -267,7 +283,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
               })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={5 + uniqueDates.length} className="p-4 z-10">
+                  <td colSpan={tableColSpan} className="p-4 z-10">
                     <EmptyState
                       title="Tidak ada data CSAT official"
                       description="Coba ubah pencarian, filter TL, atau rentang tanggal."
@@ -278,7 +294,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                   </td>
                 </tr>
               )}
-            </tbody>
+            </VirtualizedTbody>
           </table>
       </div>
     </div>

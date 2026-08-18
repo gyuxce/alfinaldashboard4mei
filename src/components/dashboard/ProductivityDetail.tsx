@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { AgentKPI, normalizeDateStr } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor } from "../../lib/utils";
 import { chart } from "../../lib/themeColors";
@@ -14,6 +14,8 @@ import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from "../ui/EmptyState";
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { KpiRankLists } from '../ui/KpiRankLists';
+import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 export const ProductivityDetail: React.FC<{ 
   data: AgentKPI[];
@@ -121,6 +123,14 @@ export const ProductivityDetail: React.FC<{
     }
     return sorted;
   }, [filteredData, sortConfig]);
+
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableVirtual = useVirtualRows({
+    count: tableData.length,
+    rowHeight: 52,
+    scrollRef: tableScrollRef,
+  });
+  const tableColSpan = 8 + uniqueDates.length;
 
   // --- CUSTOM BENTO DASHBOARD WIDGETS ---
   const {
@@ -554,7 +564,10 @@ export const ProductivityDetail: React.FC<{
       </div>
 
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all max-h-[calc(100vh-280px)]">
+      <div
+        ref={tableScrollRef}
+        className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all max-h-[calc(100vh-280px)]"
+      >
         <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
           <thead className="bg-surface text-text-secondary sticky top-0 z-30">
             <tr>
@@ -585,8 +598,14 @@ export const ProductivityDetail: React.FC<{
               <SortableHeader label="Gap (+/-)" sortKey="gap" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface z-30 relative" />
             </tr>
           </thead>
-          <tbody className="">
-            {tableData.map((agent, idx) => {
+          <VirtualizedTbody
+            colSpan={tableColSpan}
+            paddingTop={tableVirtual.paddingTop}
+            paddingBottom={tableVirtual.paddingBottom}
+          >
+            {tableVirtual.virtualIndexes.map((idx) => {
+              const agent = tableData[idx];
+              if (!agent) return null;
               const displayName = agent.name || agent.csId;
               const localManDays = agent.manDays;
               const localTargetQuota = localManDays * 100;
@@ -719,7 +738,7 @@ export const ProductivityDetail: React.FC<{
             {tableData.length === 0 && (
               <tr>
                 <td
-                  colSpan={8 + uniqueDates.length}
+                  colSpan={tableColSpan}
                   className="p-4 z-10"
                 >
                   <EmptyState
@@ -732,7 +751,7 @@ export const ProductivityDetail: React.FC<{
                 </td>
               </tr>
             )}
-          </tbody>
+          </VirtualizedTbody>
         </table>
       </div>
     </div>

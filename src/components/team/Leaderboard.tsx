@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from "../../store";
 import { AgentKPI, getCsatBadRatingCount } from "../../lib/dataProcessor";
@@ -7,6 +7,8 @@ import { formatNum, cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
+import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 const DAILY_PRODUCTIVITY_TARGET = 100;
 const QUIZ_TARGET = 92;
@@ -415,6 +417,12 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   }
 
   const activeData = toggleMode === "tl" ? tlRows : agentRows;
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableVirtual = useVirtualRows({
+    count: activeData.length,
+    rowHeight: 44,
+    scrollRef: tableScrollRef,
+  });
 
   const bottomThreeIds = activeData.slice(-3).map(a => a.csId || a.name);
   const isBottomThree = (id: string) => toggleMode === "agent" && bottomThreeIds.includes(id);
@@ -503,7 +511,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
       <div className="flex flex-col gap-4">
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
       {toggleMode === "agent" ? (
         <table className="kpi-data-table w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left">
           <colgroup>
@@ -548,8 +556,14 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               ))}
             </tr>
           </thead>
-          <tbody>
-            {activeData.map((item, idx) => {
+          <VirtualizedTbody
+            colSpan={26}
+            paddingTop={tableVirtual.paddingTop}
+            paddingBottom={tableVirtual.paddingBottom}
+          >
+            {tableVirtual.virtualIndexes.map((idx) => {
+              const item = activeData[idx];
+              if (!item) return null;
               const rank = idx + 1;
               const isBottom = isBottomThree(item.csId || item.name);
               const stickyClass = isBottom
@@ -627,7 +641,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 </td>
               </tr>
             )}
-          </tbody>
+          </VirtualizedTbody>
         </table>
       ) : (
         <table className="kpi-data-table w-full min-w-[2580px] table-fixed border-collapse whitespace-nowrap text-left">
@@ -672,8 +686,15 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               ))}
             </tr>
           </thead>
-          <tbody>
-            {tlRows.map((item, idx) => (
+          <VirtualizedTbody
+            colSpan={25}
+            paddingTop={tableVirtual.paddingTop}
+            paddingBottom={tableVirtual.paddingBottom}
+          >
+            {tableVirtual.virtualIndexes.map((idx) => {
+              const item = tlRows[idx];
+              if (!item) return null;
+              return (
               <tr key={item.name} className="border-b border-border-strong/70 hover:bg-surface-muted">
                 <td className="border-r border-border-strong px-2 py-2 text-center font-bold text-text-muted">#{idx + 1}</td>
                 <td className="border-r border-border-strong px-2 py-2 font-bold text-text-primary">{item.name}</td>
@@ -709,7 +730,8 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <span className={`text-[12px] ${getScoreColor(item.score)}`}>{formatNum(item.score, 2)}</span>
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {tlRows.length === 0 && (
               <tr>
                 <td colSpan={25} className="p-4">
@@ -722,7 +744,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 </td>
               </tr>
             )}
-          </tbody>
+          </VirtualizedTbody>
         </table>
       )}
       </div>

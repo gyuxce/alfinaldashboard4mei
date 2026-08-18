@@ -1,14 +1,23 @@
-import React from "react";
+import React, { useRef } from "react";
 import { AgentKPI } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor } from "../../lib/utils";
 import { EmptyState } from "../ui/EmptyState";
 import { MobileScrollHint } from "../ui/ChartScrollArea";
+import { VirtualizedTbody } from "../ui/VirtualizedTbody";
+import { useVirtualRows } from "../../hooks/useVirtualRows";
 
 interface DashboardAgentTableProps {
   tableData: AgentKPI[];
 }
 
 export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableData }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtual = useVirtualRows({
+    count: tableData.length,
+    rowHeight: 52,
+    scrollRef,
+  });
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden mt-6">
       <div className="p-3 border-b border-border">
@@ -17,7 +26,10 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
         </span>
       </div>
       <MobileScrollHint className="px-3 pt-2" label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] max-h-[calc(100vh-280px)]">
+      <div
+        ref={scrollRef}
+        className="relative w-full overflow-auto bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] max-h-[calc(100vh-280px)]"
+      >
         <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
           <thead className="bg-surface text-text-secondary sticky top-0 z-30">
             <tr>
@@ -44,8 +56,15 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
               <th className="p-2 font-bold">QA Score</th>
             </tr>
           </thead>
-          <tbody className="">
-            {tableData.map((agent, i) => (
+          <VirtualizedTbody
+            colSpan={13}
+            paddingTop={virtual.paddingTop}
+            paddingBottom={virtual.paddingBottom}
+          >
+            {virtual.virtualIndexes.map((i) => {
+              const agent = tableData[i];
+              if (!agent) return null;
+              return (
               <tr
                 key={agent.csId}
                 className="border-b border-border hover:bg-surface-muted transition-colors group"
@@ -150,7 +169,8 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                     : "-"}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {tableData.length === 0 && (
               <tr>
                 <td
@@ -166,7 +186,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
                 </td>
               </tr>
             )}
-          </tbody>
+          </VirtualizedTbody>
         </table>
       </div>
     </div>
