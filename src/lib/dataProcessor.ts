@@ -330,6 +330,22 @@ export function getPreviousMonthPeriod(startDate: string, endDate: string) {
   };
 }
 
+/** Full previous calendar month relative to a YYYY-MM-DD reference (used by incentive simulation). */
+export function getPreviousCalendarMonthRange(referenceDate: string) {
+  if (!referenceDate) return { start: '', end: '' };
+  const [yearValue, monthValue] = referenceDate.split('-').map(Number);
+  const year = yearValue || new Date().getFullYear();
+  const month = monthValue || new Date().getMonth() + 1;
+  const previousMonth = month === 1 ? 12 : month - 1;
+  const previousYear = month === 1 ? year - 1 : year;
+  const lastDay = new Date(previousYear, previousMonth, 0).getDate();
+
+  return {
+    start: `${previousYear}-${String(previousMonth).padStart(2, '0')}-01`,
+    end: `${previousYear}-${String(previousMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
 const dateStrCache = new Map<string, string | null>();
 
 export function normalizeDateStr(raw: string): string | null {

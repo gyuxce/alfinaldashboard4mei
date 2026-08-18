@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from './store';
-import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from './lib/dataProcessor';
+import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, getPreviousCalendarMonthRange, normalizeDateStr } from './lib/dataProcessor';
 
 import { 
   LayoutDashboard, 
@@ -460,25 +460,28 @@ export default function App() {
     return { rawData: raw, previousRawData: prevRaw, previousRawData2: prevRaw2, previousRawData3: prevRaw3, tlList: tlsArr };
   }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, agentDictionaryByMonth, isComparisonEnabled, comparisonMode]);
 
-  const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, tlList, agentList } = useMemo(() => {
+  const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, tlList, agentList } = useMemo(() => {
     let data = rawData;
     let prevData = previousRawData;
     let prevData2 = previousRawData2;
     let prevData3 = previousRawData3;
 
-    const simulationRange = getPreviousMonthPeriod(startDate || '', endDate || startDate || '');
-    const simulationData = activeTab === 'incentive'
-      ? applyAgentRoster(processKPIs(
-          productivityData,
-          csatScData,
-          slaData,
-          scheduleData,
-          qaData,
-          simulationRange.start,
-          simulationRange.end,
-          agentDictionary,
-          agentDictionaryByMonth,
-        ), getAgentDictionaryForPeriod(startDate, agentDictionary, agentDictionaryByMonth))
+    const simulationRange = getPreviousCalendarMonthRange(endDate || startDate || '');
+    const simulationData = activeTab === 'incentive' && simulationRange.start
+      ? applyAgentRoster(
+          processKPIs(
+            productivityData,
+            csatScData,
+            slaData,
+            scheduleData,
+            qaData,
+            simulationRange.start,
+            simulationRange.end,
+            agentDictionary,
+            agentDictionaryByMonth,
+          ),
+          getAgentDictionaryForPeriod(startDate, agentDictionary, agentDictionaryByMonth),
+        )
       : [];
     const filterOptionData = activeTab === 'incentive' ? simulationData : data;
 
@@ -494,6 +497,7 @@ export default function App() {
     const filteredPrevData = applyFilters(prevData);
     const filteredPrevData2 = applyFilters(prevData2);
     const filteredPrevData3 = applyFilters(prevData3);
+    const filteredIncentiveData = applyFilters(simulationData);
 
     const agents = new Set<string>();
     filterOptionData
@@ -517,6 +521,8 @@ export default function App() {
       previousKpiData: filteredPrevData,
       previousKpiData2: filteredPrevData2,
       previousKpiData3: filteredPrevData3,
+      incentiveKpiData: filteredIncentiveData,
+      incentivePeriod: simulationRange,
       tlList: activeTab === 'incentive'
         ? Array.from(optionTls).sort((a, b) => a.localeCompare(b))
         : baseTlList,
@@ -1004,8 +1010,10 @@ export default function App() {
         <div className="w-full pb-8">
           <React.Suspense fallback={<TabLoading />}>
             {activeTab === 'summary' && <DashboardSummary data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
-            {activeTab === 'leaderboard' && <Leaderboard />}
-            {activeTab === 'incentive' && <IncentiveSimulation />}
+            {activeTab === 'leaderboard' && <Leaderboard data={kpiData} />}
+            {activeTab === 'incentive' && (
+              <IncentiveSimulation data={incentiveKpiData} period={incentivePeriod} />
+            )}
             {activeTab === 'productivity' && <ProductivityDetail data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
             {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}

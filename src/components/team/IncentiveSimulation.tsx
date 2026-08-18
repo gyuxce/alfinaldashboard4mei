@@ -3,11 +3,7 @@ import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKe
 import { useStore } from "../../store";
 import {
   AgentKPI,
-  applyAgentRoster,
-  getAgentDictionaryForPeriod,
   getCsatBadRatingCount,
-  matchesAgentScope,
-  processKPIs,
 } from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
 
@@ -79,19 +75,6 @@ const formatDateLabel = (date: string) => {
   }).format(new Date(`${date}T00:00:00`));
 };
 
-const getPreviousCalendarMonthRange = (referenceDate: string) => {
-  const [yearValue, monthValue] = referenceDate.split("-").map(Number);
-  const year = yearValue || new Date().getFullYear();
-  const month = monthValue || new Date().getMonth() + 1;
-  const previousMonth = month === 1 ? 12 : month - 1;
-  const previousYear = month === 1 ? year - 1 : year;
-  const lastDay = new Date(previousYear, previousMonth, 0).getDate();
-
-  return {
-    start: `${previousYear}-${String(previousMonth).padStart(2, "0")}-01`,
-    end: `${previousYear}-${String(previousMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
-  };
-};
 
 const normalizeAgentName = (value: string) =>
   value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -235,25 +218,18 @@ const SummaryCard = ({
   </div>
 );
 
-export const IncentiveSimulation: React.FC = () => {
+export const IncentiveSimulation: React.FC<{
+  data: AgentKPI[];
+  period: { start: string; end: string };
+}> = ({ data, period: simulationPeriod }) => {
   const [viewMode, setViewMode] = React.useState<"agent" | "tl">("agent");
   const [isTlUnlocked, setIsTlUnlocked] = React.useState(false);
   const [isPinDialogOpen, setIsPinDialogOpen] = React.useState(false);
   const [pinInput, setPinInput] = React.useState("");
   const [pinError, setPinError] = React.useState("");
   const {
-    productivityData,
-    csatScData,
-    slaData,
-    scheduleData,
-    qaData,
-    agentDictionary,
-    agentDictionaryByMonth,
     startDate,
     endDate,
-    selectedBpo,
-    selectedTL,
-    selectedGlobalAgent,
   } = useStore();
 
   const openTlView = () => {
@@ -279,61 +255,13 @@ export const IncentiveSimulation: React.FC = () => {
     setViewMode("tl");
   };
 
-  const simulationPeriod = useMemo(
-    () => getPreviousCalendarMonthRange(endDate || startDate),
-    [endDate, startDate],
+  // App already ran processKPIs for the simulation month + applied roster/global filters.
+  const filteredAgents = useMemo(
+    () => data.filter((agent) => !isInactiveAgent(agent, simulationPeriod.end)),
+    [data, simulationPeriod.end],
   );
 
-  const rawData = useMemo(
-    () => processKPIs(
-      productivityData,
-      csatScData,
-      slaData,
-      scheduleData,
-      qaData,
-      simulationPeriod.start,
-      simulationPeriod.end,
-      agentDictionary,
-      agentDictionaryByMonth,
-    ),
-    [
-      agentDictionary,
-      agentDictionaryByMonth,
-      csatScData,
-      productivityData,
-      qaData,
-      scheduleData,
-      simulationPeriod.end,
-      simulationPeriod.start,
-      slaData,
-    ],
-  );
-
-  const activePeriodRoster = useMemo(
-    () => getAgentDictionaryForPeriod(startDate, agentDictionary, agentDictionaryByMonth),
-    [agentDictionary, agentDictionaryByMonth, startDate],
-  );
-
-  const simulationRoster = useMemo(
-    () => applyAgentRoster(rawData, activePeriodRoster)
-      .filter((agent) => !isInactiveAgent(agent, simulationPeriod.end)),
-    [activePeriodRoster, rawData, simulationPeriod.end],
-  );
-
-  const filteredAgents = useMemo(() => {
-    return simulationRoster.filter(
-      (agent) => matchesAgentScope(agent, {
-          bpo: selectedBpo,
-          teamLeader: selectedTL,
-          agent: selectedGlobalAgent,
-        }),
-    );
-  }, [
-    simulationRoster,
-    selectedBpo,
-    selectedGlobalAgent,
-    selectedTL,
-  ]);
+  const simulationRoster = filteredAgents;
 
   const rows = useMemo(() => filteredAgents
       .map(buildIncentiveRow)

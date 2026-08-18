@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store";
-import { AgentKPI, getCsatBadRatingCount, matchesAgentScope, processKPIs } from "../../lib/dataProcessor";
+import { AgentKPI, getCsatBadRatingCount } from "../../lib/dataProcessor";
 import { ArrowRight, Trophy, Users, User } from "lucide-react";
 import { formatNum } from "../../lib/utils";
 import { cn } from "../../lib/utils";
@@ -181,7 +181,7 @@ const getScoreColor = (score: number | null): string => {
   return 'text-danger font-bold text-[11px]';
 };
 
-export const Leaderboard: React.FC = () => {
+export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [toggleMode, setToggleMode] = useState<"tl" | "agent">("agent");
   const [selectedAgent, setSelectedAgent] = useState<LeaderboardRow | null>(null);
 
@@ -199,8 +199,6 @@ export const Leaderboard: React.FC = () => {
     slaData,
     scheduleData,
     qaData,
-    agentDictionary,
-    agentDictionaryByMonth,
     startDate,
     endDate,
     selectedBpo,
@@ -223,26 +221,8 @@ export const Leaderboard: React.FC = () => {
   const { agentRows, tlRows } = useMemo(() => {
     if (!hasData) return { agentRows: [], tlRows: [] };
 
-    const rawData = processKPIs(
-      productivityData,
-      csatScData,
-      slaData,
-      scheduleData,
-      qaData,
-      startDate,
-      endDate,
-      agentDictionary,
-      agentDictionaryByMonth,
-    );
-
-    const scopedRawData = rawData.filter((agent) =>
-      !isAgentInactive(agent, endDate)
-      && matchesAgentScope(agent, {
-        bpo: selectedBpo,
-        teamLeader: selectedTL,
-        agent: selectedGlobalAgent,
-      }),
-    );
+    // Reuse App-processed KPI rows (already scoped by global BPO/TL/Agent filters).
+    const scopedRawData = data.filter((agent) => !isAgentInactive(agent, endDate));
 
     // Prepare Agent List
     const aList: LeaderboardRow[] = [];
@@ -397,19 +377,10 @@ export const Leaderboard: React.FC = () => {
 
     return { agentRows: aList, tlRows: tList };
   }, [
-    hasData,
-    productivityData,
-    csatScData,
-    slaData,
-    scheduleData,
-    qaData,
-    agentDictionary,
-    agentDictionaryByMonth,
-    startDate,
+    data,
     endDate,
-    selectedBpo,
-    selectedTL,
-    selectedGlobalAgent,
+    hasData,
+    startDate,
   ]);
 
   if (!hasData) {
