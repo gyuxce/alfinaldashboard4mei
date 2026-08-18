@@ -7,7 +7,9 @@ import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
 import { KpiRankLists } from '../ui/KpiRankLists';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { CsatDetailModal } from "./CsatDetailModal";
+import { chart } from '../../lib/themeColors';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, AreaChart, Area } from 'recharts';
 
 export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
@@ -468,83 +470,30 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
         <div className="flex flex-col xl:flex-row xl:items-center gap-4 w-full overflow-hidden">
           <h1 className="text-lg font-bold text-text-primary whitespace-nowrap shrink-0">CSAT Room (Surveys)</h1>
           <div className="flex flex-col md:flex-row gap-2 xl:gap-4 w-full overflow-hidden">
-             <div className="flex overflow-x-auto no-scrollbar bg-surface-muted p-1 rounded-lg w-full md:w-max gap-1">
-               <button
-                 onClick={() => setViewMode('full')}
-                 className={cn(
-                   "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                   viewMode === 'full' 
-                     ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-                 )}
-               >
-                 <CheckCircle className="w-3.5 h-3.5" />
-                 Full Score
-               </button>
-               <button
-                 onClick={() => setViewMode('fair')}
-                 className={cn(
-                   "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                   viewMode === 'fair' 
-                     ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-                 )}
-               >
-                 <Filter className="w-3.5 h-3.5" />
-                 After Takeout
-               </button>
-             </div>
-             
-             <div className="flex overflow-x-auto no-scrollbar bg-surface-muted p-1 rounded-lg w-full md:w-max gap-1">
-               <button
-                 onClick={() => setAnalysisMode('agent')}
-                 className={cn(
-                   "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                   analysisMode === 'agent' 
-                     ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-                 )}
-               >
-                 <BarChart2 className="w-3.5 h-3.5" />
-                 Agent Analysis
-               </button>
-               <button
-                 onClick={() => setAnalysisMode('defect')}
-                 className={cn(
-                   "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                   analysisMode === 'defect' 
-                     ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-                 )}
-               >
-                 <AlertCircle className="w-3.5 h-3.5" />
-                 Defect Analysis
-               </button>
-               <button
-                 onClick={() => setAnalysisMode('category')}
-                 className={cn(
-                   "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                   analysisMode === 'category' 
-                     ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-                 )}
-               >
-                 <Layers className="w-3.5 h-3.5" />
-                 Category Analysis
-               </button>
-               <button
-                 onClick={() => { setAnalysisMode('score'); setSelectedScoreCase('All'); setScoreCasePage(1); }}
-                 className={cn(
-                   "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                   analysisMode === 'score' 
-                     ? "bg-blue-600 text-white font-medium shadow-sm" 
-                     : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-                 )}
-               >
-                 <TrendingUp className="w-3.5 h-3.5" />
-                 Score Analysis
-               </button>
-             </div>
+             <SegmentedControl
+               value={viewMode}
+               onChange={setViewMode}
+               options={[
+                 { value: 'full', label: 'Full Score', icon: CheckCircle },
+                 { value: 'fair', label: 'After Takeout', icon: Filter },
+               ]}
+             />
+             <SegmentedControl
+               value={analysisMode}
+               onChange={(mode) => {
+                 setAnalysisMode(mode);
+                 if (mode === 'score') {
+                   setSelectedScoreCase('All');
+                   setScoreCasePage(1);
+                 }
+               }}
+               options={[
+                 { value: 'agent', label: 'Agent Analysis', icon: BarChart2 },
+                 { value: 'defect', label: 'Defect Analysis', icon: AlertCircle },
+                 { value: 'category', label: 'Category Analysis', icon: Layers },
+                 { value: 'score', label: 'Score Analysis', icon: TrendingUp },
+               ]}
+             />
           </div>
         </div>
         
@@ -1393,11 +1342,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
                 <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
-                <Bar dataKey="SC Full" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#8b5cf6'}} />
+                <Bar dataKey="SC Full" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.kpiCsat}} />
                 </Bar>
-                <Bar dataKey="SC After Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
+                <Bar dataKey="SC After Takeout" fill={chart.success} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.success}} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -1432,11 +1381,11 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
                 <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
-                <Bar dataKey="SC Full" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#8b5cf6'}} />
+                <Bar dataKey="SC Full" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.kpiCsat}} />
                 </Bar>
-                <Bar dataKey="SC After Takeout" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: '#10b981'}} />
+                <Bar dataKey="SC After Takeout" fill={chart.success} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.success}} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -1885,9 +1834,9 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                     >
                       {[
                         { label: '1★', value: w.s1, color: 'bg-danger' },
-                        { label: '2★', value: w.s2, color: 'bg-orange-500' },
+                        { label: '2★', value: w.s2, color: 'bg-warning/80' },
                         { label: '3★', value: w.s3, color: 'bg-warning' },
-                        { label: '4★', value: w.s4, color: 'bg-[#84cc16]' },
+                        { label: '4★', value: w.s4, color: 'bg-success/70' },
                         { label: '5★', value: w.s5, color: 'bg-success' }
                       ].map(bar => {
                         const maxVal = Math.max(w.s1, w.s2, w.s3, w.s4, w.s5) || 1;
@@ -1937,16 +1886,16 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
               <AreaChart data={trendData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorResp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                    <stop offset="5%" stopColor={chart.kpiCsat} stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor={chart.kpiCsat} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 {trendMode === 'daily' && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
                 <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} minTickGap={10} />
                 <YAxis tick={{fontSize: 11}} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{stroke: 'rgba(0,0,0,0.1)', strokeWidth: 2}} />
-                <Area type="monotone" dataKey="Respondents" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorResp)">
-                  <LabelList dataKey="Respondents" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: '#f59e0b'}} />
+                <Area type="monotone" dataKey="Respondents" stroke={chart.kpiCsat} strokeWidth={3} fillOpacity={1} fill="url(#colorResp)">
+                  <LabelList dataKey="Respondents" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: chart.kpiCsat}} />
                 </Area>
               </AreaChart>
             </ResponsiveContainer>

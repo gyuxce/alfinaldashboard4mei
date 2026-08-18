@@ -1,5 +1,6 @@
 import React from "react";
 import { formatNum, parseDateForSort } from "../../lib/utils";
+import { chart } from "../../lib/themeColors";
 import {
   AreaChart,
   Area,
@@ -98,19 +99,19 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6 min-w-0">
       {/* KPI Comparison Chart */}
-      <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 min-w-0">
+      <div className="bg-card border border-border rounded-lg p-5 min-w-0">
         <div className="flex items-center justify-between gap-4 mb-8">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
             KPI Comparison (vs Target) <span className="text-[10px] text-text-muted font-normal">ⓘ</span>
           </h2>
           <div className="flex items-center gap-4 text-xs font-semibold text-text-primary">
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-1.5 rounded-full bg-[#111827]"></div>
-              <span className="text-[#111827]">Actual</span>
+              <div className="w-4 h-1.5 rounded-full bg-text-primary"></div>
+              <span className="text-text-primary">Actual</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-1.5 rounded-full bg-[#EF4444]"></div>
-              <span className="text-[#EF4444]">Target</span>
+              <div className="w-4 h-1.5 rounded-full bg-danger"></div>
+              <span className="text-danger">Target</span>
             </div>
           </div>
         </div>
@@ -120,14 +121,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={[
-                  { name: 'CSAT Official', actual: parseFloat(((stats.csat / 5) * 100 || 0).toFixed(2)), target: 75, color: '#F59E0B', isCsat: true, rawVal: stats.csat || 0 },
-                  { name: 'CSAT SC Full', actual: parseFloat((stats.csatScFull || 0).toFixed(2)), target: 75, color: '#F59E0B' },
-                  { name: 'CSAT SC After Takeout', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: '#F59E0B' },
-                  { name: 'QA Score', actual: parseFloat(stats.qa.toFixed(2)), target: 92, color: '#F59E0B' },
-                  { name: 'Avg Attendance', actual: parseFloat(stats.attendance.toFixed(2)), target: 95, color: '#3B82F6' },
-                  { name: 'WHU (%)', actual: parseFloat(stats.whu.toFixed(2)), target: 96, color: '#22C55E' },
-                  { name: 'SLA 1 Menit', actual: parseFloat(stats.sla1m.toFixed(2)), target: 92, color: '#22C55E' },
-                  { name: 'SLA 3 Menit', actual: parseFloat(stats.sla3m.toFixed(2)), target: 96, color: '#22C55E' }
+                  { name: 'CSAT Official', actual: parseFloat(((stats.csat / 5) * 100 || 0).toFixed(2)), target: 75, color: chart.kpiCsat, isCsat: true, rawVal: stats.csat || 0 },
+                  { name: 'CSAT SC Full', actual: parseFloat((stats.csatScFull || 0).toFixed(2)), target: 75, color: chart.kpiCsat },
+                  { name: 'CSAT SC After Takeout', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: chart.kpiCsat },
+                  { name: 'QA Score', actual: parseFloat(stats.qa.toFixed(2)), target: 92, color: chart.kpiQa },
+                  { name: 'Avg Attendance', actual: parseFloat(stats.attendance.toFixed(2)), target: 95, color: chart.kpiNeutral },
+                  { name: 'WHU (%)', actual: parseFloat(stats.whu.toFixed(2)), target: 96, color: chart.kpiWhu },
+                  { name: 'SLA 1 Menit', actual: parseFloat(stats.sla1m.toFixed(2)), target: 92, color: chart.kpiSla },
+                  { name: 'SLA 3 Menit', actual: parseFloat(stats.sla3m.toFixed(2)), target: 96, color: chart.kpiSla }
                 ]}
                 margin={{ top: 30, right: 50, left: -20, bottom: 45 }}
                 barGap="-100%"
@@ -184,14 +185,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                   />
                   {
                     [
-                      { color: '#F59E0B' },
-                      { color: '#F59E0B' },
-                      { color: '#F59E0B' },
-                      { color: '#F59E0B' },
-                      { color: '#3B82F6' },
-                      { color: '#22C55E' },
-                      { color: '#22C55E' },
-                      { color: '#22C55E' }
+                      { color: chart.kpiCsat },
+                      { color: chart.kpiCsat },
+                      { color: chart.kpiCsat },
+                      { color: chart.kpiQa },
+                      { color: chart.kpiNeutral },
+                      { color: chart.kpiWhu },
+                      { color: chart.kpiSla },
+                      { color: chart.kpiSla }
                     ].map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))
@@ -210,7 +211,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                           y1={y} 
                           x2={x + width + 10} 
                           y2={y} 
-                          stroke="#EF4444" 
+                          stroke={chart.danger} 
                           strokeWidth={2} 
                         />
                         <rect 
@@ -219,13 +220,13 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                           width={28} 
                           height={16} 
                           rx={4} 
-                          fill="#FEE2E2" 
+                          fill={chart.dangerSoft} 
                         />
                         <text 
                           x={x + width + 24} 
                           y={y} 
                           textAnchor="middle" 
-                          fill="#EF4444" 
+                          fill={chart.danger} 
                           fontSize={9} 
                           fontWeight={700}
                           dy={3}
@@ -243,7 +244,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
       </div>
 
       {/* Weekly/Daily Trend Chart */}
-      <div className="bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 min-w-0">
+      <div className="bg-card border border-border rounded-lg p-5 min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h2 className="text-sm font-bold text-text-primary">
             {trendMode === 'weekly' ? 'Weekly' : 'Daily'} Performance Trend <span className="text-text-muted font-medium text-xs ml-1">(Total Productivity)</span>
@@ -286,12 +287,12 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 >
                   <stop
                     offset="5%"
-                    stopColor="#EF4444"
+                    stopColor={chart.primary}
                     stopOpacity={0.15}
                   />
                   <stop
                     offset="95%"
-                    stopColor="#EF4444"
+                    stopColor={chart.primary}
                     stopOpacity={0}
                   />
                 </linearGradient>
@@ -333,19 +334,19 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
               <Area
                 type="monotone"
                 dataKey="prevProductivity"
-                stroke="#94A3B8"
+                stroke={chart.muted}
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 fill="transparent"
                 animationDuration={500}
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 0, fill: "#94A3B8" }}
+                activeDot={{ r: 4, strokeWidth: 0, fill: chart.muted }}
               />
 
               <Area
                 type="monotone"
                 dataKey="productivity"
-                stroke="#EF4444"
+                stroke={chart.primary}
                 strokeWidth={2.5}
                 fillOpacity={1}
                 fill="url(#colorProd)"
@@ -359,13 +360,13 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                          cx={cx} 
                          cy={cy} 
                          r={isLast ? 5 : 4} 
-                         fill={isLast ? "#EF4444" : "var(--color-card)"} 
-                         stroke="#EF4444" 
+                         fill={isLast ? chart.primary : chart.card} 
+                         stroke={chart.primary} 
                          strokeWidth={2}
                       />
                    );
                 }}
-                activeDot={{ r: 6, strokeWidth: 0, fill: "#EF4444" }}
+                activeDot={{ r: 6, strokeWidth: 0, fill: chart.primary }}
               >
                 {trendData.length <= 14 && (
                   <LabelList 

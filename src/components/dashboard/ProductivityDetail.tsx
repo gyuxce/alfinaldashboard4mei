@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { AgentKPI, normalizeDateStr } from "../../lib/dataProcessor";
 import { formatNum, getKpiColor } from "../../lib/utils";
+import { chart } from "../../lib/themeColors";
 import { useStore } from "../../store";
 import {
   Search,
@@ -416,14 +417,14 @@ export const ProductivityDetail: React.FC<{
                   type="monotone"
                   name={comparisonMode === 'mom' ? 'Bulan Ini' : 'Minggu Ini'}
                   dataKey="total"
-                  stroke="#E31E24"
+                  stroke={chart.primary}
                   strokeWidth={3}
                   dot={{ r: 3, cursor: "pointer", onClick: handleChartIntervalClick }}
                   activeDot={{ r: 5, cursor: "pointer", onClick: handleChartIntervalClick }}
                 />
-                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Lalu' : 'Minggu Lalu'} dataKey="prev" stroke="#6B7280" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                {previousData2.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '2 Bulan Lalu' : '2 Minggu Lalu'} dataKey="prev2" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="3 3" dot={false} />}
-                {previousData3.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '3 Bulan Lalu' : '3 Minggu Lalu'} dataKey="prev3" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="2 2" dot={false} />}
+                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Lalu' : 'Minggu Lalu'} dataKey="prev" stroke={chart.secondary} strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                {previousData2.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '2 Bulan Lalu' : '2 Minggu Lalu'} dataKey="prev2" stroke={chart.muted} strokeWidth={2} strokeDasharray="3 3" dot={false} />}
+                {previousData3.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '3 Bulan Lalu' : '3 Minggu Lalu'} dataKey="prev3" stroke={chart.disabled} strokeWidth={2} strokeDasharray="2 2" dot={false} />}
               </LineChart>
             ) : (
               <BarChart

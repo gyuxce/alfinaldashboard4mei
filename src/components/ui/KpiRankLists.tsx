@@ -27,11 +27,11 @@ const RankCard: React.FC<RankCardProps> = ({ title, items, tone = 'neutral', emp
   return (
     <div
       className={cn(
-        'rounded-xl border border-border border-t-[3px] bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] min-w-0',
+        'rounded-lg border border-border border-t-[3px] bg-card p-4 min-w-0',
         toneClass,
       )}
     >
-      <div className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">{title}</div>
+      <div className="text-[11px] font-medium tracking-wide text-text-muted mb-3">{title}</div>
       {items.length === 0 ? (
         <p className="text-xs text-text-muted">{emptyText}</p>
       ) : (

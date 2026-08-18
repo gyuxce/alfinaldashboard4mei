@@ -59,51 +59,51 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       
       {/* WIDGETS */}
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
-         <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
+         <div className="bg-card rounded-lg border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
-               <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Avg Team Attendance</div>
-               <div className="w-7 h-7 rounded-full bg-primary-soft flex items-center justify-center z-10 shrink-0">
+               <div className="text-[11px] font-medium text-text-secondary tracking-wide z-10">Avg Team Attendance</div>
+               <div className="w-7 h-7 rounded-md bg-primary-soft flex items-center justify-center z-10 shrink-0">
                  <Users className="w-3.5 h-3.5 text-primary" />
                </div>
             </div>
-            <div className="text-2xl font-bold tracking-tight text-primary z-10">{formatNum(avgTeamAttendance, 1)}%</div>
+            <div className="text-2xl font-semibold tracking-tight text-primary z-10">{formatNum(avgTeamAttendance, 1)}%</div>
          </div>
-         <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
+         <div className="bg-card rounded-lg border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
-               <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Di Bawah Target</div>
-               <div className="w-7 h-7 rounded-full bg-danger-soft flex items-center justify-center z-10 shrink-0">
+               <div className="text-[11px] font-medium text-text-secondary tracking-wide z-10">Di Bawah Target</div>
+               <div className="w-7 h-7 rounded-md bg-danger-soft flex items-center justify-center z-10 shrink-0">
                  <AlertTriangle className="w-3.5 h-3.5 text-danger" />
                </div>
             </div>
-            <div className="text-2xl font-bold tracking-tight text-danger z-10">{formatNum(belowTarget, 0)}</div>
+            <div className="text-2xl font-semibold tracking-tight text-danger z-10">{formatNum(belowTarget, 0)}</div>
             <p className="mt-1 text-[10px] text-text-muted">Target attendance 95%</p>
          </div>
-         <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
+         <div className="bg-card rounded-lg border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
-               <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Total Cuti (C)</div>
-               <div className="w-7 h-7 rounded-full bg-warning-soft flex items-center justify-center z-10 shrink-0">
+               <div className="text-[11px] font-medium text-text-secondary tracking-wide z-10">Total Cuti (C)</div>
+               <div className="w-7 h-7 rounded-md bg-warning-soft flex items-center justify-center z-10 shrink-0">
                  <HeartPulse className="w-3.5 h-3.5 text-warning" />
                </div>
             </div>
-            <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalC, 0)}</div>
+            <div className="text-2xl font-semibold tracking-tight text-text-primary z-10">{formatNum(totalC, 0)}</div>
          </div>
-         <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
+         <div className="bg-card rounded-lg border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
-               <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Total Sick (S)</div>
-               <div className="w-7 h-7 rounded-full bg-danger-soft flex items-center justify-center z-10 shrink-0">
+               <div className="text-[11px] font-medium text-text-secondary tracking-wide z-10">Total Sick (S)</div>
+               <div className="w-7 h-7 rounded-md bg-danger-soft flex items-center justify-center z-10 shrink-0">
                  <HeartPulse className="w-3.5 h-3.5 text-danger" />
                </div>
             </div>
-            <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalSick, 0)}</div>
+            <div className="text-2xl font-semibold tracking-tight text-text-primary z-10">{formatNum(totalSick, 0)}</div>
          </div>
-         <div className="bg-card rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border p-4 flex flex-col relative overflow-hidden group">
+         <div className="bg-card rounded-lg border border-border p-4 flex flex-col relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
-               <div className="text-[10px] font-bold text-text-secondary uppercase tracking-widest z-10">Total PULLOUT</div>
-               <div className="w-7 h-7 rounded-full bg-success-soft flex items-center justify-center z-10 shrink-0">
+               <div className="text-[11px] font-medium text-text-secondary tracking-wide z-10">Total PULLOUT</div>
+               <div className="w-7 h-7 rounded-md bg-success-soft flex items-center justify-center z-10 shrink-0">
                  <UserMinus className="w-3.5 h-3.5 text-success" />
                </div>
             </div>
-            <div className="text-2xl font-bold tracking-tight text-text-primary z-10">{formatNum(totalPullout, 0)}</div>
+            <div className="text-2xl font-semibold tracking-tight text-text-primary z-10">{formatNum(totalPullout, 0)}</div>
          </div>
       </div>
 

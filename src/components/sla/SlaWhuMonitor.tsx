@@ -5,6 +5,7 @@ import { Search } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -78,30 +79,15 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold text-text-primary">SLA Monitor</h1>
-          <div className="inline-flex bg-surface-muted p-1 rounded-lg w-max gap-1">
-            <button
-              onClick={() => setViewMode('1m')}
-              className={cn(
-                "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                viewMode === '1m'
-                  ? "bg-blue-600 text-white font-medium shadow-sm"
-                  : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-              )}
-            >
-              SLA 1m
-            </button>
-            <button
-              onClick={() => setViewMode('3m')}
-              className={cn(
-                "px-4 py-2 rounded-md text-[13px] transition-colors duration-150 flex items-center gap-2",
-                viewMode === '3m'
-                  ? "bg-blue-600 text-white font-medium shadow-sm"
-                  : "bg-transparent text-text-secondary font-semibold hover:text-text-primary hover:bg-surface"
-              )}
-            >
-              SLA 3m
-            </button>
-          </div>
+          <SegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            trackClassName="w-max"
+            options={[
+              { value: '1m', label: 'SLA 1m' },
+              { value: '3m', label: 'SLA 3m' },
+            ]}
+          />
         </div>
         
         <div className="flex items-center gap-4">
