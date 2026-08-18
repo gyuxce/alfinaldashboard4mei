@@ -601,6 +601,19 @@ export default function App() {
     resetPeriodToCurrentMonth();
   };
 
+  const comparisonHint = (() => {
+    if (!isComparisonEnabled || !startDate) return null;
+    const end = endDate || startDate;
+    const getPrevRange = comparisonMode === 'mom' ? getPreviousMonthPeriod : getPreviousPeriod;
+    const prev = getPrevRange(startDate, end);
+    if (!prev.start || !prev.end) return null;
+    const currentLabel = `${formatFilterDate(startDate)} – ${formatFilterDate(end)}`;
+    const prevLabel = `${formatFilterDate(prev.start)} – ${formatFilterDate(prev.end)}`;
+    return comparisonMode === 'mom'
+      ? `MoM: ${currentLabel} vs ${prevLabel}`
+      : `WoW: ${currentLabel} vs ${prevLabel}`;
+  })();
+
   return (
     <div className="flex h-[100dvh] w-full bg-background font-sans text-text-primary overflow-hidden relative transition-colors duration-300">
       
@@ -856,23 +869,30 @@ export default function App() {
 
             {/* Status strip — selalu satu baris tipis di bawah */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-1.5">
-              {import.meta.env.VITE_SHEETS_API_KEY && (
-                <div className="flex min-w-0 flex-col text-[10px] leading-tight">
-                  {syncStatusText ? (
-                    <span className={cn(
-                      "font-medium",
-                      isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-secondary"
-                    )}>
-                      {syncStatusText}
-                    </span>
-                  ) : null}
-                  {lastSyncTime && (
-                    <span className={cn("text-text-muted", syncIsStale && "text-warning")}>
-                      {syncIsStale ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Refresh untuk update.` : `Tersinkron ${formatRelativeTime(lastSyncTime)}`}
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className="flex min-w-0 flex-col gap-0.5 text-[10px] leading-tight">
+                {comparisonHint ? (
+                  <span className="font-medium text-primary">
+                    Bandingkan · {comparisonHint}
+                  </span>
+                ) : null}
+                {import.meta.env.VITE_SHEETS_API_KEY && (
+                  <>
+                    {syncStatusText ? (
+                      <span className={cn(
+                        "font-medium",
+                        isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-secondary"
+                      )}>
+                        {syncStatusText}
+                      </span>
+                    ) : null}
+                    {lastSyncTime && (
+                      <span className={cn("text-text-muted", syncIsStale && "text-warning")}>
+                        {syncIsStale ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Refresh untuk update.` : `Tersinkron ${formatRelativeTime(lastSyncTime)}`}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
               <div className="flex items-center gap-1.5 ml-auto">
                 <button
                   type="button"

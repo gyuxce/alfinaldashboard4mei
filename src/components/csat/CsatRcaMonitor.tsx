@@ -218,7 +218,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               Category per issue
             </div>
             <div className="overflow-hidden rounded-lg border border-border bg-card">
-              <table className="w-full table-fixed text-left text-[10px]">
+              <table className="kpi-data-table w-full table-fixed text-left">
                 <thead className="bg-surface-muted text-text-muted">
                   <tr>
                     <th className="w-[38%] px-2.5 py-2 font-medium tracking-wide">Issue</th>

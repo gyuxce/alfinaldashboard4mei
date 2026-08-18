@@ -5,6 +5,7 @@ import { Search, Clock } from 'lucide-react';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
+import { MobileScrollHint } from '../ui/ChartScrollArea';
 
 export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -100,8 +101,9 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         </div>
       </div>
 
+      <MobileScrollHint label="Geser → untuk lihat semua kolom" />
       <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
-            <table className="w-full text-left text-[10px] whitespace-nowrap border-collapse">
+            <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
               <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
                 <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>

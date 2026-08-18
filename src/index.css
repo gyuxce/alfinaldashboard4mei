@@ -257,4 +257,19 @@
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
+
+  /* Comfortable agent/KPI tables on 13–14" laptops */
+  .kpi-data-table {
+    font-size: 11px;
+  }
+  .kpi-data-table :is(th, td) {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+  .kpi-data-table thead th {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
 }
