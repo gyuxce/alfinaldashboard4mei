@@ -218,11 +218,11 @@ function MonthPicker({ value, options, onChange }: MonthPickerProps) {
   }, []);
 
   return (
-    <div className="relative w-full sm:w-[150px]" ref={wrapperRef}>
+    <div className="relative w-[140px] shrink-0" ref={wrapperRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-9 w-full items-center justify-between rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+        className="flex h-8 w-full items-center justify-between rounded-lg border border-border bg-surface px-2.5 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
       >
         <span className="truncate">{selectedOption?.label || 'Pilih bulan'}</span>
         <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-text-muted" />
@@ -704,7 +704,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col p-3 pt-20 md:p-6 gap-6 overflow-y-auto overflow-x-hidden w-full relative">
-        <div className="bg-card/60 backdrop-blur-xl border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3 flex flex-col relative z-50 overflow-visible">
+        <div className="bg-card/60 backdrop-blur-xl border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-3 py-2 flex flex-col relative z-50 overflow-visible">
           {/* Mobile Filter Toggle */}
           <div className="flex md:hidden items-center justify-between w-full mb-2">
             <span className="text-[11px] font-bold text-text-muted uppercase tracking-widest pl-1">Filters</span>
@@ -720,142 +720,141 @@ export default function App() {
             </button>
           </div>
 
-          {/* Filter Content */}
+          {/* Filter Content — 1 baris compact di desktop agar stabil saat zoom */}
           <div className={cn(
-            "flex-col 2xl:flex-row flex-wrap items-start 2xl:items-center gap-3",
+            "flex-col gap-2",
             isMobileFilterOpen ? "flex" : "hidden md:flex"
           )}>
-            <div className="flex flex-wrap items-center gap-2 2xl:border-r 2xl:border-border 2xl:pr-3 w-full 2xl:w-auto">
-              <span className="hidden md:inline text-[10px] font-bold text-text-muted uppercase tracking-widest pl-1">Scope</span>
-              <div className="w-full sm:w-[112px]">
-                <SearchableSelect 
-                  options={['TIN', 'TCID', 'TCID x TIN']}
-                  value={selectedBpo}
-                  onChange={setSelectedBpo}
-                  allOptionLabel="All BPO"
-                  placeholder="Search BPO..."
-                />
-              </div>
-              <div className="w-full sm:w-[150px]">
-                <SearchableSelect 
-                  options={tlList}
-                  value={selectedTL}
-                  onChange={setSelectedTL}
-                  allOptionLabel="All TL"
-                  placeholder="Search TL..."
-                />
-              </div>
-              <div className="w-full sm:w-[150px]">
-                <SearchableSelect
-                  options={agentList}
-                  value={selectedGlobalAgent}
-                  onChange={setSelectedGlobalAgent}
-                  allOptionLabel="All Agents"
-                  placeholder="Search Agent..."
-                />
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full 2xl:w-auto 2xl:border-r 2xl:border-border 2xl:pr-3">
-              <span className="hidden md:inline text-[10px] font-bold text-text-muted uppercase tracking-widest pl-1">Period</span>
-              <MonthPicker
-                value={selectedMonthFilter || getCurrentMonthValue()}
-                options={monthOptions}
-                onChange={applyMonthFilter}
-              />
-              <input type="date" className="h-9 w-full rounded-xl border border-border bg-surface px-3 text-sm font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary sm:w-[132px]" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
-              <span className="text-text-muted text-sm shrink-0">to</span>
-              <input type="date" className="h-9 w-full rounded-xl border border-border bg-surface px-3 text-sm font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary sm:w-[132px]" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-2 w-full 2xl:w-auto shrink-0">
-              <button onClick={resetPeriodToCurrentMonth} className="h-8 rounded-lg px-2.5 text-[11px] font-semibold text-text-muted transition-colors hover:bg-primary-soft hover:text-primary">Bulan Ini</button>
-              
-              <div className="flex bg-card rounded-xl border border-border p-0.5 gap-0.5">
-                <button 
-                  onClick={() => navigateWeek('prev')} 
-                  className="text-[10px] hover:bg-surface-muted text-text-secondary px-2 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  &laquo; Prev
-                </button>
-                <button 
-                  onClick={() => navigateWeek('current')} 
-                  className="text-[10px] bg-primary-soft text-primary px-2 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Minggu Ini
-                </button>
-                <button 
-                  onClick={() => navigateWeek('next')} 
-                  className="text-[10px] hover:bg-surface-muted text-text-secondary px-2 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Next &raquo;
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full 2xl:w-auto shrink-0">
-              <span className="hidden md:inline text-[10px] font-bold text-text-muted uppercase tracking-widest pl-1">Compare</span>
-              <div 
-                className="flex h-8 items-center gap-2 rounded-xl border border-border bg-card/40 px-2.5 transition-all hover:bg-card group cursor-pointer" 
-                onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
-              >
-                <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
-                  <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
+            <div className="flex flex-col md:flex-row md:flex-nowrap md:items-center gap-2 md:gap-2 md:overflow-x-auto no-scrollbar">
+              {/* Scope */}
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
+                <span className="hidden lg:inline text-[9px] font-bold text-text-muted uppercase tracking-widest w-10 shrink-0">Scope</span>
+                <div className="w-[100px] shrink-0 [&_button]:h-8 [&_button]:rounded-lg [&_button]:text-xs [&_button]:px-2.5">
+                  <SearchableSelect 
+                    options={['TIN', 'TCID', 'TCID x TIN']}
+                    value={selectedBpo}
+                    onChange={setSelectedBpo}
+                    allOptionLabel="All BPO"
+                    placeholder="Search BPO..."
+                  />
                 </div>
-                <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare</span>
+                <div className="w-[120px] shrink-0 [&_button]:h-8 [&_button]:rounded-lg [&_button]:text-xs [&_button]:px-2.5">
+                  <SearchableSelect 
+                    options={tlList}
+                    value={selectedTL}
+                    onChange={setSelectedTL}
+                    allOptionLabel="All TL"
+                    placeholder="Search TL..."
+                  />
+                </div>
+                <div className="w-[130px] shrink-0 [&_button]:h-8 [&_button]:rounded-lg [&_button]:text-xs [&_button]:px-2.5">
+                  <SearchableSelect
+                    options={agentList}
+                    value={selectedGlobalAgent}
+                    onChange={setSelectedGlobalAgent}
+                    allOptionLabel="All Agents"
+                    placeholder="Search Agent..."
+                  />
+                </div>
+              </div>
+              
+              {/* Period */}
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
+                <span className="hidden lg:inline text-[9px] font-bold text-text-muted uppercase tracking-widest w-10 shrink-0">Period</span>
+                <MonthPicker
+                  value={selectedMonthFilter || getCurrentMonthValue()}
+                  options={monthOptions}
+                  onChange={applyMonthFilter}
+                />
+                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
+                <span className="text-text-muted text-[10px] shrink-0">–</span>
+                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
+              </div>
+              
+              {/* Quick nav */}
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
+                <button onClick={resetPeriodToCurrentMonth} className="h-8 rounded-lg px-2 text-[10px] font-semibold text-text-muted transition-colors hover:bg-primary-soft hover:text-primary whitespace-nowrap">Bulan Ini</button>
+                
+                <div className="flex h-8 items-center bg-card rounded-lg border border-border p-0.5 gap-0.5">
+                  <button 
+                    onClick={() => navigateWeek('prev')} 
+                    className="text-[10px] hover:bg-surface-muted text-text-secondary px-1.5 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    &laquo;
+                  </button>
+                  <button 
+                    onClick={() => navigateWeek('current')} 
+                    className="text-[10px] bg-primary-soft text-primary px-2 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    Minggu Ini
+                  </button>
+                  <button 
+                    onClick={() => navigateWeek('next')} 
+                    className="text-[10px] hover:bg-surface-muted text-text-secondary px-1.5 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    &raquo;
+                  </button>
+                </div>
               </div>
 
-              <div className={cn(
-                "flex rounded-xl border p-0.5 gap-0.5 shadow-sm transition-opacity",
-                isComparisonEnabled ? "border-primary/30 bg-primary-soft opacity-100" : "border-border bg-surface/60 opacity-80"
-              )}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setComparisonMode('wow');
-                    setIsComparisonEnabled(true);
-                  }}
-                  className={cn(
-                    "text-[10px] px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer",
-                    comparisonMode === 'wow' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
-                  )}
-                  title="WoW membandingkan dengan periode sebelumnya dengan durasi yang sama"
+              {/* Compare */}
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 shrink-0">
+                <span className="hidden lg:inline text-[9px] font-bold text-text-muted uppercase tracking-widest shrink-0">Cmp</span>
+                <div 
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card/40 px-2 transition-all hover:bg-card group cursor-pointer" 
+                  onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
                 >
-                  WoW
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setComparisonMode('mom');
-                    setIsComparisonEnabled(true);
-                  }}
-                  className={cn(
-                    "text-[10px] px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer",
-                    comparisonMode === 'mom' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
-                  )}
-                  title="MoM membandingkan dengan bulan sebelumnya"
-                >
-                  MoM
-                </button>
-              </div>
-              <span className="text-[10px] text-text-muted">
-                {isComparisonEnabled
-                  ? comparisonMode === 'mom'
-                    ? 'vs bulan sebelumnya'
-                    : 'vs periode sebelumnya'
-                  : 'off'}
-              </span>
+                  <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
+                    <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
+                  </div>
+                  <span className="text-[10px] font-bold text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare</span>
+                </div>
 
+                <div className={cn(
+                  "flex h-8 items-center rounded-lg border p-0.5 gap-0.5 shadow-sm transition-opacity",
+                  isComparisonEnabled ? "border-primary/30 bg-primary-soft opacity-100" : "border-border bg-surface/60 opacity-80"
+                )}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComparisonMode('wow');
+                      setIsComparisonEnabled(true);
+                    }}
+                    className={cn(
+                      "text-[10px] px-2 py-1 rounded-md font-bold transition-colors cursor-pointer",
+                      comparisonMode === 'wow' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
+                    )}
+                    title="WoW membandingkan dengan periode sebelumnya dengan durasi yang sama"
+                  >
+                    WoW
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComparisonMode('mom');
+                      setIsComparisonEnabled(true);
+                    }}
+                    className={cn(
+                      "text-[10px] px-2 py-1 rounded-md font-bold transition-colors cursor-pointer",
+                      comparisonMode === 'mom' && isComparisonEnabled ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/10"
+                    )}
+                    title="MoM membandingkan dengan bulan sebelumnya"
+                  >
+                    MoM
+                  </button>
+                </div>
+              </div>
+
+              {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
+                <div className="inline-flex h-8 items-center px-2.5 rounded-full bg-primary-soft text-primary-text text-[10px] font-semibold border border-primary-soft-hover shrink-0 whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary mr-1.5 animate-pulse"></span>
+                  Tim {selectedTL}
+                </div>
+              )}
             </div>
 
-           {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
-              <div className="2xl:ml-auto inline-flex items-center px-3 py-1 rounded-full bg-primary-soft text-primary-text text-xs font-semibold border border-primary-soft-hover shadow-[0_1px_3px_rgba(0,0,0,0.04)] mt-2 2xl:mt-0">
-                <span className="w-2 h-2 rounded-full bg-primary mr-2 animate-pulse"></span>
-                Viewing: Tim {selectedTL}
-              </div>
-            )}
-
-            <div className="w-full 2xl:w-auto 2xl:ml-auto flex flex-wrap items-center justify-between 2xl:justify-end gap-2 border-t border-border pt-2 2xl:border-t-0 2xl:pt-0 mt-2 2xl:mt-0">
+            {/* Status strip — selalu satu baris tipis di bawah */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-1.5">
               {import.meta.env.VITE_SHEETS_API_KEY && (
                 <div className="flex min-w-0 flex-col text-[10px] leading-tight">
                   <span className={cn(
@@ -871,50 +870,52 @@ export default function App() {
                   )}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => setActiveTab('files')}
-                title={dataQuality.detail}
-                className={cn(
-                  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors",
-                  dataQuality.status === 'ok'
-                    ? "border-success/30 bg-success/10 text-success hover:bg-success/15"
-                    : dataQuality.status === 'warning'
-                      ? "border-warning/30 bg-warning/10 text-warning hover:bg-warning/15"
-                      : "border-danger/30 bg-danger-soft text-danger hover:bg-danger-soft/80"
-                )}
-              >
-                {dataQuality.status === 'ok' ? (
-                  <CheckCircle size={13} />
-                ) : (
-                  <AlertTriangle size={13} />
-                )}
-                <span>{dataQuality.label}</span>
-              </button>
-              {import.meta.env.VITE_SHEETS_API_KEY && (
+              <div className="flex items-center gap-1.5 ml-auto">
                 <button
-                  onClick={fetchFromSheets}
-                  disabled={isFetchingSheets}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 
-                    rounded-lg text-xs font-medium transition-colors
-                    border border-border shrink-0
-                    ${isFetchingSheets 
-                      ? 'bg-surface-muted text-text-muted cursor-not-allowed' 
-                      : 'bg-card text-text-secondary hover:bg-primary-soft hover:text-primary cursor-pointer'
-                    }`}
+                  type="button"
+                  onClick={() => setActiveTab('files')}
+                  title={dataQuality.detail}
+                  className={cn(
+                    "inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[10px] font-bold transition-colors",
+                    dataQuality.status === 'ok'
+                      ? "border-success/30 bg-success/10 text-success hover:bg-success/15"
+                      : dataQuality.status === 'warning'
+                        ? "border-warning/30 bg-warning/10 text-warning hover:bg-warning/15"
+                        : "border-danger/30 bg-danger-soft text-danger hover:bg-danger-soft/80"
+                  )}
                 >
-                  <RefreshCw 
-                    size={12} 
-                    className={isFetchingSheets ? 'animate-spin' : ''} 
-                  />
-                 {isFetchingSheets ? 'Syncing...' : 'Refresh'}
-               </button>
-             )}
+                  {dataQuality.status === 'ok' ? (
+                    <CheckCircle size={12} />
+                  ) : (
+                    <AlertTriangle size={12} />
+                  )}
+                  <span>{dataQuality.label}</span>
+                </button>
+                {import.meta.env.VITE_SHEETS_API_KEY && (
+                  <button
+                    onClick={fetchFromSheets}
+                    disabled={isFetchingSheets}
+                    className={`flex h-7 items-center gap-1 px-2.5 
+                      rounded-lg text-[10px] font-medium transition-colors
+                      border border-border shrink-0
+                      ${isFetchingSheets 
+                        ? 'bg-surface-muted text-text-muted cursor-not-allowed' 
+                        : 'bg-card text-text-secondary hover:bg-primary-soft hover:text-primary cursor-pointer'
+                      }`}
+                  >
+                    <RefreshCw 
+                      size={11} 
+                      className={isFetchingSheets ? 'animate-spin' : ''} 
+                    />
+                   {isFetchingSheets ? 'Syncing...' : 'Refresh'}
+                 </button>
+               )}
+              </div>
            </div>
           </div>
 
           {activeFilters.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
                 Active Filters
               </span>
