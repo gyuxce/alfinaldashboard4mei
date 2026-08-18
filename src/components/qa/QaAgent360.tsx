@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI, QAEntry } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn, indexByDate, groupByDate } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
@@ -10,6 +10,8 @@ import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { KpiRankLists } from '../ui/KpiRankLists';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 const isQaDefect = (entry: QAEntry) => {
   const level = (entry.mistakeLevel || '').toUpperCase();
@@ -219,6 +221,16 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return sortable;
   }, [defectData, defectSortConfig]);
 
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const activeTableData = viewMode === 'performance' ? sortedPerformanceData : sortedDefectData;
+  const tableVirtual = useVirtualRows({
+    count: activeTableData.length,
+    rowHeight: 52,
+    scrollRef: tableScrollRef,
+  });
+  const perfTableColSpan = 6 + uniqueDates.length;
+  const defectTableColSpan = 9;
+
   const highlightStats = useMemo(() => {
     const totalEvaluations = tableData.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
     const totalMistakes = defectData.reduce((sum, agent) => sum + agent.totalDefect, 0);
@@ -364,7 +376,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       {viewMode === 'performance' ? (
         <>
         <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
               <thead className="bg-surface text-text-secondary sticky top-0 z-30">
                 <tr>
@@ -383,8 +395,14 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="">
-                {sortedPerformanceData.map((agent, index) => {
+              <VirtualizedTbody
+                colSpan={perfTableColSpan}
+                paddingTop={tableVirtual.paddingTop}
+                paddingBottom={tableVirtual.paddingBottom}
+              >
+                {tableVirtual.virtualIndexes.map((index) => {
+                  const agent = sortedPerformanceData[index];
+                  if (!agent) return null;
                   const displayName = agent.name || agent.csId;
                   const qaByDate = groupByDate(agent.qaHistory);
                   const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
@@ -462,7 +480,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 })}
                 {sortedPerformanceData.length === 0 && (
                   <tr>
-                    <td colSpan={6 + uniqueDates.length} className="p-4 z-10">
+                    <td colSpan={perfTableColSpan} className="p-4 z-10">
                       <EmptyState
                         title="Tidak ada data QA performance"
                         description="Coba ubah pencarian, filter TL, view mode, atau rentang tanggal."
@@ -473,14 +491,14 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     </td>
                   </tr>
                 )}
-              </tbody>
+              </VirtualizedTbody>
             </table>
         </div>
         </>
       ) : (
         <>
         <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
               <thead className="bg-surface text-text-secondary sticky top-0 z-30">
                 <tr>
@@ -496,8 +514,14 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <th className="p-2 font-bold text-center border-b border-border bg-surface w-24">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="">
-                {sortedDefectData.map((agent, index) => {
+              <VirtualizedTbody
+                colSpan={defectTableColSpan}
+                paddingTop={tableVirtual.paddingTop}
+                paddingBottom={tableVirtual.paddingBottom}
+              >
+                {tableVirtual.virtualIndexes.map((index) => {
+                  const agent = sortedDefectData[index];
+                  if (!agent) return null;
                   const displayName = agent.name || agent.csId;
 
                   return (
@@ -540,7 +564,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 })}
                 {sortedDefectData.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="p-4 z-10">
+                    <td colSpan={defectTableColSpan} className="p-4 z-10">
                       <EmptyState
                         title="Tidak ada defect QA"
                         description="Tidak ada defect pada filter dan view mode saat ini."
@@ -550,7 +574,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     </td>
                   </tr>
                 )}
-              </tbody>
+              </VirtualizedTbody>
             </table>
         </div>
         </>

@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
 import { Search, Users, HeartPulse, UserMinus, AlertTriangle } from 'lucide-react';
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
+import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -37,6 +39,14 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     const avg = totDuty > 0 ? Math.min(100, (totPresence / totDuty) * 100) : 0;
     return { avgTeamAttendance: avg, totalSick: sick, totalPullout: pullout, totalC: leaveDays, belowTarget: agentsBelowTarget };
   }, [activeData]);
+
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableVirtual = useVirtualRows({
+    count: tableData.length,
+    rowHeight: 52,
+    scrollRef: tableScrollRef,
+  });
+  const tableColSpan = 11;
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,7 +118,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       </div>
 
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
           <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
             <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
@@ -125,8 +135,14 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <th className="p-2 font-bold text-center bg-surface">Attendance %</th>
               </tr>
             </thead>
-            <tbody className="">
-              {tableData.map((agent, index) => {
+            <VirtualizedTbody
+              colSpan={tableColSpan}
+              paddingTop={tableVirtual.paddingTop}
+              paddingBottom={tableVirtual.paddingBottom}
+            >
+              {tableVirtual.virtualIndexes.map((index) => {
+                const agent = tableData[index];
+                if (!agent) return null;
                  let colorScore = 'text-text-primary';
                  if (agent.attendanceScore >= 100) colorScore = 'text-success';
                  else if (agent.attendanceScore < 100) colorScore = 'text-danger';
@@ -159,7 +175,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="p-4 z-10 relative">
+                  <td colSpan={tableColSpan} className="p-4 z-10 relative">
                     <EmptyState
                       title="Tidak ada data attendance"
                       description="Coba ubah pencarian atau rentang tanggal. Jika data belum ada, sync dari File Center."
@@ -170,7 +186,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   </td>
                 </tr>
               )}
-            </tbody>
+            </VirtualizedTbody>
           </table>
       </div>
     </div>

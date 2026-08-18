@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search } from 'lucide-react';
 import { AgentKPI, normalizeDateStr } from '../../lib/dataProcessor';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
+import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -27,6 +29,14 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const uniqueDates = Array.from(byNorm.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([, date]) => date);
+
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableVirtual = useVirtualRows({
+    count: tableData.length,
+    rowHeight: 52,
+    scrollRef: tableScrollRef,
+  });
+  const tableColSpan = 5 + uniqueDates.length;
 
   const getBackgroundColor = (status: string) => {
     const s = status.toUpperCase();
@@ -57,7 +67,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       </div>
 
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 mx-4 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 mx-4 max-h-[calc(100vh-280px)]">
           <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
             <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
@@ -75,10 +85,14 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 </th>
               </tr>
             </thead>
-            <tbody className="">
+            <VirtualizedTbody
+              colSpan={tableColSpan}
+              paddingTop={tableVirtual.paddingTop}
+              paddingBottom={tableVirtual.paddingBottom}
+            >
               {tableData.length === 0 ? (
                 <tr>
-                  <td colSpan={5 + uniqueDates.length} className="p-4 z-10 relative">
+                  <td colSpan={tableColSpan} className="p-4 z-10 relative">
                     <EmptyState
                       title="Tidak ada data schedule"
                       description="Coba ubah pencarian atau rentang tanggal."
@@ -88,7 +102,9 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     />
                   </td>
                 </tr>
-              ) : tableData.map((agent, idx) => {
+              ) : tableVirtual.virtualIndexes.map((idx) => {
+                const agent = tableData[idx];
+                if (!agent) return null;
                 const displayName = agent.name || agent.csId;
 
                 return (
@@ -127,7 +143,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   </td>
                 </tr>
               )})}
-            </tbody>
+            </VirtualizedTbody>
           </table>
       </div>
     </div>

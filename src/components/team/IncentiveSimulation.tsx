@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
@@ -7,6 +7,8 @@ import {
   getCsatBadRatingCount,
 } from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
+import { VirtualizedTbody } from "../ui/VirtualizedTbody";
+import { useVirtualRows } from "../../hooks/useVirtualRows";
 
 const DAILY_LIVECHAT_TARGET = 100;
 const LIVECHAT_PRODUCTIVITY_BONUS_PER_100 = 40000;
@@ -278,6 +280,13 @@ export const IncentiveSimulation: React.FC<{
         if (b.totalScore === null) return -1;
         return b.totalScore - a.totalScore;
       }), [filteredAgents]);
+
+  const agentTableScrollRef = useRef<HTMLDivElement>(null);
+  const agentTableVirtual = useVirtualRows({
+    count: rows.length,
+    rowHeight: 52,
+    scrollRef: agentTableScrollRef,
+  });
 
   const teamLeaderRows = useMemo(() => {
     const grouped = new Map<string, AgentKPI[]>();
@@ -553,7 +562,7 @@ export const IncentiveSimulation: React.FC<{
             </div>
 
             {viewMode === "agent" ? (
-            <div className="max-h-[calc(100vh-350px)] overflow-auto">
+            <div ref={agentTableScrollRef} className="max-h-[calc(100vh-350px)] overflow-auto">
               <table className="kpi-data-table min-w-[1240px] w-full table-fixed border-collapse text-left">
                 <colgroup>
                   <col className="w-[34px]" />
@@ -585,8 +594,15 @@ export const IncentiveSimulation: React.FC<{
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {rows.map((row, index) => (
+                <VirtualizedTbody
+                  colSpan={15}
+                  paddingTop={agentTableVirtual.paddingTop}
+                  paddingBottom={agentTableVirtual.paddingBottom}
+                >
+                  {agentTableVirtual.virtualIndexes.map((index) => {
+                    const row = rows[index];
+                    if (!row) return null;
+                    return (
                     <tr key={row.csId} className="border-b border-border hover:bg-surface-muted">
                       <td className="px-2 py-2 font-semibold text-text-muted">{index + 1}</td>
                       <td className="px-2 py-2">
@@ -627,7 +643,8 @@ export const IncentiveSimulation: React.FC<{
                         </span>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {rows.length === 0 && (
                     <tr>
                       <td colSpan={15} className="p-8 text-center text-xs text-text-muted">
@@ -635,7 +652,7 @@ export const IncentiveSimulation: React.FC<{
                       </td>
                     </tr>
                   )}
-                </tbody>
+                </VirtualizedTbody>
               </table>
             </div>
             ) : (

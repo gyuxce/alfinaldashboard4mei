@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
 import { Search } from 'lucide-react';
@@ -8,6 +8,8 @@ import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -80,6 +82,14 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableVirtual = useVirtualRows({
+    count: tableData.length,
+    rowHeight: 52,
+    scrollRef: tableScrollRef,
+  });
+  const tableColSpan = 5 + uniqueDates.length;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between xl:gap-8 gap-4 mb-4">
@@ -111,7 +121,7 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       </div>
 
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-280px)]">
             <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
               <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
@@ -127,8 +137,14 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <SortableHeader label="Total SLA Average" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
               </tr>
             </thead>
-            <tbody className="">
-              {tableData.map((agent, index) => {
+            <VirtualizedTbody
+              colSpan={tableColSpan}
+              paddingTop={tableVirtual.paddingTop}
+              paddingBottom={tableVirtual.paddingBottom}
+            >
+              {tableVirtual.virtualIndexes.map((index) => {
+                const agent = tableData[index];
+                if (!agent) return null;
                 const displayName = agent.name || agent.csId;
 
                 return (
@@ -175,7 +191,7 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={5 + uniqueDates.length} className="p-4 z-10">
+                  <td colSpan={tableColSpan} className="p-4 z-10">
                     <EmptyState
                       title={`Tidak ada data SLA ${viewMode === '1m' ? '1 menit' : '3 menit'}`}
                       description="Coba ubah pencarian, filter TL, atau rentang tanggal."
@@ -186,7 +202,7 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   </td>
                 </tr>
               )}
-            </tbody>
+            </VirtualizedTbody>
           </table>
       </div>
     </div>
