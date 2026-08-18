@@ -16,7 +16,7 @@ export type KpiRankCardConfig = {
 
 type RankCardProps = KpiRankCardConfig;
 
-function RankCard({ title, items, tone = 'neutral', emptyText = 'Belum ada data' }: RankCardProps) {
+const RankCard: React.FC<RankCardProps> = ({ title, items, tone = 'neutral', emptyText = 'Belum ada data' }) => {
   const toneClass =
     tone === 'good'
       ? 'border-t-success'
@@ -72,7 +72,7 @@ function RankCard({ title, items, tone = 'neutral', emptyText = 'Belum ada data'
       )}
     </div>
   );
-}
+};
 
 export type KpiRankListsProps = {
   cards: KpiRankCardConfig[];
