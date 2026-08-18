@@ -502,7 +502,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input 
               type="text" 
-              placeholder="Search CS ID..." 
+              placeholder="Cari CS ID..." 
               className="pl-8 pr-3 py-1.5 border border-border rounded-lg text-xs focus:border-primary focus:outline-none w-full md:w-56"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -551,7 +551,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 <div className="flex flex-col justify-center px-4 md:px-6 py-3 border-b md:border-b-0 md:border-r border-border"
                      style={{ borderLeftWidth: '4px', borderLeftColor: 'rgb(var(--kpi-csat))' }}>
                    <div className="flex items-center justify-between md:justify-start gap-4 mb-2">
-                     <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">TOTAL RATING RESPONDENTS</span>
+                     <span className="text-[11px] font-medium tracking-wide text-text-secondary">Total rating responden</span>
                      <span className="text-xl font-bold ml-auto" style={{ color: 'rgb(var(--kpi-csat))' }}>{formatNum(answeredScoreRows, 0)}</span>
                    </div>
                    <div className="flex flex-wrap gap-2 md:gap-4 text-[11px] font-bold items-center">
@@ -564,7 +564,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 </div>
                 <div className="flex flex-col items-center justify-center px-6 py-3 bg-surface-muted/30">
                    <span className="text-[10px] text-text-muted font-bold tracking-wider uppercase mb-1">Response Rate</span>
-                   <span className="text-lg font-black text-primary">{formatNum(surveyResponseRate, 1)}%</span>
+                   <span className="text-lg font-semibold text-primary">{formatNum(surveyResponseRate, 1)}%</span>
                    <span className="text-[10px] text-text-muted font-medium mt-0.5">({formatNum(answeredScoreRows, 0)} / {formatNum(totalScoreRows, 0)} Ratings)</span>
                 </div>
              </div>
@@ -602,7 +602,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                      onClick={() => { setSelectedScoreCase(card.key); setScoreCasePage(1); }}
                      className={`flex flex-col items-center p-4 rounded-xl border transition-all ${isSelected ? `${selectedBorder} shadow-[0_1px_3px_rgba(0,0,0,0.04)]` : 'border-border hover:border-text-muted/30 bg-card hover:bg-surface-muted'}`}
                    >
-                     <div className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-1 text-center">
+                     <div className="text-xs font-bold text-text-secondary tracking-wide mb-1 text-center">
                         {card.label}
                      </div>
                      {'sub' in card && card.sub ? (
@@ -610,7 +610,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                      ) : (
                        <div className="h-[15px] mb-1" />
                      )}
-                     <div className={`text-2xl font-black mb-1 ${countClass}`}>{formatNum(count, 0)}</div>
+                     <div className={`text-2xl font-semibold mb-1 ${countClass}`}>{formatNum(count, 0)}</div>
                      <div className="text-xs font-medium text-text-muted">{formatNum(pct, 1)}%</div>
                      {card.key === 'Bad' && (
                        <div className="mt-2 text-[10px] font-semibold text-danger/80">
@@ -750,7 +750,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  <h2 className="text-base font-bold text-text-primary">Top Categories (Score 1 & 2)</h2>
                  <p className="text-xs text-text-muted mt-1 ">Identifies categories and top contributors for bad scores</p>
                </div>
-               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
+               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg tracking-wide">
                  {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
                </span>
             </div>
@@ -834,7 +834,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                  <h2 className="text-base font-bold text-text-primary">Agent Bottom Score 1-2</h2>
                  <p className="text-xs text-text-muted mt-1 ">Identifies agents with the highest bad scores</p>
                </div>
-               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg uppercase tracking-wider">
+               <span className="text-[11px] text-text-secondary font-bold px-3 py-1.5 bg-card border border-border rounded-lg tracking-wide">
                  {viewMode === 'full' ? 'From Full Data' : 'After Take Out'}
                </span>
             </div>
@@ -1009,9 +1009,10 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   <td colSpan={6 + uniqueDates.length} className="p-4 z-10">
                     <EmptyState
                       title="Tidak ada data CSAT survey"
-                      description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search, filter Team Leader, view mode, atau range tanggal."
+                      description="Coba ubah pencarian, filter TL, view mode, atau rentang tanggal."
                       variant="filter"
                       className="border-0 bg-transparent py-6"
+                      showDataActions
                     />
                   </td>
                 </tr>
@@ -1483,7 +1484,7 @@ const WoWAnalysisPanel = ({ data, previousData, previousData2, previousData3, vi
     <div className={cn('grid grid-cols-1 md:grid-cols-2 gap-4', comparisonMode === 'mom' ? 'xl:grid-cols-3' : 'xl:grid-cols-4')}>
       {weeks.map((week, wIdx) => (
         <div key={wIdx} className="flex flex-col gap-4">
-          <div className="p-2 bg-primary/10 text-primary font-bold text-center rounded-xl border border-primary/20 text-[11px] uppercase tracking-wider">
+          <div className="p-2 bg-primary/10 text-primary font-bold text-center rounded-xl border border-primary/20 text-[11px] tracking-wide">
             {week.name}
           </div>
           

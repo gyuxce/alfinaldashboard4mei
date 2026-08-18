@@ -206,15 +206,10 @@ export const Leaderboard: React.FC = () => {
     selectedTL,
     selectedGlobalAgent,
   } = useStore();
+  const openTab = useStore((s) => s.openTab);
 
   const handleOpenFiles = () => {
-    const navButtons = document.querySelectorAll("nav button");
-    const fileBtn = Array.from(navButtons).find((el) =>
-      el.textContent?.includes("File Center"),
-    );
-    if (fileBtn) {
-      (fileBtn as HTMLButtonElement).click();
-    }
+    openTab("files");
   };
 
   const hasData =
@@ -424,7 +419,7 @@ export const Leaderboard: React.FC = () => {
           Belum Ada Data
         </h2>
         <p className="text-sm text-text-secondary mb-6 max-w-sm text-center">
-          Buka File Center, pilih bulan data, lalu klik Sync Now untuk melihat ranking Leaderboard.
+          Buka File Center, pilih bulan data, lalu klik Sync sekarang untuk melihat ranking Leaderboard.
         </p>
         <button
           onClick={handleOpenFiles}
@@ -481,7 +476,7 @@ export const Leaderboard: React.FC = () => {
               Periode: {startDate || "-"} s/d {endDate || "-"}
             </span>
             {(selectedBpo !== "All BPO" || selectedTL !== "All TL" || selectedGlobalAgent !== "All Agents") && (
-              <span className="font-bold uppercase tracking-wider text-text-muted">Filter aktif:</span>
+              <span className="font-medium tracking-wide text-text-muted">Filter aktif:</span>
             )}
             {selectedBpo !== "All BPO" && (
               <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 font-semibold text-primary">BPO: {selectedBpo}</span>
@@ -643,9 +638,10 @@ export const Leaderboard: React.FC = () => {
                 <td colSpan={26} className="p-4">
                   <EmptyState
                     title="Tidak ada data leaderboard"
-                    description="Jika belum sync, buka File Center lalu klik Sync Now dan pastikan periode aktif memiliki data."
+                    description="Pastikan periode aktif memiliki data agent."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
+                    showDataActions
                   />
                 </td>
               </tr>
@@ -797,7 +793,7 @@ export const Leaderboard: React.FC = () => {
               {/* LEFT COLUMN: KPI BREAKDOWN */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">
+                  <h3 className="text-xs font-medium text-text-secondary tracking-wide mb-2">
                     SKOR KPI KAMU
                   </h3>
 
@@ -872,7 +868,7 @@ export const Leaderboard: React.FC = () => {
             {/* RIGHT COLUMN: REKOMENDASI */}
             <div className="space-y-4 md:border-l md:border-border md:pl-6 md:pt-0 pt-6 border-t border-border md:border-t-0">
               <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-text-secondary tracking-wide mb-2">
                   Prioritas Peningkatan
                 </h3>
 

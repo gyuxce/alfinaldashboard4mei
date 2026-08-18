@@ -34,7 +34,7 @@ export const BpoPerformanceCard: React.FC<BpoPerformanceProps> = ({ data, format
               )}
             >
               <div 
-                className="text-[10px] uppercase tracking-wider text-text-secondary font-medium truncate max-w-full mb-0.5"
+                className="text-[10px] tracking-wide text-text-secondary font-medium truncate max-w-full mb-0.5"
                 title={item.name}
               >
                 {item.name}

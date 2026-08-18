@@ -49,7 +49,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
           <input 
             type="text" 
-            placeholder="Search CS ID or Name..." 
+            placeholder="Cari CS ID atau nama..." 
             className="pl-8 pr-3 py-1.5 border border-border rounded-lg text-xs focus:border-primary focus:outline-none w-full md:w-56"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -161,9 +161,10 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td colSpan={11} className="p-4 z-10 relative">
                     <EmptyState
                       title="Tidak ada data attendance"
-                      description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search atau range tanggal."
+                      description="Coba ubah pencarian atau rentang tanggal. Jika data belum ada, sync dari File Center."
                       variant="filter"
                       className="border-0 bg-transparent py-6"
+                      showDataActions
                     />
                   </td>
                 </tr>

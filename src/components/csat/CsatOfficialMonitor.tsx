@@ -148,7 +148,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                 <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
                 <input 
                   type="text" 
-                  placeholder="Search CS ID or Name..." 
+                  placeholder="Cari CS ID atau nama..." 
                   className="pl-8 pr-3 py-1.5 border border-border rounded-lg text-xs focus:border-primary focus:outline-none w-full md:w-56"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -161,20 +161,20 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Skor CSAT</span>
+            <span className="text-[10px] font-medium tracking-wide text-text-muted">Skor CSAT</span>
             <Star className="h-4 w-4 text-warning" />
           </div>
-          <div className="mt-2 text-2xl font-black text-text-primary">
+          <div className="mt-2 text-2xl font-semibold text-text-primary">
             {highlightStats.aggregate.score !== null ? `${formatNum(highlightStats.aggregate.score, 2)} / 5` : '-'}
           </div>
           <p className="mt-1 text-[11px] text-text-muted">Target 3.75</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Responden</span>
+            <span className="text-[10px] font-medium tracking-wide text-text-muted">Total Responden</span>
             <Users className="h-4 w-4 text-primary" />
           </div>
-          <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.aggregate.respondents, 0)}</div>
+          <div className="mt-2 text-2xl font-semibold text-text-primary">{formatNum(highlightStats.aggregate.respondents, 0)}</div>
           <p className="mt-1 text-[11px] text-text-muted">Pada periode terpilih</p>
         </div>
       </div>
@@ -260,9 +260,10 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                   <td colSpan={5 + uniqueDates.length} className="p-4 z-10">
                     <EmptyState
                       title="Tidak ada data CSAT official"
-                      description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search, filter Team Leader, atau range tanggal."
+                      description="Coba ubah pencarian, filter TL, atau rentang tanggal."
                       variant="filter"
                       className="border-0 bg-transparent py-6"
+                      showDataActions
                     />
                   </td>
                 </tr>

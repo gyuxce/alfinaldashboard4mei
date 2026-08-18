@@ -358,7 +358,7 @@ export const ProductivityDetail: React.FC<{
           <div className="relative">
             <input
               type="text"
-              placeholder="Search CS ID or Name..."
+              placeholder="Cari CS ID atau nama..."
               className="pl-8 pr-3 py-1.5 border border-border bg-card text-text-primary rounded-xl text-xs focus:border-primary focus:outline-none w-full md:w-56"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -478,7 +478,7 @@ export const ProductivityDetail: React.FC<{
                   Selected Interval {selectedIntervalInsight.hour}
                 </div>
                 <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-2xl font-black leading-none text-text-primary">
+                  <span className="text-2xl font-semibold leading-none text-text-primary">
                     {formatNum(selectedIntervalInsight.total, 0)}
                   </span>
                   <span className="text-xs font-semibold text-text-muted">chats</span>
@@ -512,10 +512,10 @@ export const ProductivityDetail: React.FC<{
                 <table className="w-full text-left text-xs">
                   <thead className="bg-surface-muted text-text-muted">
                     <tr>
-                      <th className="w-12 px-3 py-2 font-bold uppercase tracking-wide">Rank</th>
-                      <th className="px-3 py-2 font-bold uppercase tracking-wide">Category</th>
-                      <th className="w-28 px-3 py-2 text-right font-bold uppercase tracking-wide">Cases</th>
-                      <th className="w-28 px-3 py-2 text-right font-bold uppercase tracking-wide">Share</th>
+                      <th className="w-12 px-3 py-2 font-medium tracking-wide">Rank</th>
+                      <th className="px-3 py-2 font-medium tracking-wide">Category</th>
+                      <th className="w-28 px-3 py-2 text-right font-medium tracking-wide">Cases</th>
+                      <th className="w-28 px-3 py-2 text-right font-medium tracking-wide">Share</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -715,9 +715,10 @@ export const ProductivityDetail: React.FC<{
                 >
                   <EmptyState
                     title="Tidak ada data productivity"
-                    description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search, filter Team Leader, atau range tanggal."
+                    description="Coba ubah pencarian, filter TL, atau rentang tanggal."
                     variant="filter"
                     className="border-0 bg-transparent py-6"
+                    showDataActions
                   />
                 </td>
               </tr>

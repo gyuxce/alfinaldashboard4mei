@@ -89,6 +89,11 @@ export interface AppState {
   setDataSource: (mode: 'sheets' | 'csv') => void;
   setIsComparisonEnabled: (enabled: boolean) => void;
   setComparisonMode: (mode: 'wow' | 'mom') => void;
+
+  /** Soft navigation request from child views (e.g. EmptyState → File Center) */
+  pendingTab: string | null;
+  openTab: (tab: string) => void;
+  clearPendingTab: () => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -123,6 +128,7 @@ export const useStore = create<AppState>((set, get) => ({
   agentDictionaryByMonth: {},
   isComparisonEnabled: false,
   comparisonMode: 'wow',
+  pendingTab: null,
   fileValidations: {},
   fileNames: {},
 
@@ -206,6 +212,8 @@ export const useStore = create<AppState>((set, get) => ({
   setSelectedGlobalAgent: (agent) => set(() => ({ selectedGlobalAgent: agent })),
   setIsComparisonEnabled: (enabled) => set(() => ({ isComparisonEnabled: enabled })),
   setComparisonMode: (mode) => set(() => ({ comparisonMode: mode })),
+  openTab: (tab) => set(() => ({ pendingTab: tab })),
+  clearPendingTab: () => set(() => ({ pendingTab: null })),
 
   clearFiles: async () => {
     // Clear Zustand

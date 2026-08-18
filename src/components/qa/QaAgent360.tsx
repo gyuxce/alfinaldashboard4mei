@@ -312,7 +312,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input 
               type="text" 
-              placeholder="Search CS ID or Name..." 
+              placeholder="Cari CS ID atau nama..." 
               className="pl-8 pr-3 py-1.5 border border-border rounded-lg text-xs focus:border-primary focus:outline-none w-full md:w-56"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -324,26 +324,26 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Evaluasi</span>
+            <span className="text-[10px] font-medium tracking-wide text-text-muted">Total Evaluasi</span>
             <BarChart2 className="h-4 w-4 text-primary" />
           </div>
-          <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.totalEvaluations, 0)}</div>
+          <div className="mt-2 text-2xl font-semibold text-text-primary">{formatNum(highlightStats.totalEvaluations, 0)}</div>
           <p className="mt-1 text-[11px] text-text-muted">QA pada periode terpilih</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Total Mistake</span>
+            <span className="text-[10px] font-medium tracking-wide text-text-muted">Total Mistake</span>
             <AlertCircle className="h-4 w-4 text-danger" />
           </div>
-          <div className="mt-2 text-2xl font-black text-danger">{formatNum(highlightStats.totalMistakes, 0)}</div>
+          <div className="mt-2 text-2xl font-semibold text-danger">{formatNum(highlightStats.totalMistakes, 0)}</div>
           <p className="mt-1 text-[11px] text-text-muted">Temuan dari seluruh evaluasi</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Persentase Mistake</span>
+            <span className="text-[10px] font-medium tracking-wide text-text-muted">Persentase Mistake</span>
             <AlertCircle className="h-4 w-4 text-warning" />
           </div>
-          <div className="mt-2 text-2xl font-black text-text-primary">{formatNum(highlightStats.mistakeRate, 1)}%</div>
+          <div className="mt-2 text-2xl font-semibold text-text-primary">{formatNum(highlightStats.mistakeRate, 1)}%</div>
           <p className="mt-1 text-[11px] text-text-muted">Dibandingkan total evaluasi</p>
         </div>
       </div>
@@ -457,9 +457,10 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     <td colSpan={6 + uniqueDates.length} className="p-4 z-10">
                       <EmptyState
                         title="Tidak ada data QA performance"
-                        description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search, filter Team Leader, view mode, atau range tanggal."
+                        description="Coba ubah pencarian, filter TL, view mode, atau rentang tanggal."
                         variant="filter"
                         className="border-0 bg-transparent py-6"
+                        showDataActions
                       />
                     </td>
                   </tr>
@@ -608,14 +609,14 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   
                   <div className="flex flex-wrap items-center gap-4 md:gap-8 ml-0 md:ml-7 mt-1 md:mt-0 pl-0 md:pl-4">
                      <div className="flex flex-col bg-card md:bg-transparent border border-border md:border-transparent px-3 py-1.5 md:px-0 md:py-0 rounded-lg shrink-0 shadow-sm md:shadow-none">
-                        <span className="text-[9px] md:text-[10px] font-bold text-text-muted uppercase tracking-wider mb-0.5">
+                        <span className="text-[9px] md:text-[10px] font-bold text-text-muted tracking-wide mb-0.5">
                           {selectedAgent.type === 'defects' ? 'Total Defects' : selectedAgent.type === 'no_mistake' ? 'No Mistake Count' : 'Total Evaluations'}
                         </span>
-                        <span className={`text-base md:text-lg font-black leading-none ${selectedAgent.type === 'defects' ? 'text-danger' : selectedAgent.type === 'no_mistake' ? 'text-success' : 'text-primary'}`}>{filteredDefects.length}</span>
+                        <span className={`text-base md:text-lg font-semibold leading-none ${selectedAgent.type === 'defects' ? 'text-danger' : selectedAgent.type === 'no_mistake' ? 'text-success' : 'text-primary'}`}>{filteredDefects.length}</span>
                      </div>
                      
                      <div className="flex md:hidden flex-col flex-1 min-w-[120px]">
-                        <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider mb-1">Top Categories</span>
+                        <span className="text-[9px] font-bold text-text-muted tracking-wide mb-1">Top Categories</span>
                         <div className="flex flex-wrap gap-1">
                           {topCategories.map((cat, i) => (
                              <span key={i} className="text-[9px] font-medium bg-card border border-border px-1.5 py-0.5 rounded text-text-secondary truncate max-w-full" title={cat}>{cat}</span>
@@ -627,7 +628,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 
                 <div className="hidden md:flex gap-8 items-start mt-4">
                   <div className="flex flex-col mr-4 mt-0.5">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Top Categories (Max 3)</span>
+                      <span className="text-[10px] font-bold text-text-muted tracking-wide mb-2">Top Categories (Max 3)</span>
                       <ul className="flex flex-col gap-1.5 text-xs">
                         {topCategories.map((cat, i) => (
                           <li key={i} className="font-semibold text-text-primary leading-tight max-w-[280px] truncate" title={cat}>

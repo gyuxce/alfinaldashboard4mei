@@ -199,7 +199,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
           <div className="relative">
             <input
               type="text"
-              placeholder="Search CS ID or Name..."
+              placeholder="Cari CS ID atau nama..."
               className="pl-8 pr-3 py-1.5 border border-border bg-card text-text-primary rounded-xl text-xs focus:border-primary focus:outline-none w-full md:w-56"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -225,8 +225,9 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
       {!data.length && (
         <EmptyState
           title="Belum ada data KPI untuk ditampilkan"
-          description="Buka File Center, pilih bulan data, lalu klik Sync Now. Setelah sync berhasil, dashboard akan menampilkan data sesuai bulan yang dipilih."
+          description="Pilih bulan data di File Center, lalu sync. Dashboard akan menampilkan KPI sesuai periode aktif."
           variant="data"
+          showDataActions
         />
       )}
 
@@ -433,7 +434,7 @@ const FormulaTooltip = ({ title }: { title: string }) => {
         <Info size={12} />
       </button>
       <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-border bg-card p-3 text-left shadow-xl group-hover/formula:block group-focus-within/formula:block">
-        <span className="block text-[11px] font-bold uppercase tracking-wide text-text-primary">
+        <span className="block text-[11px] font-medium tracking-wide text-text-primary">
           {title}
         </span>
         {formula.target && (
@@ -495,11 +496,11 @@ const KpiRulesPanel = ({
             <table className="w-full text-left text-[11px]">
               <thead className="bg-surface text-text-muted">
                 <tr>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">KPI</th>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Target</th>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Cara Hitung</th>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Sumber Data</th>
-                  <th className="px-4 py-2 font-bold uppercase tracking-wide">Catatan</th>
+                  <th className="px-4 py-2 font-medium tracking-wide">KPI</th>
+                  <th className="px-4 py-2 font-medium tracking-wide">Target</th>
+                  <th className="px-4 py-2 font-medium tracking-wide">Cara Hitung</th>
+                  <th className="px-4 py-2 font-medium tracking-wide">Sumber Data</th>
+                  <th className="px-4 py-2 font-medium tracking-wide">Catatan</th>
                 </tr>
               </thead>
               <tbody>
@@ -785,13 +786,13 @@ const WeeklyReportPanel = ({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left px-5 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">KPI</th>
-              <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">Target</th>
-              <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(endDate)}</th>
-              <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prevEnd)}</th>
-              {hasPrev2 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prev2End)}</th>}
-              {showPrev3 && <th className="text-right px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">{getPeriodLabel(prev3End)}</th>}
-              <th className="text-right px-5 py-3 text-[11px] font-bold text-text-muted uppercase tracking-widest">Perubahan</th>
+              <th className="text-left px-5 py-3 text-[11px] font-medium text-text-muted tracking-wide">KPI</th>
+              <th className="text-right px-4 py-3 text-[11px] font-medium text-text-muted tracking-wide">Target</th>
+              <th className="text-right px-4 py-3 text-[11px] font-medium text-text-muted tracking-wide">{getPeriodLabel(endDate)}</th>
+              <th className="text-right px-4 py-3 text-[11px] font-medium text-text-muted tracking-wide">{getPeriodLabel(prevEnd)}</th>
+              {hasPrev2 && <th className="text-right px-4 py-3 text-[11px] font-medium text-text-muted tracking-wide">{getPeriodLabel(prev2End)}</th>}
+              {showPrev3 && <th className="text-right px-4 py-3 text-[11px] font-medium text-text-muted tracking-wide">{getPeriodLabel(prev3End)}</th>}
+              <th className="text-right px-5 py-3 text-[11px] font-medium text-text-muted tracking-wide">Perubahan</th>
             </tr>
           </thead>
           <tbody>

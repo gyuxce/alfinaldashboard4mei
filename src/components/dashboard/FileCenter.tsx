@@ -435,17 +435,17 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 border-b border-border bg-surface/30">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Total Rows</div>
-          <div className="text-lg font-black text-text-primary mt-0.5">{summary.rows}</div>
+          <div className="text-[11px] tracking-wide text-text-muted font-medium">Total baris</div>
+          <div className="text-lg font-semibold text-text-primary mt-0.5">{summary.rows}</div>
           <div className="text-[10px] text-text-muted mt-0.5">Bulan aktif saja</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Known Agents</div>
-          <div className="text-lg font-black text-text-primary mt-0.5">{agentCount}</div>
+          <div className="text-[11px] tracking-wide text-text-muted font-medium">Agent dikenal</div>
+          <div className="text-lg font-semibold text-text-primary mt-0.5">{agentCount}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Mode</div>
-          <div className="text-lg font-black text-text-primary mt-0.5">{isSheetMode ? 'Google Sheets' : 'CSV Upload'}</div>
+          <div className="text-[11px] tracking-wide text-text-muted font-medium">Mode</div>
+          <div className="text-lg font-semibold text-text-primary mt-0.5">{isSheetMode ? 'Google Sheets' : 'CSV Upload'}</div>
         </div>
       </div>
 
@@ -457,7 +457,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
               Coverage agent per source dibandingkan Master CSID.
             </p>
           </div>
-          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-text-muted tracking-wide">
             Target utama: Productivity + Schedule 100%
           </span>
         </div>
@@ -472,7 +472,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
                   </div>
                 </div>
                 <span className={cn(
-                  'shrink-0 rounded-lg border px-2 py-1 text-[10px] font-black',
+                  'shrink-0 rounded-lg border px-2 py-1 text-[10px] font-semibold',
                   item.status === 'ok'
                     ? 'bg-success/5 border-success/20 text-success'
                     : item.status === 'partial'
@@ -528,7 +528,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[11px] font-bold text-text-primary">{item.title}</div>
                 <span className={cn(
-                  'rounded-lg border px-2 py-1 text-[10px] font-black',
+                  'rounded-lg border px-2 py-1 text-[10px] font-semibold',
                   item.tone === 'success'
                     ? 'bg-success/5 border-success/20 text-success'
                     : 'bg-warning/5 border-warning/20 text-warning'
@@ -571,11 +571,11 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
             </div>
             <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
               <div className="rounded-lg border border-border bg-card px-3 py-2">
-                <div className="font-black text-text-primary">{productivityDuplicateHealth.duplicateGroups}</div>
+                <div className="font-semibold text-text-primary">{productivityDuplicateHealth.duplicateGroups}</div>
                 <div className="text-text-muted">groups</div>
               </div>
               <div className="rounded-lg border border-border bg-card px-3 py-2">
-                <div className="font-black text-text-primary">{productivityDuplicateHealth.duplicateRows}</div>
+                <div className="font-semibold text-text-primary">{productivityDuplicateHealth.duplicateRows}</div>
                 <div className="text-text-muted">extra rows</div>
               </div>
             </div>
@@ -743,7 +743,7 @@ const UploadCard = ({ title, fileKey }: { title: string, fileKey: keyof AppState
     <div className="bg-card border border-border rounded-xl p-5 flex flex-col items-center text-center shadow-[0_1px_3px_rgba(0,0,0,0.04)] relative overflow-hidden group">
       {/* Saved Indicator */}
       {isPersisted && (
-        <div className="absolute top-2 right-2 flex items-center gap-1 text-[9px] font-bold text-success  px-1.5 py-0.5 rounded uppercase tracking-wider backdrop-blur-sm mt-0.5">
+        <div className="absolute top-2 right-2 flex items-center gap-1 text-[9px] font-bold text-success  px-1.5 py-0.5 rounded tracking-wide backdrop-blur-sm mt-0.5">
            <DatabaseBackup className="w-3 h-3" />
            Saved
         </div>
@@ -888,7 +888,7 @@ export const FileCenter = () => {
                 ${isFetchingSheets ? 'bg-primary/70 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'}`}
             >
               <RefreshCw className={`w-4 h-4 ${isFetchingSheets ? 'animate-spin' : ''}`} />
-              {isFetchingSheets ? 'Syncing...' : 'Sync Now'}
+              {isFetchingSheets ? 'Menyinkronkan...' : 'Sync sekarang'}
             </button>
           </div>
         </div>
@@ -900,7 +900,7 @@ export const FileCenter = () => {
             <div>
               <p>{sheetsFetchError}</p>
               <p className="text-xs mt-1 text-danger/80">
-                Data yang sedang tampil tidak dihapus. Setelah tab dibuat, klik Sync Now lagi.
+                Data yang sedang tampil tidak dihapus. Setelah tab dibuat, klik Sync sekarang lagi.
               </p>
             </div>
           </div>
@@ -917,7 +917,7 @@ export const FileCenter = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
             <div>
               <p className={cn(
-                "font-bold",
+                "font-medium",
                 isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-primary"
               )}>
                 {syncStatusText || (syncIsStale ? 'Data perlu di-refresh' : 'Data tersinkron')}
@@ -927,20 +927,20 @@ export const FileCenter = () => {
                   ? 'Mohon tunggu, dashboard sedang membaca tab Google Sheets.'
                   : hasSuccessfulSync
                     ? syncIsStale
-                      ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Sync Now untuk update.`
+                      ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Sync sekarang untuk update.`
                       : `Sinkron ${formatRelativeTime(lastSyncTime)}. ${activeMonth.description}`
-                    : 'Dashboard akan otomatis sync saat dibuka. Klik Sync Now jika ingin memaksa update manual.'}
+                    : 'Dashboard akan otomatis sync saat dibuka. Klik Sync sekarang jika ingin memaksa update manual.'}
               </p>
             </div>
             <span className={cn(
-              "text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border",
+              "text-[11px] font-medium tracking-wide px-2 py-1 rounded-lg border",
               hasSuccessfulSync
                 ? syncIsStale
                   ? "text-warning border-warning/30 bg-warning/10"
                   : "text-success border-success/30 bg-success/10"
                 : "text-warning border-warning/30 bg-warning/10"
             )}>
-              {isFetchingSheets ? 'Syncing' : hasSuccessfulSync ? syncIsStale ? 'Perlu refresh' : 'Synced' : 'Belum sync'}
+              {isFetchingSheets ? 'Menyinkronkan' : hasSuccessfulSync ? syncIsStale ? 'Perlu refresh' : 'Synced' : 'Belum sync'}
             </span>
           </div>
         </div>
@@ -957,7 +957,7 @@ export const FileCenter = () => {
                 </p>
               </div>
               <span className={cn(
-                "text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border",
+                "text-[10px] font-medium tracking-wide px-2 py-1 rounded-lg border",
                 hasSuccessfulSync
                   ? "text-success border-success/30 bg-success/10"
                   : activeMonth.suffix
@@ -1059,7 +1059,7 @@ export const FileCenter = () => {
                       <span className={cn("font-medium", isFailed ? "text-danger" : isSynced ? "text-success" : "text-text-muted")}>
                         {isFailed
                           ? 'Tab belum ditemukan'
-                          : isSynced ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Belum di-sync'}
+                          : isSynced ? `Tersinkron ${formatRelativeTime(lastSyncTime)}` : 'Belum di-sync'}
                       </span>
                     </p>
                   </div>
