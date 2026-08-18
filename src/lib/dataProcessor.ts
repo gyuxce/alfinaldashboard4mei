@@ -1161,11 +1161,13 @@ export const processKPIs = (
             agent.csatScFairTotalValid += 1;
 
             let fairDay = agent.dailyHistory.csatScFair.find(
-              (h) => h.date === targetDateLabel,
+              (h) => (normDate && h.normDate === normDate) || h.date === targetDateLabel,
             );
             if (!fairDay) {
-              fairDay = { date: targetDateLabel, score: 0, count: 0 };
+              fairDay = { date: targetDateLabel, normDate, score: 0, count: 0 };
               agent.dailyHistory.csatScFair.push(fairDay);
+            } else if (!fairDay.normDate && normDate) {
+              fairDay.normDate = normDate;
             }
             if (score >= 4) fairDay.score += 1; // good count
             fairDay.count += 1; // valid count
