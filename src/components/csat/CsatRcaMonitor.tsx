@@ -188,7 +188,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     const dynamicHeight = Math.max(100, barData.length * 36);
     return (
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col">
-        <h4 className="text-[11px] font-bold text-text-secondary mb-4 uppercase tracking-widest">{title}</h4>
+        <h4 className="text-[11px] font-bold text-text-secondary mb-4 tracking-wide">{title}</h4>
         {barData.length === 0 ? (
           <EmptyState
             title="Belum ada data RCA"
@@ -214,15 +214,15 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         )}
         {issueCategories.length > 0 && (
           <div className="mt-4 border-t border-border pt-3">
-            <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">
+            <div className="text-[10px] font-medium text-text-muted tracking-wide mb-2">
               Category per issue
             </div>
             <div className="overflow-hidden rounded-lg border border-border bg-card">
               <table className="w-full table-fixed text-left text-[10px]">
                 <thead className="bg-surface-muted text-text-muted">
                   <tr>
-                    <th className="w-[38%] px-2.5 py-2 font-bold uppercase tracking-wide">Issue</th>
-                    <th className="px-2.5 py-2 font-bold uppercase tracking-wide">Top Categories</th>
+                    <th className="w-[38%] px-2.5 py-2 font-medium tracking-wide">Issue</th>
+                    <th className="px-2.5 py-2 font-medium tracking-wide">Top Categories</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -322,6 +322,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 description="Pastikan data CSAT SC memiliki kolom RCA dan kasus bad CSAT."
                 variant="data"
                 className="w-full border-0 bg-transparent py-6"
+                showDataActions
               />
             )}
           </div>
@@ -341,7 +342,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     {grandTotal > 0 ? `${((item.count / grandTotal) * 100).toFixed(1)}%` : '-'} dari total kasus
                   </p>
                 </div>
-                <span className="text-2xl font-black shrink-0" style={{ color: item.color }}>{item.count}</span>
+                <span className="text-2xl font-semibold shrink-0" style={{ color: item.color }}>{item.count}</span>
               </div>
             ))}
             <div className="text-center text-[10px] text-text-muted pt-1">
@@ -376,9 +377,10 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         {filteredAgentRanking.length === 0 ? (
           <EmptyState
             title="Belum ada data RCA agent"
-            description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah pencarian agent/TL atau filter global."
+            description="Coba ubah pencarian agent/TL atau filter global."
             variant="filter"
             className="border-0 bg-transparent py-6"
+            showDataActions
           />
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border">
@@ -416,7 +418,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                         : <span className="text-text-muted text-xs">-</span>}
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <span className="font-black text-text-primary text-[13px]">{a.total}</span>
+                      <span className="font-semibold text-text-primary text-[13px]">{a.total}</span>
                     </td>
                   </tr>
                 ))}

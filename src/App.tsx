@@ -284,12 +284,19 @@ export default function App() {
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, activeMonthRowCounts,
-    isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode
+    isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode,
+    pendingTab, clearPendingTab,
   } = useStore();
 
   useEffect(() => {
     hydrateFromStorage();
   }, [hydrateFromStorage]);
+
+  useEffect(() => {
+    if (!pendingTab) return;
+    setActiveTab(pendingTab);
+    clearPendingTab();
+  }, [pendingTab, clearPendingTab]);
 
   useEffect(() => {
     if (!import.meta.env.VITE_SHEETS_API_KEY) return;
@@ -366,7 +373,7 @@ export default function App() {
     return {
       status: 'ok' as const,
       label: 'Data OK',
-      detail: lastSyncTime ? `Synced ${formatRelativeTime(lastSyncTime)}` : 'Waiting for sync',
+      detail: lastSyncTime ? `Tersinkron ${formatRelativeTime(lastSyncTime)}` : 'Menunggu sync',
       count: 0,
     };
   }, [
@@ -701,15 +708,15 @@ export default function App() {
         <div className="bg-card border border-border rounded-lg px-3 py-2 flex flex-col relative z-50 overflow-visible">
           {/* Mobile Filter Toggle */}
           <div className="flex md:hidden items-center justify-between w-full mb-2">
-            <span className="text-[11px] font-medium text-text-muted tracking-wide pl-1">Filters</span>
+            <span className="text-[11px] font-medium text-text-muted tracking-wide pl-1">Filter</span>
             <button
               onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-surface border border-border hover:bg-surface-muted transition-colors cursor-pointer"
             >
               {isMobileFilterOpen ? (
-                <>Hide Filters <ChevronUp size={14} /></>
+                <>Sembunyikan <ChevronUp size={14} /></>
               ) : (
-                <>Show Filters <ChevronDown size={14} /></>
+                <>Tampilkan filter <ChevronDown size={14} /></>
               )}
             </button>
           </div>
@@ -729,7 +736,7 @@ export default function App() {
                     value={selectedBpo}
                     onChange={setSelectedBpo}
                     allOptionLabel="All BPO"
-                    placeholder="Search BPO..."
+                    placeholder="Cari BPO..."
                   />
                 </div>
                 <div className="w-[120px] shrink-0 [&_button]:h-8 [&_button]:rounded-lg [&_button]:text-xs [&_button]:px-2.5">
@@ -738,7 +745,7 @@ export default function App() {
                     value={selectedTL}
                     onChange={setSelectedTL}
                     allOptionLabel="All TL"
-                    placeholder="Search TL..."
+                    placeholder="Cari TL..."
                   />
                 </div>
                 <div className="w-[130px] shrink-0 [&_button]:h-8 [&_button]:rounded-lg [&_button]:text-xs [&_button]:px-2.5">
@@ -747,14 +754,14 @@ export default function App() {
                     value={selectedGlobalAgent}
                     onChange={setSelectedGlobalAgent}
                     allOptionLabel="All Agents"
-                    placeholder="Search Agent..."
+                    placeholder="Cari agent..."
                   />
                 </div>
               </div>
               
               {/* Period */}
               <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
-                <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide w-10 shrink-0">Period</span>
+                <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide w-10 shrink-0">Periode</span>
                 <MonthPicker
                   value={selectedMonthFilter || getCurrentMonthValue()}
                   options={monthOptions}
@@ -801,7 +808,7 @@ export default function App() {
                   <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
                     <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
                   </div>
-                  <span className="text-[10px] font-medium text-text-secondary group-hover:text-text-primary whitespace-nowrap">Compare</span>
+                  <span className="text-[10px] font-medium text-text-secondary group-hover:text-text-primary whitespace-nowrap">Bandingkan</span>
                 </div>
 
                 <div className={cn(
@@ -861,7 +868,7 @@ export default function App() {
                   ) : null}
                   {lastSyncTime && (
                     <span className={cn("text-text-muted", syncIsStale && "text-warning")}>
-                      {syncIsStale ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Refresh untuk update.` : `Synced ${formatRelativeTime(lastSyncTime)}`}
+                      {syncIsStale ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Refresh untuk update.` : `Tersinkron ${formatRelativeTime(lastSyncTime)}`}
                     </span>
                   )}
                 </div>
@@ -903,7 +910,7 @@ export default function App() {
                       size={11} 
                       className={isFetchingSheets ? 'animate-spin' : ''} 
                     />
-                   {isFetchingSheets ? 'Syncing...' : 'Refresh'}
+                   {isFetchingSheets ? 'Menyinkronkan...' : 'Refresh'}
                  </button>
                )}
               </div>
@@ -913,7 +920,7 @@ export default function App() {
           {activeFilters.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
               <span className="text-[10px] font-medium tracking-wide text-text-muted">
-                Active Filters
+                Filter aktif
               </span>
               {activeFilters.map((filter) => (
                 <React.Fragment key={filter.label}>
@@ -929,7 +936,7 @@ export default function App() {
                 onClick={clearAllFilters}
                 className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-text-muted hover:bg-surface-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                Clear all
+                Hapus semua
               </button>
             </div>
           )}

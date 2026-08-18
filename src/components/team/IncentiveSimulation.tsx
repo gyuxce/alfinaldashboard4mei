@@ -226,7 +226,7 @@ const SummaryCard = ({
   tone?: "neutral" | "success" | "warning";
 }) => (
   <div className="rounded-lg border border-border bg-card p-4">
-    <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}</p>
+    <p className="text-[10px] font-medium tracking-wide text-text-muted">{label}</p>
     <p className={cn(
       "mt-1 text-xl font-bold",
       tone === "success" ? "text-success-text" : tone === "warning" ? "text-warning-text" : "text-text-primary",

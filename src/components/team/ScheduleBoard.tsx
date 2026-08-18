@@ -41,7 +41,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
              <Search className="w-4 h-4 absolute left-3 top-1.5 text-text-muted" />
              <input
                type="text"
-               placeholder="Search CS ID or Name..."
+               placeholder="Cari CS ID atau nama..."
                className="pl-9 pr-4 py-1.5 border border-border rounded-lg text-xs w-64 focus:outline-none focus:ring-1 focus:ring-primary bg-card text-text-primary"
                value={search}
                onChange={e => setSearch(e.target.value)}
@@ -74,9 +74,10 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td colSpan={5 + uniqueDates.length} className="p-4 z-10 relative">
                     <EmptyState
                       title="Tidak ada data schedule"
-                      description="Jika belum sync, buka File Center lalu klik Sync Now. Jika sudah sync, coba ubah search atau range tanggal."
+                      description="Coba ubah pencarian atau rentang tanggal."
                       variant="filter"
                       className="border-0 bg-transparent py-6"
+                      showDataActions
                     />
                   </td>
                 </tr>

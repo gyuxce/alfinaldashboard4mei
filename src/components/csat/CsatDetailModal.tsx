@@ -188,28 +188,28 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5 bg-card space-y-4">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             <div className="flex min-w-0 flex-col rounded-lg border border-border bg-surface/40 px-2 py-1.5">
-              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-text-muted">Total</span>
-              <span className="text-sm font-black text-text-primary">{filteredSurveys.length}</span>
+              <span className="truncate text-[8px] font-medium tracking-wide text-text-muted">Total</span>
+              <span className="text-sm font-semibold text-text-primary">{filteredSurveys.length}</span>
             </div>
             <div className="flex min-w-0 flex-col rounded-lg border border-success/20 bg-success/5 px-2 py-1.5">
-              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-success">Score 5</span>
-              <span className="text-sm font-black text-success">{scoreCounts[5] || 0}</span>
+              <span className="truncate text-[8px] font-medium tracking-wide text-success">Score 5</span>
+              <span className="text-sm font-semibold text-success">{scoreCounts[5] || 0}</span>
             </div>
             <div className="flex min-w-0 flex-col rounded-lg border border-success/20 bg-success/5 px-2 py-1.5">
-              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-success/80">Score 4</span>
-              <span className="text-sm font-black text-success/80">{scoreCounts[4] || 0}</span>
+              <span className="truncate text-[8px] font-medium tracking-wide text-success/80">Score 4</span>
+              <span className="text-sm font-semibold text-success/80">{scoreCounts[4] || 0}</span>
             </div>
             <div className="flex min-w-0 flex-col rounded-lg border border-warning/20 bg-warning/5 px-2 py-1.5">
-              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-warning">Score 3</span>
-              <span className="text-sm font-black text-warning">{scoreCounts[3] || 0}</span>
+              <span className="truncate text-[8px] font-medium tracking-wide text-warning">Score 3</span>
+              <span className="text-sm font-semibold text-warning">{scoreCounts[3] || 0}</span>
             </div>
-            <div className="flex min-w-0 flex-col rounded-lg border border-orange-500/20 bg-orange-500/5 px-2 py-1.5">
-              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-orange-500">Score 2</span>
-              <span className="text-sm font-black text-orange-500">{scoreCounts[2] || 0}</span>
+            <div className="flex min-w-0 flex-col rounded-lg border border-warning/30 bg-warning/5 px-2 py-1.5">
+              <span className="truncate text-[8px] font-medium tracking-wide text-warning">Score 2</span>
+              <span className="text-sm font-semibold text-warning">{scoreCounts[2] || 0}</span>
             </div>
             <div className="flex min-w-0 flex-col rounded-lg border border-danger/20 bg-danger/5 px-2 py-1.5">
-              <span className="truncate text-[8px] font-bold uppercase tracking-wider text-danger">Score 1</span>
-              <span className="text-sm font-black text-danger">{scoreCounts[1] || 0}</span>
+              <span className="truncate text-[8px] font-medium tracking-wide text-danger">Score 1</span>
+              <span className="text-sm font-semibold text-danger">{scoreCounts[1] || 0}</span>
             </div>
           </div>
 
@@ -217,7 +217,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
             {/* Menu 1: All Scores */}
             {(modalType === 'category' ? topAgentsAll.length > 0 : topCategoriesAll.length > 0) && (
               <div className="min-w-0 rounded-lg border border-border bg-surface/30 p-3">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                <div className="mb-2 text-[10px] font-medium tracking-wide text-text-muted">
                   Top {modalType === 'category' ? topAgentsAll.length : topCategoriesAll.length} {modalType === 'category' ? 'Agents' : 'Categories'} (All Scores 1-5)
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-1.5">
@@ -269,7 +269,7 @@ export const CsatDetailModal: React.FC<CsatDetailModalProps> = ({
             {/* Menu 2: Bad Scores */}
             {(modalType === 'category' ? topAgentsBad.length > 0 : topCategoriesBad.length > 0) && (
               <div className="min-w-0 rounded-lg border border-danger/30 bg-danger/5 p-3">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-danger">
+                <div className="mb-2 text-[10px] font-medium tracking-wide text-danger">
                   Top {modalType === 'category' ? topAgentsBad.length : topCategoriesBad.length} {modalType === 'category' ? 'Agents' : 'Categories'} (Score 1 & 2 Only)
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-1.5">
