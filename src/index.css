@@ -1,175 +1,196 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
+/* Geist Sans (Vercel) — variable font via local package */
+@font-face {
+  font-family: "Geist Sans";
+  src: url("../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  /* Base Surfaces */
-  --background: 248 250 252;          /* #F8FAFC */
+  /* Base Surfaces — light off-white (Cursor-like, not blue-slate) */
+  --background: 250 250 249;          /* #FAFAF9 */
   --surface: 255 255 255;             /* #FFFFFF */
-  --surface-muted: 249 250 251;       /* #F9FAFB */
+  --surface-muted: 245 245 244;       /* #F5F5F4 */
   --card: 255 255 255;                /* #FFFFFF */
-  --border: 238 242 247;              /* #EEF2F7 */
-  --border-strong: 229 231 235;       /* #E5E7EB */
-  
+  --border: 231 229 228;              /* #E7E5E4 */
+  --border-strong: 214 211 209;       /* #D6D3D1 */
+
   /* Text */
-  --text-primary: 31 41 55;           /* #1F2937 */
-  --text-secondary: 107 114 128;      /* #6B7280 */
-  --text-muted: 156 163 175;          /* #9CA3AF */
-  --text-disabled: 209 213 219;       /* #D1D5DB */
-  
-  /* Brand - Akulaku Red */
+  --text-primary: 28 25 23;           /* #1C1917 */
+  --text-secondary: 87 83 78;         /* #57534E */
+  --text-muted: 168 162 158;          /* #A8A29E */
+  --text-disabled: 214 211 209;       /* #D6D3D1 */
+
+  /* Brand - Akulaku Red (chrome / CTA) */
   --primary: 227 30 36;               /* #E31E24 */
-  --primary-hover: 239 68 68;         /* #EF4444 */
-  --primary-soft: 254 226 226;        /* #FEE2E2 */
-  --primary-soft-hover: 252 165 165;  /* #FCA5A5 */
+  --primary-hover: 200 25 30;         /* #C8191E */
+  --primary-soft: 254 242 242;        /* #FEF2F2 */
+  --primary-soft-hover: 254 226 226;  /* #FEE2E2 */
   --primary-text: 227 30 36;          /* #E31E24 */
-  
-  /* Semantic */
+
+  /* Semantic — keep KPI traffic lights; danger distinct from brand soft */
   --success: 22 163 74;               /* #16A34A */
   --success-soft: 220 252 231;
   --success-text: 21 128 61;
-  --danger: 227 30 36;                /* #E31E24 */
+  --danger: 185 28 28;                /* #B91C1C — under-target, not brand soft */
   --danger-soft: 254 226 226;
-  --danger-text: 185 28 28;
-  --warning: 245 158 11;              /* #F59E0B */
+  --danger-text: 153 27 27;
+  --warning: 217 119 6;               /* #D97706 */
   --warning-soft: 254 243 199;
   --warning-text: 180 83 9;
-  
+
   /* Sidebar */
-  --sidebar-bg: 255 255 255;          /* Light Mode */
-  --sidebar-bg-hover: 243 244 246;    /* #F3F4F6 */
-  --sidebar-bg-active: 254 226 226;   /* #FEE2E2 */
-  --sidebar-text: 71 85 105;          /* #475569 */
-  --sidebar-text-hover: 15 23 42;     /* #0F172A */
-  --sidebar-text-active: 227 30 36;   /* #E31E24 */
-  --sidebar-border: 238 242 247;
+  --sidebar-bg: 255 255 255;
+  --sidebar-bg-hover: 245 245 244;    /* #F5F5F4 */
+  --sidebar-bg-active: 250 250 249;   /* quiet active — not loud red fill */
+  --sidebar-text: 87 83 78;           /* #57534E */
+  --sidebar-text-hover: 28 25 23;     /* #1C1917 */
+  --sidebar-text-active: 28 25 23;    /* #1C1917 — accent bar carries brand */
+  --sidebar-border: 231 229 228;
   --sidebar-accent: 227 30 36;        /* #E31E24 */
 
+  /* Radius & elevation */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+
   /* KPI Color Identity */
-  --kpi-productivity: 227 30 36;       /* #E31E24 */
-  --kpi-productivity-soft: 254 226 226; /* #FEE2E2 */
-  --kpi-productivity-text: 227 30 36;   /* #E31E24 */
+  --kpi-productivity: 227 30 36;
+  --kpi-productivity-soft: 254 226 226;
+  --kpi-productivity-text: 227 30 36;
 
-  --kpi-productivity-avg: 227 30 36;    /* #E31E24 */
-  --kpi-productivity-avg-soft: 254 226 226; /* #FEE2E2 */
-  --kpi-productivity-avg-text: 227 30 36;   /* #E31E24 */
+  --kpi-productivity-avg: 227 30 36;
+  --kpi-productivity-avg-soft: 254 226 226;
+  --kpi-productivity-avg-text: 227 30 36;
 
-  --kpi-csat: 245 158 11;              /* #F59E0B */
-  --kpi-csat-soft: 254 243 199;        /* #FEF3C7 */
-  --kpi-csat-text: 245 158 11;         /* #F59E0B */
-  
-  --kpi-qa: 245 158 11;                /* #F59E0B */
-  --kpi-qa-soft: 254 243 199;          /* #FEF3C7 */
-  --kpi-qa-text: 245 158 11;           /* #F59E0B */
+  --kpi-csat: 217 119 6;
+  --kpi-csat-soft: 254 243 199;
+  --kpi-csat-text: 217 119 6;
 
-  --kpi-sla: 22 163 74;                /* #16A34A */
-  --kpi-sla-soft: 220 252 231;         /* #DCFCE7 */
-  --kpi-sla-text: 22 163 74;           /* #16A34A */
+  --kpi-qa: 217 119 6;
+  --kpi-qa-soft: 254 243 199;
+  --kpi-qa-text: 217 119 6;
 
-  --kpi-whu: 22 163 74;                /* #16A34A */
-  --kpi-whu-soft: 220 252 231;         /* #DCFCE7 */
-  --kpi-whu-text: 22 163 74;           /* #16A34A */
+  --kpi-sla: 22 163 74;
+  --kpi-sla-soft: 220 252 231;
+  --kpi-sla-text: 22 163 74;
 
-  --kpi-neutral: 37 99 235;            /* #2563EB */
-  --kpi-neutral-soft: 219 234 254;     /* #DBEAFE */
-  --kpi-neutral-text: 37 99 235;       /* #2563EB */
-  --chart-primary: 37 99 235;          /* Blue in Light Mode */
+  --kpi-whu: 22 163 74;
+  --kpi-whu-soft: 220 252 231;
+  --kpi-whu-text: 22 163 74;
+
+  --kpi-neutral: 82 82 91;            /* zinc — quieter than blue */
+  --kpi-neutral-soft: 244 244 245;
+  --kpi-neutral-text: 63 63 70;
+  --chart-primary: 82 82 91;
 }
 
 .dark {
-  /* Base Surfaces */
-  --background: 15 23 42;             /* #0F172A */
-  --surface: 30 41 59;                /* #1E293B */
-  --surface-muted: 39 53 73;          /* #273549 */
-  --card: 30 41 59;                   /* #1E293B */
-  --border: 51 65 85;                 /* #334155 */
-  --border-strong: 71 85 105;         /* #475569 */
-  
+  /* Base Surfaces — charcoal (not navy slate) */
+  --background: 18 18 18;             /* #121212 */
+  --surface: 26 26 26;                /* #1A1A1A */
+  --surface-muted: 36 36 36;          /* #242424 */
+  --card: 26 26 26;                   /* #1A1A1A */
+  --border: 48 48 48;                 /* #303030 */
+  --border-strong: 64 64 64;          /* #404040 */
+
   /* Text */
-  --text-primary: 241 245 249;        /* #F1F5F9 */
-  --text-secondary: 203 213 245;      /* #CBD5F5 */
-  --text-muted: 148 163 184;          /* #94A3B8 */
-  --text-disabled: 71 85 105;         /* #475569 */
-  
-  /* Brand - Akulaku Red Dark */
+  --text-primary: 245 245 244;        /* #F5F5F4 */
+  --text-secondary: 168 162 158;      /* #A8A29E */
+  --text-muted: 115 115 115;          /* #737373 */
+  --text-disabled: 64 64 64;          /* #404040 */
+
+  /* Brand */
   --primary: 239 68 68;               /* #EF4444 */
-  --primary-hover: 220 38 38;         /* #DC2626 */
-  --primary-soft: 127 29 29;          /* #7F1D1D */
-  --primary-soft-hover: 153 27 27;    /* #991B1B */
-  --primary-text: 241 245 249;        /* #F1F5F9 */
-  
+  --primary-hover: 248 113 113;       /* #F87171 */
+  --primary-soft: 69 26 26;           /* #451A1A */
+  --primary-soft-hover: 90 30 30;
+  --primary-text: 252 165 165;        /* #FCA5A5 */
+
   /* Semantic */
   --success: 34 197 94;               /* #22C55E */
-  --success-soft: 20 83 45;           /* #14532D */
-  --success-text: 34 197 94;          /* #22C55E */
-  --danger: 239 68 68;                /* #EF4444 */
-  --danger-soft: 127 29 29;           /* #7F1D1D */
-  --danger-text: 239 68 68;           /* #EF4444 */
+  --success-soft: 20 53 34;
+  --success-text: 74 222 128;
+  --danger: 248 113 113;              /* #F87171 */
+  --danger-soft: 69 26 26;
+  --danger-text: 252 165 165;
   --warning: 251 191 36;              /* #FBBF24 */
-  --warning-soft: 120 53 15;          /* #78350F */
-  --warning-text: 251 191 36;         /* #FBBF24 */
-  
+  --warning-soft: 66 40 10;
+  --warning-text: 252 211 77;
+
   /* Sidebar */
-  --sidebar-bg: 2 6 23;               /* #020617 */
-  --sidebar-bg-hover: 30 41 59;       /* #1E293B */
-  --sidebar-bg-active: transparent;
-  --sidebar-text: 148 163 184;        /* #94A3B8 */
-  --sidebar-text-hover: 241 245 249;  /* #F1F5F9 */
-  --sidebar-text-active: 239 68 68;   /* #EF4444 */
-  --sidebar-border: 51 65 85;         /* #334155 */
-  --sidebar-accent: 239 68 68;        /* #EF4444 */
+  --sidebar-bg: 18 18 18;             /* #121212 */
+  --sidebar-bg-hover: 36 36 36;
+  --sidebar-bg-active: 36 36 36;
+  --sidebar-text: 163 163 163;
+  --sidebar-text-hover: 245 245 244;
+  --sidebar-text-active: 245 245 244;
+  --sidebar-border: 48 48 48;
+  --sidebar-accent: 239 68 68;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
 
   /* KPI Color Identity */
-  --kpi-productivity: 239 68 68;        /* #EF4444 */
-  --kpi-productivity-soft: 127 29 29;   /* #7F1D1D */
-  --kpi-productivity-text: 239 68 68;   /* #EF4444 */
+  --kpi-productivity: 239 68 68;
+  --kpi-productivity-soft: 69 26 26;
+  --kpi-productivity-text: 248 113 113;
 
-  --kpi-productivity-avg: 239 68 68;        /* #EF4444 */
-  --kpi-productivity-avg-soft: 127 29 29; /* #7F1D1D */
-  --kpi-productivity-avg-text: 239 68 68; /* #EF4444 */
+  --kpi-productivity-avg: 239 68 68;
+  --kpi-productivity-avg-soft: 69 26 26;
+  --kpi-productivity-avg-text: 248 113 113;
 
-  --kpi-csat: 251 191 36;               /* #FBBF24 */
-  --kpi-csat-soft: 120 53 15;           /* #78350F */
-  --kpi-csat-text: 251 191 36;          /* #FBBF24 */
-  
-  --kpi-qa: 251 191 36;                 /* #FBBF24 */
-  --kpi-qa-soft: 120 53 15;             /* #78350F */
-  --kpi-qa-text: 251 191 36;            /* #FBBF24 */
+  --kpi-csat: 251 191 36;
+  --kpi-csat-soft: 66 40 10;
+  --kpi-csat-text: 252 211 77;
 
-  --kpi-sla: 34 197 94;                 /* #22C55E */
-  --kpi-sla-soft: 20 83 45;             /* #14532D */
-  --kpi-sla-text: 34 197 94;            /* #22C55E */
+  --kpi-qa: 251 191 36;
+  --kpi-qa-soft: 66 40 10;
+  --kpi-qa-text: 252 211 77;
 
-  --kpi-whu: 34 197 94;                 /* #22C55E */
-  --kpi-whu-soft: 20 83 45;             /* #14532D */
-  --kpi-whu-text: 34 197 94;            /* #22C55E */
+  --kpi-sla: 34 197 94;
+  --kpi-sla-soft: 20 53 34;
+  --kpi-sla-text: 74 222 128;
 
-  --kpi-neutral: 96 165 250;            /* #60A5FA */
-  --kpi-neutral-soft: 30 58 138;        /* #1E3A8A */
-  --kpi-neutral-text: 96 165 250;       /* #60A5FA */
-  --chart-primary: 239 68 68;           /* Red in Dark Mode */
+  --kpi-whu: 34 197 94;
+  --kpi-whu-soft: 20 53 34;
+  --kpi-whu-text: 74 222 128;
+
+  --kpi-neutral: 163 163 163;
+  --kpi-neutral-soft: 38 38 38;
+  --kpi-neutral-text: 212 212 212;
+  --chart-primary: 163 163 163;
 }
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  
+  --font-sans: "Geist Sans", "Geist", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
   --color-background: rgb(var(--background));
   --color-surface: rgb(var(--surface));
   --color-surface-muted: rgb(var(--surface-muted));
   --color-card: rgb(var(--card));
   --color-border: rgb(var(--border));
   --color-border-strong: rgb(var(--border-strong));
-  
+
   --color-text-primary: rgb(var(--text-primary));
   --color-text-secondary: rgb(var(--text-secondary));
   --color-text-muted: rgb(var(--text-muted));
   --color-text-disabled: rgb(var(--text-disabled));
-  
+
   --color-primary: rgb(var(--primary));
   --color-primary-hover: rgb(var(--primary-hover));
   --color-primary-soft: rgb(var(--primary-soft));
   --color-primary-soft-hover: rgb(var(--primary-soft-hover));
   --color-primary-text: rgb(var(--primary-text));
-  
+
   --color-success: rgb(var(--success));
   --color-success-soft: rgb(var(--success-soft));
   --color-success-text: rgb(var(--success-text));
@@ -179,7 +200,7 @@
   --color-warning: rgb(var(--warning));
   --color-warning-soft: rgb(var(--warning-soft));
   --color-warning-text: rgb(var(--warning-text));
-  
+
   --color-sidebar-bg: rgb(var(--sidebar-bg));
   --color-sidebar-bg-hover: rgb(var(--sidebar-bg-hover));
   --color-sidebar-bg-active: rgb(var(--sidebar-bg-active));
@@ -220,6 +241,14 @@
   --color-chart-primary: rgb(var(--chart-primary));
 }
 
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -229,4 +258,3 @@
     scrollbar-width: none; /* Firefox */
   }
 }
-
