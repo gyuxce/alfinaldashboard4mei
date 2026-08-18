@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, getCurrentSheetMonthKey, getPreviousSheetMonthKey, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
+import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
 
 function formatLocalDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -356,12 +356,8 @@ export const useStore = create<AppState>((set, get) => ({
         scheduleData: countDataRows(sheetDataToParseResult(currentMonthData.schedule).data),
         qaData: countDataRows(sheetDataToParseResult(currentMonthData.qa).data),
       };
-      const historyMonthKeys = [selectedMonth];
-      let historyCursor = getPreviousSheetMonthKey(selectedMonth);
-      while (historyCursor) {
-        historyMonthKeys.unshift(historyCursor);
-        historyCursor = getPreviousSheetMonthKey(historyCursor);
-      }
+      // Cap history: selected month + 3 prior (MoM×3 / Incentive). Avoid unbounded RAM growth.
+      const historyMonthKeys = getSheetMonthHistoryKeys(selectedMonth);
 
       const historicalSheets = await Promise.all(
         historyMonthKeys.map(monthKey =>

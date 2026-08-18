@@ -972,7 +972,7 @@ export const FileCenter = () => {
                 <h3 className="text-sm font-bold text-text-primary">Monthly Sheet Setup</h3>
                 <p className="text-xs text-text-muted mt-1">
                   {activeMonth.suffix
-                    ? 'Buat tab berikut sebelum sync bulan baru. Sync juga memuat bulan sebelumnya untuk MoM.'
+                    ? 'Buat tab berikut sebelum sync bulan baru. Sync memuat bulan aktif + 3 bulan sebelumnya (cukup untuk Bandingkan MoM & Insentif).'
                     : 'Mei 2026 masih memakai nama tab dari env Vercel, jadi tidak perlu rename tab.'}
                 </p>
               </div>

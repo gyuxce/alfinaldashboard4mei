@@ -201,6 +201,25 @@ export function getPreviousSheetMonthKey(monthKey: string): string | null {
   return `${MONTHS[monthIndex - 1].code}_${year}`;
 }
 
+/**
+ * Sheet months to keep in RAM for sync: selected month + N prior months.
+ * N=3 covers Bandingkan MoM (3 previous periods) and Incentive (previous calendar month).
+ */
+export const SHEETS_HISTORY_LOOKBACK_MONTHS = 3;
+
+export function getSheetMonthHistoryKeys(
+  monthKey: string,
+  lookback: number = SHEETS_HISTORY_LOOKBACK_MONTHS,
+): string[] {
+  const keys = [monthKey];
+  let cursor = getPreviousSheetMonthKey(monthKey);
+  while (cursor && keys.length < lookback + 1) {
+    keys.unshift(cursor);
+    cursor = getPreviousSheetMonthKey(cursor);
+  }
+  return keys;
+}
+
 export function getSheetConfigForMonth(monthKey: string): SheetConfig {
   const option = getSheetMonthOption(monthKey);
   if (!option.suffix) return DEFAULT_CONFIG;
