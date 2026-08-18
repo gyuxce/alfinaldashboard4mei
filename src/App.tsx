@@ -433,32 +433,133 @@ export default function App() {
     syncIsStale,
   ]);
 
-  const { rawData, previousRawData, previousRawData2, previousRawData3, tlList: baseTlList } = useMemo(() => {
-    let raw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, agentDictionaryByMonth);
-    
-    let prevRaw: any[] = [];
-    let prevRaw2: any[] = [];
-    let prevRaw3: any[] = [];
-    if (isComparisonEnabled && startDate && endDate) {
-      const getPrevRange = comparisonMode === 'mom' ? getPreviousMonthPeriod : getPreviousPeriod;
-      const prevRange = getPrevRange(startDate, endDate);
-      prevRaw = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange.start, prevRange.end, agentDictionary, agentDictionaryByMonth);
-      
-      const prevRange2 = getPrevRange(prevRange.start, prevRange.end);
-      prevRaw2 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange2.start, prevRange2.end, agentDictionary, agentDictionaryByMonth);
-      
-      const prevRange3 = getPrevRange(prevRange2.start, prevRange2.end);
-      prevRaw3 = processKPIs(productivityData, csatScData, slaData, scheduleData, qaData, prevRange3.start, prevRange3.end, agentDictionary, agentDictionaryByMonth);
-    }
+  const comparisonTabs = activeTab === 'summary'
+    || activeTab === 'productivity'
+    || activeTab === 'csat_official'
+    || activeTab === 'csat';
+  const needsComparisonData = isComparisonEnabled && comparisonTabs;
+
+  // Current period only — independent of Bandingkan so toggle/filter-tab changes
+  // do not redo the heaviest pass unnecessarily.
+  const { rawData, tlList: baseTlList } = useMemo(() => {
+    const raw = processKPIs(
+      productivityData,
+      csatScData,
+      slaData,
+      scheduleData,
+      qaData,
+      startDate,
+      endDate,
+      agentDictionary,
+      agentDictionaryByMonth,
+    );
 
     const tls = new Set<string>();
     raw.forEach(a => {
       if (a.teamLeader && a.teamLeader.trim() !== '') tls.add(a.teamLeader.trim());
     });
-    const tlsArr = Array.from(tls).sort((a,b) => a.localeCompare(b));
-    
-    return { rawData: raw, previousRawData: prevRaw, previousRawData2: prevRaw2, previousRawData3: prevRaw3, tlList: tlsArr };
-  }, [productivityData, csatScData, slaData, scheduleData, qaData, startDate, endDate, agentDictionary, agentDictionaryByMonth, isComparisonEnabled, comparisonMode]);
+
+    return {
+      rawData: raw,
+      tlList: Array.from(tls).sort((a, b) => a.localeCompare(b)),
+    };
+  }, [
+    productivityData,
+    csatScData,
+    slaData,
+    scheduleData,
+    qaData,
+    startDate,
+    endDate,
+    agentDictionary,
+    agentDictionaryByMonth,
+  ]);
+
+  const comparisonRanges = useMemo(() => {
+    if (!needsComparisonData || !startDate || !endDate) {
+      return { prev1: null, prev2: null, prev3: null } as const;
+    }
+    const getPrevRange = comparisonMode === 'mom' ? getPreviousMonthPeriod : getPreviousPeriod;
+    const prev1 = getPrevRange(startDate, endDate);
+    const prev2 = getPrevRange(prev1.start, prev1.end);
+    const prev3 = getPrevRange(prev2.start, prev2.end);
+    return { prev1, prev2, prev3 } as const;
+  }, [needsComparisonData, comparisonMode, startDate, endDate]);
+
+  const previousRawData = useMemo(() => {
+    if (!comparisonRanges.prev1) return [] as ReturnType<typeof processKPIs>;
+    const range = comparisonRanges.prev1;
+    return processKPIs(
+      productivityData,
+      csatScData,
+      slaData,
+      scheduleData,
+      qaData,
+      range.start,
+      range.end,
+      agentDictionary,
+      agentDictionaryByMonth,
+    );
+  }, [
+    comparisonRanges.prev1,
+    productivityData,
+    csatScData,
+    slaData,
+    scheduleData,
+    qaData,
+    agentDictionary,
+    agentDictionaryByMonth,
+  ]);
+
+  const previousRawData2 = useMemo(() => {
+    if (!comparisonRanges.prev2) return [] as ReturnType<typeof processKPIs>;
+    const range = comparisonRanges.prev2;
+    return processKPIs(
+      productivityData,
+      csatScData,
+      slaData,
+      scheduleData,
+      qaData,
+      range.start,
+      range.end,
+      agentDictionary,
+      agentDictionaryByMonth,
+    );
+  }, [
+    comparisonRanges.prev2,
+    productivityData,
+    csatScData,
+    slaData,
+    scheduleData,
+    qaData,
+    agentDictionary,
+    agentDictionaryByMonth,
+  ]);
+
+  const previousRawData3 = useMemo(() => {
+    if (!comparisonRanges.prev3) return [] as ReturnType<typeof processKPIs>;
+    const range = comparisonRanges.prev3;
+    return processKPIs(
+      productivityData,
+      csatScData,
+      slaData,
+      scheduleData,
+      qaData,
+      range.start,
+      range.end,
+      agentDictionary,
+      agentDictionaryByMonth,
+    );
+  }, [
+    comparisonRanges.prev3,
+    productivityData,
+    csatScData,
+    slaData,
+    scheduleData,
+    qaData,
+    agentDictionary,
+    agentDictionaryByMonth,
+  ]);
 
   const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, tlList, agentList } = useMemo(() => {
     let data = rawData;
