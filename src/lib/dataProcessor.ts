@@ -305,9 +305,12 @@ export const getOfficialCsatAggregate = (data: AgentKPI[]) => {
 // Helpers
 export function getPreviousPeriod(startDate: string, endDate: string) {
   if (!startDate || !endDate) return { start: '', end: '' };
-  
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const toLocalDate = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+  const start = toLocalDate(startDate);
+  const end = toLocalDate(endDate);
   
   // Calculate duration in days
   const diffTime = Math.abs(end.getTime() - start.getTime());
@@ -320,8 +323,8 @@ export function getPreviousPeriod(startDate: string, endDate: string) {
   prevStart.setDate(prevStart.getDate() - diffDays + 1);
   
   return {
-    start: prevStart.toISOString().split('T')[0],
-    end: prevEnd.toISOString().split('T')[0]
+    start: toIsoDate(prevStart),
+    end: toIsoDate(prevEnd)
   };
 }
 
@@ -552,7 +555,8 @@ export const processKPIs = (
 
   const isWithin = (dStr: string | null) => {
     if (!startDate && !endDate) return true;
-    if (!dStr) return true; // If no date found in row, include by default? Or exclude it. Let's include if we can't parse to not lose empty dates.
+    // Never let a malformed date silently pollute every selected period.
+    if (!dStr) return false;
     if (startDate && dStr < startDate) return false;
     if (endDate && dStr > endDate) return false;
     return true;
@@ -561,9 +565,9 @@ export const processKPIs = (
   const subtractOneDay = (dStr: string) => {
     const parts = dStr.split("-").map((p) => parseInt(p, 10));
     if (parts.length !== 3 || parts.some((n) => isNaN(n))) return dStr;
-    const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
-    d.setUTCDate(d.getUTCDate() - 1);
-    return d.toISOString().split("T")[0];
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setDate(d.getDate() - 1);
+    return toIsoDate(d);
   };
 
   // Keep schedule lookup available even when the previous calendar day is
@@ -840,6 +844,7 @@ export const processKPIs = (
   // 1. Productivity, CSAT Asli, WHU
   let totalProdCsatAsliSum: Record<string, { sum: number; count: number }> = {};
   let totalWhuSum: Record<string, { sum: number; count: number }> = {};
+  const seenProductivityEntries = new Set<string>();
 
   let whuActualIdx = -1;
   if (prodData.length > 0) {
@@ -906,6 +911,22 @@ export const processKPIs = (
       const fVal = parseFloat(String(row[5] || "").replace(",", ".")) || 0;
       const gVal = parseFloat(String(row[6] || "").replace(",", ".")) || 0;
       const hVal = parseFloat(String(row[7] || "").replace(",", ".")) || 0;
+      // Consecutive monthly exports commonly overlap at period boundaries.
+      // Ignore exact repeated source facts before they reach any aggregate.
+      const sourceKey = [
+        agentId,
+        normDate,
+        prodBase,
+        csatAsliStr,
+        whuStr,
+        dVal,
+        eVal,
+        fVal,
+        gVal,
+        hVal,
+      ].join("|");
+      if (seenProductivityEntries.has(sourceKey)) continue;
+      seenProductivityEntries.add(sourceKey);
       const totalRes = dVal + eVal + fVal + gVal + hVal;
 
       agent.csatRespondents += totalRes;
@@ -994,6 +1015,10 @@ export const processKPIs = (
   // 2. CSAT SC
   if (csatData.length > 1) {
     const headerRow = csatData[0] || [];
+    const timestampIdx = headerRow.findIndex((h: unknown) => {
+      const header = String(h || '').trim().toLowerCase();
+      return header.includes('timestamp') || header.includes('close time') || header.includes('waktu close');
+    });
     const rcaAgentIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca agent area');
     const rcaCustomerIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca customer area');
     const rcaAkulakuIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca akulaku process');
@@ -1013,7 +1038,8 @@ export const processKPIs = (
       const agentId = String(row[idIdx]).trim();
       const dateStr = idIdx > 0 ? String(row[0] || "") : "";
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
-      const timestampStr = String(row[22] || "").trim();
+      // Prefer schema header; retain legacy W-column fallback for old exports.
+      const timestampStr = String(row[timestampIdx >= 0 ? timestampIdx : 22] || "").trim();
       const hour = extractTimestampHour(timestampStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
       if (dateStr && normDate && !isWithin(normDate)) continue;

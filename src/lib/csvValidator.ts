@@ -1,3 +1,5 @@
+import { resolveCsidColumns } from './csid';
+
 export type ValidationSeverity = 'ok' | 'warning' | 'error';
 
 export interface ValidationResult {
@@ -73,10 +75,13 @@ export function validateCsidFile(parsedData: any[][]): ValidationResult {
   if (base && base.errorType !== 'FEW_ROWS') return base;
 
   const headers = extractHeaders(parsedData);
-  const hasId = hasAnyHeader(headers, ['CS ID', 'csid', 'id', 'cs_id']);
-  const hasName = hasAnyHeader(headers, ['Agent Name', 'name', 'Nama']);
-  const hasBpo = hasAnyHeader(headers, ['BPO', 'company', 'Perusahaan']);
-  const hasTl = hasAnyHeader(headers, ['Team Leader', 'TL', 'leader']);
+  // Parser and validator intentionally share aliases so a file cannot be
+  // shown as valid while its CSID columns are read from different positions.
+  const columns = resolveCsidColumns(headers);
+  const hasId = columns.id >= 0;
+  const hasName = columns.name >= 0;
+  const hasBpo = columns.bpo >= 0;
+  const hasTl = columns.teamLeader >= 0;
 
   if (!hasId || !hasName || !hasBpo || !hasTl) {
     let missing = [];

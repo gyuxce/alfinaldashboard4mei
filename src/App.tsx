@@ -539,7 +539,7 @@ export default function App() {
             agentDictionary,
             agentDictionaryByMonth,
           ),
-          getAgentDictionaryForPeriod(startDate, agentDictionary, agentDictionaryByMonth),
+          getAgentDictionaryForPeriod(simulationRange.start, agentDictionary, agentDictionaryByMonth),
         )
       : [];
     const filterOptionData = activeTab === 'incentive' ? simulationData : data;
@@ -689,10 +689,10 @@ export default function App() {
       const d = new Date();
       const day = d.getDay() || 7;
       d.setDate(d.getDate() - day + 1);
-      const t1 = d.toISOString().split('T')[0];
+      const t1 = formatLocalDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
       const end = new Date(d);
       end.setDate(end.getDate() + 6);
-      setDateRange(t1, end.toISOString().split('T')[0]);
+      setDateRange(t1, formatLocalDate(end.getFullYear(), end.getMonth() + 1, end.getDate()));
       return;
     }
     if (startDate) {
@@ -702,17 +702,17 @@ export default function App() {
       s.setDate(s.getDate() + offset);
       e.setDate(e.getDate() + offset);
       setDateRange(
-        s.toISOString().split('T')[0], 
-        e.toISOString().split('T')[0]
+        formatLocalDate(s.getFullYear(), s.getMonth() + 1, s.getDate()),
+        formatLocalDate(e.getFullYear(), e.getMonth() + 1, e.getDate()),
       );
     } else {
       const now = new Date();
       const day = now.getDay() || 7;
       now.setDate(now.getDate() - day + 1);
-      const t1 = now.toISOString().split('T')[0];
+      const t1 = formatLocalDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
       const end = new Date(now);
       end.setDate(end.getDate() + 6);
-      setDateRange(t1, end.toISOString().split('T')[0]);
+      setDateRange(t1, formatLocalDate(end.getFullYear(), end.getMonth() + 1, end.getDate()));
     }
   };
 

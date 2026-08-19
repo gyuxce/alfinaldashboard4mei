@@ -79,6 +79,9 @@ export function useProcessedKpis(args: Args): {
 
     const gen = ++genRef.current;
     let cancelled = false;
+    // Do not render a prior period/filter's KPI while this generation runs.
+    // App can show its existing loading panel instead of stale totals.
+    setBundle(EMPTY_BUNDLE);
     setIsProcessing(true);
 
     const run = async () => {

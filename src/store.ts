@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
 import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
+import { buildAgentDictionary } from './lib/csid';
 
 function formatLocalDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -148,41 +149,7 @@ export const useStore = create<AppState>((set, get) => ({
     // Process CSID Dictionary if csidData is uploaded
     let dictUpdates = {};
     if (key === 'csidFile') {
-      const dict: Record<string, {name: string; bpo: string; teamLeader: string}> = {};
-      let idIdx = 0, nameIdx = 1, bpoIdx = 2, tlIdx = -1;
-
-      if (data.length > 0) {
-        const header = data[0].map((h: any) => String(h || '').toLowerCase().trim());
-        const iCSID = header.findIndex((h: string) => h === 'cs id' || h === 'csid');
-        const iName = header.findIndex((h: string) => h === 'agent name' || h === 'name');
-        const iBpo = header.findIndex((h: string) => h === 'bpo');
-        const iTL = header.findIndex((h: string) => h === 'team leader' || h === 'tl' || h === 'leader' || h === 'supervisor');
-        
-        if (iCSID >= 0) idIdx = iCSID;
-        if (iName >= 0) nameIdx = iName;
-        if (iBpo >= 0) bpoIdx = iBpo;
-        if (iTL >= 0) tlIdx = iTL;
-        else if (header.length > 3 && (header[3] === '' || !header[3])) tlIdx = 3;
-      }
-
-      data.forEach(row => {
-        if (row && row.length > Math.max(idIdx, 0)) {
-          const id = String(row[idIdx] || '').trim();
-          const name = String(row[nameIdx] || '').trim();
-          const bpo = String(row[bpoIdx] || '').trim();
-          const teamLeader = tlIdx >= 0 ? String(row[tlIdx] || '').trim() : '';
-
-          if (id && id.toLowerCase() !== 'cs id' && id !== 'undefined' && id.startsWith('3-1-')) {
-            if (!dict[id]) {
-              dict[id] = { name, bpo, teamLeader };
-            } else {
-              if (name) dict[id].name = name;
-              if (bpo) dict[id].bpo = bpo;
-              if (teamLeader) dict[id].teamLeader = teamLeader;
-            }
-          }
-        }
-      });
+      const dict = buildAgentDictionary(data);
       dictUpdates = { agentDictionary: dict, agentDictionaryByMonth: { legacy: dict } };
     }
 
@@ -293,42 +260,8 @@ export const useStore = create<AppState>((set, get) => ({
 
       // Re-build dictionary if csidData is present
       if (fileData.csidData) {
-        const dict: Record<string, {name: string; bpo: string; teamLeader: string}> = {};
         const data = fileData.csidData as any[][];
-        let idIdx = 0, nameIdx = 1, bpoIdx = 2, tlIdx = -1;
-
-        if (data.length > 0) {
-          const header = data[0].map((h: any) => String(h || '').toLowerCase().trim());
-          const iCSID = header.findIndex((h: string) => h === 'cs id' || h === 'csid');
-          const iName = header.findIndex((h: string) => h === 'agent name' || h === 'name');
-          const iBpo = header.findIndex((h: string) => h === 'bpo');
-          const iTL = header.findIndex((h: string) => h === 'team leader' || h === 'tl' || h === 'leader' || h === 'supervisor');
-          
-          if (iCSID >= 0) idIdx = iCSID;
-          if (iName >= 0) nameIdx = iName;
-          if (iBpo >= 0) bpoIdx = iBpo;
-          if (iTL >= 0) tlIdx = iTL;
-          else if (header.length > 3 && (header[3] === '' || !header[3])) tlIdx = 3;
-        }
-
-        data.forEach(row => {
-          if (row && row.length > Math.max(idIdx, 0)) {
-            const id = String(row[idIdx] || '').trim();
-            const name = String(row[nameIdx] || '').trim();
-            const bpo = String(row[bpoIdx] || '').trim();
-            const teamLeader = tlIdx >= 0 ? String(row[tlIdx] || '').trim() : '';
-
-            if (id && id.toLowerCase() !== 'cs id' && id !== 'undefined' && id.startsWith('3-1-')) {
-              if (!dict[id]) {
-                dict[id] = { name, bpo, teamLeader };
-              } else {
-                if (name) dict[id].name = name;
-                if (bpo) dict[id].bpo = bpo;
-                if (teamLeader) dict[id].teamLeader = teamLeader;
-              }
-            }
-          }
-        });
+        const dict = buildAgentDictionary(data);
         fileData.agentDictionary = dict;
         fileData.agentDictionaryByMonth = { legacy: dict };
       }
@@ -443,49 +376,9 @@ export const useStore = create<AppState>((set, get) => ({
       const csvSchedule = sheetDataToParseResult(allData.schedule);
       const csvQa = sheetDataToParseResult(allData.qa);
 
-      // Function to process dictionary inline to avoid duplicating logic from setFile
-      const buildDict = (data: any[][]) => {
-        const dict: Record<string, {name: string; bpo: string; teamLeader: string}> = {};
-        let idIdx = 0, nameIdx = 1, bpoIdx = 2, tlIdx = -1;
-
-        if (data.length > 0) {
-          const header = data[0].map((h: any) => String(h || '').toLowerCase().trim());
-          const iCSID = header.findIndex((h: string) => h === 'cs id' || h === 'csid');
-          const iName = header.findIndex((h: string) => h === 'agent name' || h === 'name');
-          const iBpo = header.findIndex((h: string) => h === 'bpo');
-          const iTL = header.findIndex((h: string) => h === 'team leader' || h === 'tl' || h === 'leader' || h === 'supervisor');
-          
-          if (iCSID >= 0) idIdx = iCSID;
-          if (iName >= 0) nameIdx = iName;
-          if (iBpo >= 0) bpoIdx = iBpo;
-          if (iTL >= 0) tlIdx = iTL;
-          else if (header.length > 3 && (header[3] === '' || !header[3])) tlIdx = 3;
-        }
-
-        data.forEach(row => {
-          if (row && row.length > Math.max(idIdx, 0)) {
-            const id = String(row[idIdx] || '').trim();
-            const name = String(row[nameIdx] || '').trim();
-            const bpo = String(row[bpoIdx] || '').trim();
-            const teamLeader = tlIdx >= 0 ? String(row[tlIdx] || '').trim() : '';
-
-            if (id && id.toLowerCase() !== 'cs id' && id !== 'undefined' && id.startsWith('3-1-')) {
-              if (!dict[id]) {
-                dict[id] = { name, bpo, teamLeader };
-              } else {
-                if (name) dict[id].name = name;
-                if (bpo) dict[id].bpo = bpo;
-                if (teamLeader) dict[id].teamLeader = teamLeader;
-              }
-            }
-          }
-        });
-        return dict;
-      };
-
-      const newAgentDict = buildDict(csvCsid.data);
+      const newAgentDict = buildAgentDictionary(csvCsid.data);
       const agentDictionaryByMonth = historyMonthKeys.reduce((result, monthKey, index) => {
-        result[monthKey] = buildDict(
+        result[monthKey] = buildAgentDictionary(
           sheetDataToParseResult(historicalSheets[index].csid).data,
         );
         return result;

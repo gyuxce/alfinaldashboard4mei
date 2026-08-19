@@ -289,7 +289,17 @@ export async function fetchAllSheets(
 function mergeSheetData(previous: SheetData, current: SheetData): SheetData {
   if (!previous.length) return current;
   if (!current.length) return previous;
-  return [...previous, ...current.slice(1)];
+
+  // History tabs can overlap at month boundaries. Preserve legitimate rows
+  // while removing only exact duplicate records, including sparse cells.
+  const seenRows = new Set<string>();
+  const body = [...previous.slice(1), ...current.slice(1)].filter((row) => {
+    const key = row.map((cell) => String(cell ?? '')).join('\u001F');
+    if (seenRows.has(key)) return false;
+    seenRows.add(key);
+    return true;
+  });
+  return [previous[0], ...body];
 }
 
 function mergeScheduleSheetData(previous: SheetData, current: SheetData): SheetData {
@@ -378,11 +388,12 @@ export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsDa
 export function sheetDataToCsv(data: SheetData): string {
   return data
     .map(row => row.map(cell => {
+      const value = String(cell ?? '');
       // Quote cells yang mengandung koma atau newline
-      if (cell.includes(',') || cell.includes('\n') || cell.includes('"')) {
-        return `"${cell.replace(/"/g, '""')}"`;
+      if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+        return `"${value.replace(/"/g, '""')}"`;
       }
-      return cell;
+      return value;
     }).join(','))
     .join('\n');
 }
