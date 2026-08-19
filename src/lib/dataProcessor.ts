@@ -1244,6 +1244,19 @@ export const processKPIs = (
 
   if (slaData.length > 1) {
     const seenSlaEntries = new Set<string>();
+    const findSlaHeader = (terms: string[]) => {
+      for (const header of slaData.slice(0, 2)) {
+        const index = header.findIndex((cell) => {
+          const value = String(cell || '').trim().toLowerCase();
+          return terms.some((term) => value.includes(term));
+        });
+        if (index >= 0) return index;
+      }
+      return -1;
+    };
+    const sla1HeaderIdx = findSlaHeader(['sla 1m', 'sla1m', 'sla 1 min']);
+    const sla3HeaderIdx = findSlaHeader(['sla 3m', 'sla3m', 'sla 3 min']);
+    const slaDateHeaderIdx = findSlaHeader(['date', 'tanggal', 'time', 'waktu']);
 
     for (let i = 1; i < slaData.length; i++) {
       const row = slaData[i];
@@ -1257,7 +1270,7 @@ export const processKPIs = (
       if (idIdx === -1) continue;
 
       const agentId = String(row[idIdx]).trim();
-      const dateStr = idIdx > 0 ? String(row[0] || "") : "";
+      const dateStr = String(row[slaDateHeaderIdx >= 0 ? slaDateHeaderIdx : (idIdx > 0 ? 0 : -1)] || "");
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
       const hour = extractTimestampHour(dateStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
@@ -1279,14 +1292,16 @@ export const processKPIs = (
         return isNaN(n) ? null : n * 100;
       };
 
-      const sla1 = parseSla(String(row[idIdx + 11] || ""));
-      const sla3 = parseSla(String(row[idIdx + 13] || ""));
+      const sla1ValueIdx = sla1HeaderIdx >= 0 ? sla1HeaderIdx : idIdx + 11;
+      const sla3ValueIdx = sla3HeaderIdx >= 0 ? sla3HeaderIdx : idIdx + 13;
+      const sla1 = parseSla(String(row[sla1ValueIdx] || ""));
+      const sla3 = parseSla(String(row[sla3ValueIdx] || ""));
 
       const slaEntryKey = [
         agentId,
         normDate || dateStr.trim(),
-        String(row[idIdx + 11] || "").trim(),
-        String(row[idIdx + 13] || "").trim(),
+        String(row[sla1ValueIdx] || "").trim(),
+        String(row[sla3ValueIdx] || "").trim(),
       ].join("|").toLowerCase();
 
       if (seenSlaEntries.has(slaEntryKey)) continue;

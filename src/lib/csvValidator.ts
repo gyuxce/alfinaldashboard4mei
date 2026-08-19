@@ -338,6 +338,21 @@ export function validateQaFile(parsedData: any[][]): ValidationResult {
       severity: 'warning'
     };
   }
+
+  // The current QA processor reads up to AG (index 32). Accepting a narrower
+  // export would otherwise silently turn category/remarks/CRM fields empty.
+  const maxColumns = parsedData.reduce(
+    (max, row) => Math.max(max, Array.isArray(row) ? row.length : 0),
+    0,
+  );
+  if (maxColumns < 33) {
+    return {
+      isValid: false,
+      errorType: 'SCHEMA_TOO_NARROW',
+      message: `Struktur QA kurang kolom (Punya: ${maxColumns}, butuh minimal 33 sampai kolom AG).`,
+      severity: 'warning',
+    };
+  }
   
   const rows = countDataRows(parsedData);
   if (rows < 5) {
