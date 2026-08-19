@@ -517,7 +517,6 @@ export default function App() {
     previousRawData,
     previousRawData2,
     previousRawData3,
-    baseTlList,
   } = kpiRawBundle;
 
   const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, tlList, agentList } = useMemo(() => {
@@ -559,8 +558,17 @@ export default function App() {
     const filteredPrevData3 = applyFilters(prevData3);
     const filteredIncentiveData = applyFilters(simulationData);
 
+    // Cascading scope options: TL must belong to selected BPO (including
+    // the separate TCID / TCID × TIN rosters), then agent must belong to
+    // the selected BPO + TL pair.
+    const bpoScopedData = filterOptionData.filter(a => matchesAgentScope(a, {
+      bpo: selectedBpo,
+      teamLeader: 'All TL',
+      agent: 'All Agents',
+    }));
+
     const agents = new Set<string>();
-    filterOptionData
+    bpoScopedData
       .filter(a => matchesAgentScope(a, {
         bpo: selectedBpo,
         teamLeader: selectedTL,
@@ -572,7 +580,7 @@ export default function App() {
     });
 
     const optionTls = new Set<string>();
-    filterOptionData.forEach(a => {
+    bpoScopedData.forEach(a => {
       if (a.teamLeader && a.teamLeader.trim() !== '') optionTls.add(a.teamLeader.trim());
     });
 
@@ -583,16 +591,13 @@ export default function App() {
       previousKpiData3: filteredPrevData3,
       incentiveKpiData: filteredIncentiveData,
       incentivePeriod: simulationRange,
-      tlList: activeTab === 'incentive'
-        ? Array.from(optionTls).sort((a, b) => a.localeCompare(b))
-        : baseTlList,
+      tlList: Array.from(optionTls).sort((a, b) => a.localeCompare(b)),
       agentList: Array.from(agents).sort((a,b) => a.localeCompare(b)) 
     };
   }, [
     activeTab,
     agentDictionary,
     agentDictionaryByMonth,
-    baseTlList,
     csatScData,
     endDate,
     previousRawData,
@@ -608,6 +613,37 @@ export default function App() {
     slaData,
     startDate,
   ]);
+
+  // Keep persisted/stale scope choices from mixing different BPO rosters.
+  useEffect(() => {
+    if (
+      selectedTL !== 'All TL'
+      && selectedTL !== 'All Team Leaders'
+      && !tlList.includes(selectedTL)
+    ) {
+      setSelectedTL('All TL');
+    }
+  }, [selectedTL, setSelectedTL, tlList]);
+
+  useEffect(() => {
+    if (
+      selectedGlobalAgent !== 'All Agents'
+      && !agentList.includes(selectedGlobalAgent)
+    ) {
+      setSelectedGlobalAgent('All Agents');
+    }
+  }, [agentList, selectedGlobalAgent, setSelectedGlobalAgent]);
+
+  const handleBpoChange = (bpo: string) => {
+    setSelectedBpo(bpo);
+    setSelectedTL('All TL');
+    setSelectedGlobalAgent('All Agents');
+  };
+
+  const handleTeamLeaderChange = (teamLeader: string) => {
+    setSelectedTL(teamLeader);
+    setSelectedGlobalAgent('All Agents');
+  };
 
   const showBootLoading =
     isHydrating
@@ -865,7 +901,7 @@ export default function App() {
                   <SearchableSelect 
                     options={['TIN', 'TCID', 'TCID x TIN']}
                     value={selectedBpo}
-                    onChange={setSelectedBpo}
+                    onChange={handleBpoChange}
                     allOptionLabel="All BPO"
                     placeholder="Cari BPO..."
                   />
@@ -874,7 +910,7 @@ export default function App() {
                   <SearchableSelect 
                     options={tlList}
                     value={selectedTL}
-                    onChange={setSelectedTL}
+                    onChange={handleTeamLeaderChange}
                     allOptionLabel="All TL"
                     placeholder="Cari TL..."
                   />

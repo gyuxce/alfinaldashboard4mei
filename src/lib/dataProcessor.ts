@@ -158,6 +158,21 @@ const PERIOD_MONTH_CODES = [
 const normalizeScopeValue = (value: unknown) =>
   String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
 
+/**
+ * Keep standalone BPOs distinct from the shared TCID × TIN roster.
+ * Source sheets use a few separators (`x`, `×`, `&`, `/`), so normalize
+ * them into one canonical combined value before strict scope comparison.
+ */
+const normalizeBpoScope = (value: unknown) => {
+  const normalized = normalizeScopeValue(value)
+    .replace(/[×&/+]/g, " X ")
+    .replace(/\s*X\s*/g, " X ")
+    .trim();
+  const tokens = new Set(normalized.split(" ").filter(Boolean));
+  if (tokens.has("TCID") && tokens.has("TIN")) return "TCID X TIN";
+  return normalized;
+};
+
 const matchesScopePersonName = (left: unknown, right: unknown) => {
   const leftValue = normalizeScopeValue(left);
   const rightValue = normalizeScopeValue(right);
@@ -179,12 +194,12 @@ export const matchesAgentScope = (
   agent: Pick<AgentKPI, "bpo" | "teamLeader" | "name" | "csId">,
   filters: AgentScopeFilters,
 ) => {
-  const selectedBpo = normalizeScopeValue(filters.bpo);
+  const selectedBpo = normalizeBpoScope(filters.bpo);
   const selectedTeamLeader = normalizeScopeValue(filters.teamLeader);
   const selectedAgent = normalizeScopeValue(filters.agent);
 
   const bpoMatches = isAllScopeValue(filters.bpo, ["ALL BPO"])
-    || normalizeScopeValue(agent.bpo) === selectedBpo;
+    || normalizeBpoScope(agent.bpo) === selectedBpo;
   const teamLeaderMatches = isAllScopeValue(filters.teamLeader, ["ALL TL", "ALL TEAM LEADERS"])
     || matchesScopePersonName(agent.teamLeader, selectedTeamLeader);
   const agentMatches = isAllScopeValue(filters.agent, ["ALL AGENTS"])
