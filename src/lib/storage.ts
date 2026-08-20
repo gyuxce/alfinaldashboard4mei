@@ -2,12 +2,18 @@ import { openDB } from 'idb';
 
 const DB_NAME = 'kpi-dashboard';
 const STORE_NAME = 'csv-data';
+// v2: drop snapshots that collapsed QA tickets to the empty follow-up row.
+const DB_VERSION = 2;
+export const SHEETS_SNAPSHOT_REVISION = 2;
 
 export async function initDB() {
-  return openDB(DB_NAME, 1, {
-    upgrade(db) {
+  return openDB(DB_NAME, DB_VERSION, {
+    upgrade(db, oldVersion, _newVersion, transaction) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
+      }
+      if (oldVersion < 2 && db.objectStoreNames.contains(STORE_NAME)) {
+        transaction.objectStore(STORE_NAME).clear();
       }
     },
   });

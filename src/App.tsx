@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 're
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
+import { SHEETS_SNAPSHOT_REVISION } from './lib/storage';
 import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, getPreviousCalendarMonthRange, normalizeDateStr } from './lib/dataProcessor';
 import { cell, pickColumn, resolveProductivityColumns, resolveRowCsId } from './lib/sheetHeaders';
 
@@ -338,6 +339,7 @@ export default function App() {
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, sheetsSyncProgress, activeMonthRowCounts,
+    sheetsSnapshotRevision,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode,
     pendingTab, clearPendingTab,
   } = useStore(useShallow((s) => ({
@@ -367,6 +369,7 @@ export default function App() {
     sheetsFetchError: s.sheetsFetchError,
     sheetsSyncProgress: s.sheetsSyncProgress,
     activeMonthRowCounts: s.activeMonthRowCounts,
+    sheetsSnapshotRevision: s.sheetsSnapshotRevision,
     isComparisonEnabled: s.isComparisonEnabled,
     setIsComparisonEnabled: s.setIsComparisonEnabled,
     comparisonMode: s.comparisonMode,
@@ -388,11 +391,12 @@ export default function App() {
   useEffect(() => {
     if (!import.meta.env.VITE_SHEETS_API_KEY) return;
     if (isHydrating || isFetchingSheets || hasAutoFetchedSheetsRef.current) return;
-    if (productivityData.length > 0) return;
+    const staleQaSnapshot = sheetsSnapshotRevision !== SHEETS_SNAPSHOT_REVISION;
+    if (productivityData.length > 0 && !staleQaSnapshot) return;
 
     hasAutoFetchedSheetsRef.current = true;
     void fetchFromSheets();
-  }, [fetchFromSheets, isFetchingSheets, isHydrating, productivityData.length]);
+  }, [fetchFromSheets, isFetchingSheets, isHydrating, productivityData.length, sheetsSnapshotRevision]);
 
   const syncStatusText = isFetchingSheets
     ? 'Menyinkronkan data...'

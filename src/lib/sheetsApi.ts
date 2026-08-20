@@ -485,18 +485,10 @@ export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsDa
     csatSc: mergeSheetData(previous.csatSc, current.csatSc, ['ticket id', 'ticket', 'chat id']),
     sla: mergeSheetData(previous.sla, current.sla, ['ticket id', 'ticket']),
     schedule: mergeScheduleSheetData(previous.schedule, current.schedule),
-    qa: mergeSheetData(
-      previous.qa,
-      current.qa,
-      ['ticket id', 'ticketid', 'id ticket'],
-      [
-        ['mistake level', 'defect level', 'severity'],
-        ['crm kode', 'crm code', 'kode crm'],
-        ['nilai pengurang', 'deduction', 'pengurang'],
-        ['detail mistake', 'remarks', 'remark', 'catatan'],
-      ],
-      ['qc score', 'qa score', 'final score', 'nilai qc', 'nilai qa'],
-    ),
+    // QA tickets are several rows (score + extra mistake lines). Ticket-level
+    // collapse kept the empty follow-up row and wiped daily scores for every
+    // agent. Exact-row dedupe is enough for overlapping month tabs.
+    qa: mergeSheetData(previous.qa, current.qa),
   };
 }
 

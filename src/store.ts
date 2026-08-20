@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
+import { saveData, loadData, clearAllData, listKeys, SHEETS_SNAPSHOT_REVISION } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
 import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError, getDateRangeForSheetMonth } from './lib/sheetsApi';
 import { buildAgentDictionary } from './lib/csid';
@@ -43,6 +43,7 @@ export interface AppState {
   lastSyncTime: Date | null;
   selectedSheetMonth: string;
   activeMonthRowCounts: Record<string, number> | null;
+  sheetsSnapshotRevision: number | null;
   
   // Sheet configuration
   sheetsConfig: {
@@ -117,6 +118,7 @@ export const useStore = create<AppState>((set, get) => ({
   lastSyncTime: null,
   selectedSheetMonth: getCurrentSheetMonthKey(),
   activeMonthRowCounts: null,
+  sheetsSnapshotRevision: null,
   sheetsConfig: null,
 
   productivityFile: null,
@@ -226,6 +228,7 @@ export const useStore = create<AppState>((set, get) => ({
       persistedKeys: [],
       lastSyncTime: null,
       dataSource: 'csv',
+      sheetsSnapshotRevision: null,
       isFetchingSheets: false,
       sheetsSyncProgress: null,
       sheetsFetchError: null,
@@ -305,6 +308,9 @@ export const useStore = create<AppState>((set, get) => ({
             if (meta.agentDictionary) fileData.agentDictionary = meta.agentDictionary;
             if (meta.fileNames) {
               fileData.fileNames = { ...(fileData.fileNames || {}), ...meta.fileNames };
+            }
+            if (typeof meta.sheetsSnapshotRevision === 'number') {
+              fileData.sheetsSnapshotRevision = meta.sheetsSnapshotRevision;
             }
           }
         }
@@ -527,6 +533,7 @@ export const useStore = create<AppState>((set, get) => ({
           isFetchingSheets: false,
           sheetsSyncProgress: null,
           dataSource: 'sheets',
+          sheetsSnapshotRevision: SHEETS_SNAPSHOT_REVISION,
           fileNames,
           ...(monthRange ? { startDate: monthRange.start, endDate: monthRange.end } : {}),
         });
@@ -550,6 +557,7 @@ export const useStore = create<AppState>((set, get) => ({
                 agentDictionary,
                 agentDictionaryByMonth,
                 fileNames,
+                sheetsSnapshotRevision: SHEETS_SNAPSHOT_REVISION,
               }),
             ]);
             if (persistGen !== sheetsSyncGeneration) return;
