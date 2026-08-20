@@ -233,7 +233,7 @@ export const applyAgentRoster = (
   agents: AgentKPI[],
   roster?: Record<string, { name: string; bpo: string; teamLeader: string }>,
 ) => agents.map((agent) => {
-  const rosterInfo = roster?.[agent.csId];
+  const rosterInfo = roster?.[agent.csId] || roster?.[String(agent.csId || "").trim()];
   if (!rosterInfo) return agent;
 
   return {

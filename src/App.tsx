@@ -526,6 +526,13 @@ export default function App() {
     let prevData3 = previousRawData3;
 
     const simulationRange = getPreviousCalendarMonthRange(endDate || startDate || '');
+    // KPI angka = bulan sebelumnya (periode selesai). Nama/BPO/TL harus
+    // mengikuti roster CSID bulan filter yang sama dengan menu lain.
+    const currentRoster = getAgentDictionaryForPeriod(
+      startDate || endDate,
+      agentDictionary,
+      agentDictionaryByMonth,
+    );
     const simulationData = activeTab === 'incentive' && simulationRange.start
       ? applyAgentRoster(
           processKPIs(
@@ -539,7 +546,7 @@ export default function App() {
             agentDictionary,
             agentDictionaryByMonth,
           ),
-          getAgentDictionaryForPeriod(simulationRange.start, agentDictionary, agentDictionaryByMonth),
+          currentRoster,
         )
       : [];
     const filterOptionData = activeTab === 'incentive' ? simulationData : data;
