@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI, QAEntry, normalizeDateStr } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, parseDateForSort, indexByDate, groupByDate, getByCalendarDate, getGroupByCalendarDate, formatCalendarHeader } from '../../lib/utils';
+import { formatNum, getKpiColor, groupByDate, uniqueCalendarDates, getGroupByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -75,13 +75,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   }, [data, search, filterTL]);
 
   const uniqueDates = useMemo(() => {
-    const dates = new Set<string>();
-    tableData.forEach((a) => {
-      a.qaHistory?.forEach((h) => {
-        if (h.date) dates.add(h.date);
-      });
-    });
-    return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+    return uniqueCalendarDates(tableData.map((a) => a.qaHistory));
   }, [tableData]);
 
   const defectData = useMemo(() => {
@@ -388,7 +382,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="TL" sortKey="teamLeader" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                   {uniqueDates.map(date => (
                     <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[76px]">
-                      {date}
+                      {formatCalendarHeader(date)}
                     </th>
                   ))}
                   <SortableHeader label="Rata-rata QA" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
@@ -407,7 +401,6 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   if (!agent) return null;
                   const displayName = agent.name || agent.csId;
                   const qaByDate = groupByDate(agent.qaHistory);
-                  const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
 
                   return (
                     <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
@@ -424,36 +417,20 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                       
                       {uniqueDates.map(date => {
-                        const dailyQA = (qaByDate.get(date) && qaByDate.get(date)!.length > 0)
-                          ? qaByDate.get(date)!
-                          : getGroupByCalendarDate(qaByDate, date);
-                        const sched = scheduleByDate.get(date) || getByCalendarDate(scheduleByDate, date);
-                        const status = sched?.status?.toUpperCase() || '';
-                        
-                        const isOff = status === 'OFF' || status === 'C';
-                        const isPullout = status === 'PULLOUT';
-                        const bgClass = isOff ? 'text-text-muted' : '';
-                        
+                        const dailyQA = getGroupByCalendarDate(qaByDate, date);
                         const validQA = dailyQA.filter(h => h.hasScore);
-                        if (dailyQA.length === 0) {
-                          return <td key={date} className={`p-2 text-center text-text-disabled z-10 ${bgClass} min-w-[76px]`}>-</td>;
+                        if (dailyQA.length === 0 || validQA.length === 0) {
+                          return <td key={date} className="p-2 text-center text-text-disabled z-10 min-w-[76px]">-</td>;
                         }
-                        
-                        let displayValue = '-';
-                        let avg = 0;
-                        if (validQA.length > 0) {
-                          const sum = validQA.reduce((acc, curr) => acc + curr.score, 0);
-                          avg = sum / validQA.length;
-                          displayValue = formatNum(avg, 1);
-                        }
-                        
-                        const baseColor = validQA.length > 0 ? getKpiColor(avg, 'qa') : 'text-text-disabled';
-                        const textColor = isPullout ? 'text-text-muted italic' : baseColor;
+
+                        const sum = validQA.reduce((acc, curr) => acc + curr.score, 0);
+                        const avg = sum / validQA.length;
+                        const displayValue = formatNum(avg, 1);
                         return (
-                          <td key={date} className={`p-0 text-center font-semibold z-10 min-w-[76px] ${bgClass}`}>
+                          <td key={date} className="p-0 text-center font-semibold z-10 min-w-[76px]">
                             <button 
                               onClick={() => setSelectedAgent({ agent, date, type: 'defects' })}
-                              className={`w-full h-full p-2 font-bold text-[11px] hover:bg-surface-muted transition-colors flex items-center justify-center gap-1 group/btn relative cursor-pointer ${textColor}`}
+                              className={`w-full h-full p-2 font-bold text-[11px] hover:bg-surface-muted transition-colors flex items-center justify-center gap-1 group/btn relative cursor-pointer ${getKpiColor(avg, 'qa')}`}
                             >
                               {displayValue}
                               <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity absolute right-1" />

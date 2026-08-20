@@ -1349,15 +1349,9 @@ export const processKPIs = (
 
       const dateIdx = pickColumn(qaColumns.date, 13);
       const dateStr = cell(row, dateIdx);
-      let normDate = dateStr ? normalizeDateStr(dateStr) : null;
-      const hour = extractTimestampHour(dateStr);
-      normDate = getShiftAdjustedDate(agentId, normDate, hour);
+      const normDate = dateStr ? normalizeDateStr(dateStr) : null;
       if (dateStr && normDate && !isWithin(normDate)) continue;
-      const targetDateLabel = dateStr
-        ? normDate
-          ? getScheduleDateLabel(agentId, normDate)
-          : dateStr
-        : dateStr;
+      const targetDateLabel = normDate || dateStr;
 
       const agent = getAgent(agentId);
       if (!agent) continue;
