@@ -1,5 +1,5 @@
 import { normalizeDateStr } from './dataProcessor';
-import { cell, findHeaderIncludes } from './sheetHeaders';
+import { cell, findHeader, findHeaderIncludes } from './sheetHeaders';
 
 // Config (dari env variables)
 const API_KEY = import.meta.env.VITE_SHEETS_API_KEY;
@@ -357,9 +357,11 @@ function mergeSheetData(
 
   const header = previous[0] || [];
   const ticketIdx = ticketAliases.length ? findHeaderIncludes(header, ticketAliases) : -1;
+  const csIdIdx = findHeader(header, ['CS ID', 'csid', 'cs_id', 'agent id', 'csid agent']);
+  const dateIdx = findHeaderIncludes(header, ['checking date', 'check date', 'qa date', 'date', 'tanggal']);
 
   // History tabs can overlap at month boundaries. Drop exact duplicate rows,
-  // then keep the latest row when the same ticket/chat appears twice.
+  // then keep the latest row for the same agent + calendar day + ticket.
   const seenRows = new Set<string>();
   const ticketIndex = new Map<string, number>();
   const body: SheetRow[] = [];
@@ -370,11 +372,15 @@ function mergeSheetData(
     seenRows.add(key);
 
     const ticket = ticketIdx >= 0 ? cell(row, ticketIdx).toLowerCase() : '';
-    if (ticket && ticketIndex.has(ticket)) {
-      body[ticketIndex.get(ticket)!] = row;
+    const csId = csIdIdx >= 0 ? cell(row, csIdIdx).toLowerCase() : '';
+    const rawDate = dateIdx >= 0 ? cell(row, dateIdx) : '';
+    const day = (normalizeDateStr(rawDate) || rawDate).toLowerCase();
+    const mergeKey = ticket ? [csId, day, ticket].filter(Boolean).join('|') : '';
+    if (mergeKey && ticketIndex.has(mergeKey)) {
+      body[ticketIndex.get(mergeKey)!] = row;
       continue;
     }
-    if (ticket) ticketIndex.set(ticket, body.length);
+    if (mergeKey) ticketIndex.set(mergeKey, body.length);
     body.push(row);
   }
   return [header, ...body];

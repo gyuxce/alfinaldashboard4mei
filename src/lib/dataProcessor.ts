@@ -526,9 +526,27 @@ function readStarCount(row: unknown[] | undefined, index: number) {
 }
 
 function transactionKey(parts: Array<string | number | null | undefined>) {
-  const ticket = String(parts[0] || "").trim();
-  if (ticket) return `ticket:${ticket.toLowerCase()}`;
   return parts.map((part) => String(part || "").trim().toLowerCase()).join("|");
+}
+
+function ticketOccurrenceKey(
+  agentId: string,
+  normDate: string | null | undefined,
+  dateStr: string,
+  ticketId: string,
+  fallbackParts: Array<string | null | undefined> = [],
+) {
+  const agent = String(agentId || "").trim().toLowerCase();
+  const day = String(normDate || normalizeDateStr(dateStr) || dateStr || "").trim().toLowerCase();
+  const ticket = String(ticketId || "").trim().toLowerCase();
+  if (ticket) return `${agent}|${day}|${ticket}`;
+  const fallback = fallbackParts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join("|")
+    .toLowerCase();
+  if (!fallback) return "";
+  return `${agent}|${day}|${fallback}`;
 }
 
 function productivityDataStartRow(data: any[][]) {
@@ -1072,11 +1090,13 @@ export const processKPIs = (
       const rcaCustomer = cell(row, csatColumns.rcaCustomer);
       const rcaAkulaku = cell(row, csatColumns.rcaAkulaku);
 
-      const csatTicketKey = ticketId
-        ? ticketId.toLowerCase()
-        : (chatId || uid)
-          ? [chatId, uid, normDate || dateStr.trim()].join("|").toLowerCase()
-          : "";
+      const csatTicketKey = ticketOccurrenceKey(
+        agentId,
+        normDate,
+        dateStr,
+        ticketId,
+        [chatId, uid],
+      );
       if (csatTicketKey && seenCsatTickets.has(csatTicketKey)) continue;
       if (csatTicketKey) seenCsatTickets.add(csatTicketKey);
 
@@ -1283,9 +1303,7 @@ export const processKPIs = (
       const sla3 = parseSla(sla3Raw);
       const ticketId = cell(row, slaColumns.ticketId);
 
-      const slaTicketKey = ticketId
-        ? ticketId.toLowerCase()
-        : '';
+      const slaTicketKey = ticketOccurrenceKey(agentId, normDate, dateStr, ticketId);
       if (slaTicketKey && seenSlaTickets.has(slaTicketKey)) continue;
       if (slaTicketKey) seenSlaTickets.add(slaTicketKey);
 
@@ -1365,11 +1383,13 @@ export const processKPIs = (
         score = parseFloat(scoreStr);
       }
 
-      const qaTicketKey = ticketId
-        ? `${agentId}|${ticketId}`.toLowerCase()
-        : (chatId || uid)
-          ? [agentId, chatId, uid, normDate || dateStr.trim()].join("|").toLowerCase()
-          : "";
+      const qaTicketKey = ticketOccurrenceKey(
+        agentId,
+        normDate,
+        dateStr,
+        ticketId,
+        [chatId, uid],
+      );
       if (qaTicketKey && seenQaTickets.has(qaTicketKey)) continue;
       if (qaTicketKey) seenQaTickets.add(qaTicketKey);
 

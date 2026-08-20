@@ -740,10 +740,10 @@ export default function App() {
 
   const activeFilters = [
     selectedBpo && selectedBpo !== 'All BPO'
-      ? { label: 'BPO', value: selectedBpo, onClear: () => setSelectedBpo('All BPO') }
+      ? { label: 'BPO', value: selectedBpo, onClear: () => handleBpoChange('All BPO') }
       : null,
     selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders'
-      ? { label: 'TL', value: selectedTL, onClear: () => setSelectedTL('All TL') }
+      ? { label: 'TL', value: selectedTL, onClear: () => handleTeamLeaderChange('All TL') }
       : null,
     selectedGlobalAgent && selectedGlobalAgent !== 'All Agents'
       ? { label: 'Agent', value: selectedGlobalAgent, onClear: () => setSelectedGlobalAgent('All Agents') }
