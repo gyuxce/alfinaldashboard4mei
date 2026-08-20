@@ -75,10 +75,9 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   }, [data, search, filterTL]);
 
   const uniqueDates = useMemo(() => {
-    return uniqueCalendarDates(tableData.flatMap((a) => [
-      a.dailyHistory?.schedule,
-      a.qaHistory,
-    ]));
+    // QA is sparse (not every roster day). Using schedule dates fills the
+    // matrix with "-" and hides the days that actually have scores.
+    return uniqueCalendarDates(tableData.map((a) => a.qaHistory));
   }, [tableData]);
 
   const defectData = useMemo(() => {
@@ -257,10 +256,10 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     const dailyMap = new Map<string, { scoreSum: number; scoreCount: number; mistakes: number }>();
     tableData.forEach(agent => {
       agent.qaHistory?.forEach(entry => {
-        const date = entry.normDate || entry.date;
+        const date = entry.normDate || normalizeDateStr(entry.date || '') || entry.date;
         if (!date) return;
         const current = dailyMap.get(date) || { scoreSum: 0, scoreCount: 0, mistakes: 0 };
-        if (entry.hasScore && entry.score !== undefined) {
+        if (entry.hasScore !== false && typeof entry.score === 'number' && !isNaN(entry.score)) {
           current.scoreSum += entry.score;
           current.scoreCount += 1;
         }
@@ -288,7 +287,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         value: `${formatNum(c.count, 0)} temuan`,
       })),
       bottomDays: daysByQa.slice(0, 3).map(d => ({
-        label: d.date,
+        label: formatCalendarHeader(d.date),
         subLabel: `${formatNum(d.mistakes, 0)} temuan · ${formatNum(d.scoreCount, 0)} evaluasi`,
         value: `${formatNum(d.avg, 1)}%`,
       })),
@@ -384,7 +383,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="BPO" sortKey="bpo" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                   <SortableHeader label="TL" sortKey="teamLeader" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                   {uniqueDates.map(date => (
-                    <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border">
+                    <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[76px]">
                       {formatCalendarHeader(date)}
                     </th>
                   ))}
@@ -429,9 +428,13 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                         const isPullout = status === 'PULLOUT';
                         const bgClass = isOff ? 'text-text-muted' : '';
                         
-                        const validQA = dailyQA.filter(h => h.hasScore);
+                        const validQA = dailyQA.filter((h) => (
+                          h.hasScore !== false
+                          && typeof h.score === 'number'
+                          && !isNaN(h.score)
+                        ));
                         if (dailyQA.length === 0) {
-                          return <td key={date} className={`p-2 text-center text-text-disabled z-10 ${bgClass} `}>-</td>;
+                          return <td key={date} className={`p-2 text-center text-text-disabled z-10 ${bgClass} min-w-[76px]`}>-</td>;
                         }
                         
                         let displayValue = '-';
@@ -445,7 +448,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                         const baseColor = validQA.length > 0 ? getKpiColor(avg, 'qa') : 'text-text-disabled';
                         const textColor = isPullout ? 'text-text-muted italic' : baseColor;
                         return (
-                          <td key={date} className={`p-0 text-center font-semibold z-10   ${bgClass}`}>
+                          <td key={date} className={`p-0 text-center font-semibold z-10 min-w-[76px] ${bgClass}`}>
                             <button 
                               onClick={() => setSelectedAgent({ agent, date, type: 'defects' })}
                               className={`w-full h-full p-2 font-bold text-[11px] hover:bg-surface-muted transition-colors flex items-center justify-center gap-1 group/btn relative cursor-pointer ${textColor}`}

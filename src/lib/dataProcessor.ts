@@ -1048,7 +1048,7 @@ export const processKPIs = (
       const timestampStr = cell(row, timestampIdx);
       const hour = extractTimestampHour(timestampStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
-      if (dateStr && normDate && !isWithin(normDate)) continue;
+      if (!isWithin(normDate)) continue;
 
       const agent = getAgent(agentId);
       if (!agent) continue;
@@ -1277,7 +1277,7 @@ export const processKPIs = (
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
       const hour = extractTimestampHour(dateStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
-      if (dateStr && normDate && !isWithin(normDate)) continue;
+      if (!isWithin(normDate)) continue;
 
       const agent = getAgent(agentId);
       if (!agent) continue;
@@ -1352,7 +1352,7 @@ export const processKPIs = (
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
       const hour = extractTimestampHour(dateStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
-      if (dateStr && normDate && !isWithin(normDate)) continue;
+      if (!isWithin(normDate)) continue;
       const targetDateLabel = dateStr
         ? normDate
           ? getScheduleDateLabel(agentId, normDate)

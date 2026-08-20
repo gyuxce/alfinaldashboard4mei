@@ -77,6 +77,18 @@ export function getMonthOffsetLabel(periodStart: string, offset = 0): string {
 
 type DatedEntry = { date?: string; normDate?: string };
 
+function calendarDayKey(value: string | null | undefined): string | null {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const isoPrefix = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoPrefix) return isoPrefix[1];
+  return normalizeDateStr(raw);
+}
+
+function entryCalendarDay(entry: DatedEntry): string | null {
+  return calendarDayKey(entry.normDate) || calendarDayKey(entry.date);
+}
+
 /**
  * O(n) index of dated entries → Map<raw date | normalized date, entry>.
  *
@@ -90,9 +102,11 @@ export function indexByDate<T extends readonly DatedEntry[]>(
   const map = new Map<string, T[number]>();
   if (!entries) return map;
   for (const entry of entries) {
+    const day = entryCalendarDay(entry);
+    if (day) map.set(day, entry);
     if (entry.date) map.set(entry.date, entry);
     if (entry.normDate) map.set(entry.normDate, entry);
-    const extraNorm = normalizeDateStr(entry.date || '');
+    const extraNorm = calendarDayKey(entry.date);
     if (extraNorm) map.set(extraNorm, entry);
   }
   return map;
@@ -105,8 +119,11 @@ export function groupByDate<T extends readonly DatedEntry[]>(
   const map = new Map<string, Array<T[number]>>();
   if (!entries) return map;
   for (const entry of entries) {
-    const extraNorm = normalizeDateStr(entry.date || '');
-    const keys = new Set([entry.date, entry.normDate, extraNorm].filter(Boolean) as string[]);
+    const extraNorm = calendarDayKey(entry.date);
+    const day = entryCalendarDay(entry);
+    const keys = new Set(
+      [entry.date, entry.normDate, extraNorm, day].filter(Boolean) as string[],
+    );
     for (const key of keys) {
       const list = map.get(key);
       if (list) list.push(entry);
@@ -117,7 +134,7 @@ export function groupByDate<T extends readonly DatedEntry[]>(
 }
 
 export function formatCalendarHeader(dateKey: string): string {
-  const nd = /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : (normalizeDateStr(dateKey) || '');
+  const nd = calendarDayKey(dateKey) || '';
   const match = nd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return dateKey;
   return `${Number(match[3])}/${Number(match[2])}/${match[1]}`;
@@ -130,8 +147,7 @@ export function uniqueCalendarDates(
   for (const entries of series) {
     if (!entries) continue;
     for (const entry of entries) {
-      const label = String(entry.date || '').trim();
-      const nd = String(entry.normDate || '').trim() || normalizeDateStr(label);
+      const nd = entryCalendarDay(entry);
       if (!nd) continue;
       byNorm.add(nd);
     }
@@ -143,7 +159,7 @@ export function getByCalendarDate<T extends DatedEntry>(
   indexed: Map<string, T>,
   dateLabel: string,
 ): T | undefined {
-  const nd = /^\d{4}-\d{2}-\d{2}$/.test(dateLabel) ? dateLabel : normalizeDateStr(dateLabel);
+  const nd = calendarDayKey(dateLabel);
   if (nd && indexed.has(nd)) return indexed.get(nd);
   if (indexed.has(dateLabel)) return indexed.get(dateLabel);
   return undefined;
@@ -153,7 +169,7 @@ export function getGroupByCalendarDate<T extends DatedEntry>(
   grouped: Map<string, T[]>,
   dateLabel: string,
 ): T[] {
-  const nd = /^\d{4}-\d{2}-\d{2}$/.test(dateLabel) ? dateLabel : normalizeDateStr(dateLabel);
+  const nd = calendarDayKey(dateLabel);
   if (nd && grouped.has(nd)) return grouped.get(nd) || [];
   if (grouped.has(dateLabel)) return grouped.get(dateLabel) || [];
   return [];
