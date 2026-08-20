@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { normalizeDateStr } from './dataProcessor';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -91,6 +92,8 @@ export function indexByDate<T extends readonly DatedEntry[]>(
   for (const entry of entries) {
     if (entry.date) map.set(entry.date, entry);
     if (entry.normDate) map.set(entry.normDate, entry);
+    const extraNorm = normalizeDateStr(entry.date || '');
+    if (extraNorm) map.set(extraNorm, entry);
   }
   return map;
 }
@@ -102,7 +105,8 @@ export function groupByDate<T extends readonly DatedEntry[]>(
   const map = new Map<string, Array<T[number]>>();
   if (!entries) return map;
   for (const entry of entries) {
-    const keys = new Set([entry.date, entry.normDate].filter(Boolean) as string[]);
+    const extraNorm = normalizeDateStr(entry.date || '');
+    const keys = new Set([entry.date, entry.normDate, extraNorm].filter(Boolean) as string[]);
     for (const key of keys) {
       const list = map.get(key);
       if (list) list.push(entry);
@@ -110,6 +114,44 @@ export function groupByDate<T extends readonly DatedEntry[]>(
     }
   }
   return map;
+}
+
+export function uniqueCalendarDates(
+  series: Array<readonly DatedEntry[] | null | undefined>,
+): string[] {
+  const byNorm = new Map<string, string>();
+  for (const entries of series) {
+    if (!entries) continue;
+    for (const entry of entries) {
+      const label = String(entry.date || '').trim();
+      const nd = String(entry.normDate || '').trim() || normalizeDateStr(label);
+      if (!nd) continue;
+      if (!byNorm.has(nd)) byNorm.set(nd, label || nd);
+    }
+  }
+  return Array.from(byNorm.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([, date]) => date);
+}
+
+export function getByCalendarDate<T extends DatedEntry>(
+  indexed: Map<string, T>,
+  dateLabel: string,
+): T | undefined {
+  if (indexed.has(dateLabel)) return indexed.get(dateLabel);
+  const nd = normalizeDateStr(dateLabel);
+  if (nd && indexed.has(nd)) return indexed.get(nd);
+  return undefined;
+}
+
+export function getGroupByCalendarDate<T extends DatedEntry>(
+  grouped: Map<string, T[]>,
+  dateLabel: string,
+): T[] {
+  if (grouped.has(dateLabel)) return grouped.get(dateLabel) || [];
+  const nd = normalizeDateStr(dateLabel);
+  if (nd && grouped.has(nd)) return grouped.get(nd) || [];
+  return [];
 }
 
 

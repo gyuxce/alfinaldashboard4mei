@@ -1,12 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { Search } from 'lucide-react';
-import { AgentKPI, normalizeDateStr } from '../../lib/dataProcessor';
+import { AgentKPI } from '../../lib/dataProcessor';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { VirtualizedTbody } from '../ui/VirtualizedTbody';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
+import { uniqueCalendarDates, indexByDate, getByCalendarDate } from '../../lib/utils';
 
 export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -18,17 +19,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
   const tableData = data.filter(a => a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase()));
 
-  // One column per calendar day (avoid duplicate labels like 1/7/2026 vs 01/07/2026)
-  const byNorm = new Map<string, string>();
-  data.forEach((d) => {
-    d.dailyHistory.schedule.forEach((x) => {
-      const nd = x.normDate || normalizeDateStr(x.date);
-      if (nd && !byNorm.has(nd)) byNorm.set(nd, x.date);
-    });
-  });
-  const uniqueDates = Array.from(byNorm.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([, date]) => date);
+  const uniqueDates = uniqueCalendarDates(data.map((d) => d.dailyHistory?.schedule));
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const tableVirtual = useVirtualRows({
@@ -106,6 +97,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 const agent = tableData[idx];
                 if (!agent) return null;
                 const displayName = agent.name || agent.csId;
+                const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
 
                 return (
                 <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
@@ -122,12 +114,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                   
                   {uniqueDates.map(date => {
-                    const dateNorm = normalizeDateStr(date);
-                    const sched = agent.dailyHistory.schedule.find(
-                      (s) =>
-                        s.date === date ||
-                        (dateNorm != null && s.normDate === dateNorm),
-                    );
+                    const sched = getByCalendarDate(scheduleByDate, date);
                     const status = sched ? sched.status : '-';
                     const bgClass = getBackgroundColor(status);
                     

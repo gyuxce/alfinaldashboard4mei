@@ -265,9 +265,18 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
   const dailyTrend = useMemo(() => {
     const current = generateDailyTrend(data);
     const previous = isComparisonEnabled ? generateDailyTrend(previousData) : [];
+    const originCurrent = current[0]?.date || '';
+    const originPrevious = previous[0]?.date || '';
+    const dayOffset = (iso: string, origin: string) => {
+      if (!iso || !origin) return Number.NaN;
+      return Math.round((parseDateForSort(iso) - parseDateForSort(origin)) / 86400000);
+    };
+    const prevByOffset = new Map(
+      previous.map((item) => [dayOffset(item.date, originPrevious), item]),
+    );
 
-    return current.map((item, idx) => {
-      const prevItem = previous[idx];
+    return current.map((item) => {
+      const prevItem = prevByOffset.get(dayOffset(item.date, originCurrent));
       return {
         ...item,
         prevProductivity: prevItem ? prevItem.productivity : null,

@@ -16,6 +16,16 @@ import {
   ValidationResult
 } from '../../lib/csvValidator';
 import { normalizeDateStr } from '../../lib/dataProcessor';
+import {
+  cell,
+  pickColumn,
+  resolveCsatScColumns,
+  resolveProductivityColumns,
+  resolveQaColumns,
+  resolveRowCsId,
+  resolveScheduleIdentityColumns,
+  resolveSlaColumns,
+} from '../../lib/sheetHeaders';
 
 function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
@@ -91,28 +101,32 @@ const extractCsIds = (
   masterIds: ReadonlySet<string>,
 ) => {
   const ids = new Set<string>();
+  const header = data[0] || [];
 
   const addId = (value: unknown) => {
     const id = String(value || '').trim();
     if (id.startsWith('3-1-')) ids.add(id);
   };
 
+  const scheduleCols = dataKey === 'scheduleData' ? resolveScheduleIdentityColumns(header) : null;
+  const qaCsIdIdx = dataKey === 'qaData' ? pickColumn(resolveQaColumns(header).csId, 0) : -1;
+
   data.forEach((row, index) => {
     if (!row || index === 0) return;
 
-    if (dataKey === 'scheduleData') {
-      addId(row[1]);
+    if (scheduleCols) {
+      addId(cell(row, scheduleCols.csId));
       return;
     }
 
     if (dataKey === 'qaData') {
-      addId(row[0]);
+      addId(resolveRowCsId(row, qaCsIdIdx).id);
       return;
     }
 
     if (dataKey === 'productivityData' || dataKey === 'csatScData' || dataKey === 'slaData') {
-      row.forEach((cell) => {
-        const id = String(cell || '').trim();
+      row.forEach((value) => {
+        const id = String(value || '').trim();
         if (id.startsWith('3-1-') && masterIds.has(id)) ids.add(id);
       });
     }
@@ -142,25 +156,43 @@ const getDateHealth = (source: DataSource, data: any[][]) => {
 
   if (source.dataKey === 'scheduleData') {
     const header = data[0] || [];
-    for (let c = 5; c < header.length; c++) {
+    const firstDate = resolveScheduleIdentityColumns(header).firstDateColumn;
+    for (let c = firstDate; c < header.length; c++) {
       checkValue(header[c]);
     }
     return { checked, invalid, samples, ruleLabel: 'Schedule header dates' };
   }
 
-  const config: Record<string, { startRow: number; dateCol: number; label: string }> = {
-    productivityData: { startRow: 2, dateCol: 0, label: 'Productivity date column' },
-    csatScData: { startRow: 1, dateCol: 0, label: 'CSAT SC date column' },
-    slaData: { startRow: 1, dateCol: 0, label: 'SLA date column' },
-    qaData: { startRow: 1, dateCol: 13, label: 'QA checking date column' },
+  const header = data[0] || [];
+  const dateIdxBySource: Record<string, { idx: number; startRow: number; label: string }> = {
+    productivityData: {
+      idx: pickColumn(resolveProductivityColumns(data).date, 0),
+      startRow: 2,
+      label: 'Productivity date column',
+    },
+    csatScData: {
+      idx: pickColumn(resolveCsatScColumns(header).date, 0),
+      startRow: 1,
+      label: 'CSAT SC date column',
+    },
+    slaData: {
+      idx: pickColumn(resolveSlaColumns(data).date, 0),
+      startRow: 1,
+      label: 'SLA date column',
+    },
+    qaData: {
+      idx: pickColumn(resolveQaColumns(header).date, 13),
+      startRow: 1,
+      label: 'QA checking date column',
+    },
   };
-  const sourceConfig = config[source.dataKey];
+  const sourceConfig = dateIdxBySource[source.dataKey];
   if (!sourceConfig) return { checked, invalid, samples, ruleLabel: 'No date rule' };
 
   for (let r = sourceConfig.startRow; r < data.length; r++) {
     const row = data[r];
-    if (!row || !row.some(cell => String(cell || '').trim() !== '')) continue;
-    checkValue(row[sourceConfig.dateCol]);
+    if (!row || !row.some(item => String(item || '').trim() !== '')) continue;
+    checkValue(row[sourceConfig.idx]);
   }
 
   return { checked, invalid, samples, ruleLabel: sourceConfig.label };
@@ -175,25 +207,26 @@ const getCoverageStatus = (covered: number, total: number): CoverageStatus => {
 
 const getProductivityDuplicateHealth = (data: any[][]) => {
   const seen = new Map<string, { count: number; label: string }>();
+  const columns = resolveProductivityColumns(data);
+  const startRow = data.length > 2 ? 2 : 1;
 
-  for (let r = 2; r < data.length; r++) {
+  for (let r = startRow; r < data.length; r++) {
     const row = data[r];
     if (!row || row.length < 2) continue;
 
-    const idIdx = row.findIndex((cell) =>
-      String(cell || "")
-        .trim()
-        .startsWith("3-1-"),
-    );
-    if (idIdx === -1) continue;
+    const resolved = resolveRowCsId(row, columns.csId);
+    if (!resolved.id) continue;
 
-    const rawDate = String(row[0] || "").trim();
+    const dateIdx = pickColumn(columns.date, resolved.index > 0 ? 0 : -1);
+    const rawDate = cell(row, dateIdx);
     const normDate = normalizeDateStr(rawDate) || rawDate;
-    const agentId = String(row[idIdx] || "").trim();
-    const productivity = String(row[idIdx + 8] || "").trim();
-    const csatOfficial = String(row[idIdx + 1] || "").trim();
-    const whu = String(row[idIdx + 15] || "").trim();
-    const scoreDistribution = [3, 4, 5, 6, 7].map((idx) => String(row[idx] || "").trim()).join("/");
+    const agentId = resolved.id;
+    const productivity = cell(row, pickColumn(columns.productivity, resolved.index >= 0 ? resolved.index + 8 : -1));
+    const csatOfficial = cell(row, pickColumn(columns.csatAsli, resolved.index >= 0 ? resolved.index + 1 : -1));
+    const whu = cell(row, pickColumn(columns.whu, resolved.index >= 0 ? resolved.index + 15 : -1));
+    const scoreDistribution = [columns.star5, columns.star4, columns.star3, columns.star2, columns.star1]
+      .map((idx, i) => cell(row, pickColumn(idx, 3 + i)))
+      .join("/");
 
     const key = [
       agentId,

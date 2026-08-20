@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, parseDateForSort, cn } from '../../lib/utils';
+import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, getByCalendarDate } from '../../lib/utils';
 import { Search } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -74,12 +74,11 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   }, [data, search, filterTL, viewMode, sortConfig]);
 
   const uniqueDates = useMemo(() => {
-    const dates = new Set<string>();
-    tableData.forEach(a => {
-      a.dailyHistory?.sla1m?.forEach(h => dates.add(h.date));
-      a.dailyHistory?.sla3m?.forEach(h => dates.add(h.date));
-    });
-    return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+    return uniqueCalendarDates(tableData.flatMap((a) => [
+      a.dailyHistory?.schedule,
+      a.dailyHistory?.sla1m,
+      a.dailyHistory?.sla3m,
+    ]));
   }, [tableData]);
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -146,6 +145,8 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 const agent = tableData[index];
                 if (!agent) return null;
                 const displayName = agent.name || agent.csId;
+                const slaByDate = indexByDate(viewMode === '1m' ? agent.dailyHistory?.sla1m : agent.dailyHistory?.sla3m);
+                const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
 
                 return (
                   <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
@@ -162,8 +163,8 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                     
                     {uniqueDates.map(date => {
-                      const daily = viewMode === '1m' ? agent.dailyHistory?.sla1m?.find(h => h.date === date) : agent.dailyHistory?.sla3m?.find(h => h.date === date);
-                      const sched = agent.dailyHistory?.schedule?.find(h => h.date === date);
+                      const daily = getByCalendarDate(slaByDate, date);
+                      const sched = getByCalendarDate(scheduleByDate, date);
                       const status = sched?.status?.toUpperCase() || '';
                       
                       const isOff = status === 'OFF' || status === 'C';

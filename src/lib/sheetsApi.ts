@@ -1,4 +1,5 @@
 import { normalizeDateStr } from './dataProcessor';
+import { cell, findHeaderIncludes } from './sheetHeaders';
 
 // Config (dari env variables)
 const API_KEY = import.meta.env.VITE_SHEETS_API_KEY;
@@ -54,12 +55,13 @@ function buildSheetFetchError(sheetName: string, status: number, statusText: str
 export async function fetchSheet(
   sheetName: string,
   range: string = 'A:AZ',
-  spreadsheetId: string = DEFAULT_SPREADSHEET_ID
+  spreadsheetId: string = DEFAULT_SPREADSHEET_ID,
+  signal?: AbortSignal,
 ): Promise<SheetData> {
   const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!${range}?key=${API_KEY}`;
 
   for (let attempt = 0; attempt < 4; attempt++) {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
 
     if (response.ok) {
       const json = await response.json();
@@ -244,7 +246,8 @@ export function getSpreadsheetIdForMonth(monthKey: string): string {
 
 export async function fetchAllSheets(
   config: SheetConfig = DEFAULT_CONFIG,
-  spreadsheetId: string = DEFAULT_SPREADSHEET_ID
+  spreadsheetId: string = DEFAULT_SPREADSHEET_ID,
+  signal?: AbortSignal,
 ): Promise<AllSheetsData> {
   const sheetEntries = [
     ['csid', config.csidSheetName],
@@ -263,7 +266,7 @@ export async function fetchAllSheets(
   const url = `${BASE_URL}/${spreadsheetId}/values:batchGet?${params.toString()}`;
 
   for (let attempt = 0; attempt < 4; attempt++) {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
 
     if (response.ok) {
       const json = await response.json();
@@ -286,20 +289,37 @@ export async function fetchAllSheets(
   return { csid: [], productivity: [], csatSc: [], sla: [], schedule: [], qa: [] };
 }
 
-function mergeSheetData(previous: SheetData, current: SheetData): SheetData {
+function mergeSheetData(
+  previous: SheetData,
+  current: SheetData,
+  ticketAliases: string[] = [],
+): SheetData {
   if (!previous.length) return current;
   if (!current.length) return previous;
 
-  // History tabs can overlap at month boundaries. Preserve legitimate rows
-  // while removing only exact duplicate records, including sparse cells.
+  const header = previous[0] || [];
+  const ticketIdx = ticketAliases.length ? findHeaderIncludes(header, ticketAliases) : -1;
+
+  // History tabs can overlap at month boundaries. Drop exact duplicate rows,
+  // then keep the latest row when the same ticket/chat appears twice.
   const seenRows = new Set<string>();
-  const body = [...previous.slice(1), ...current.slice(1)].filter((row) => {
-    const key = row.map((cell) => String(cell ?? '')).join('\u001F');
-    if (seenRows.has(key)) return false;
+  const ticketIndex = new Map<string, number>();
+  const body: SheetRow[] = [];
+
+  for (const row of [...previous.slice(1), ...current.slice(1)]) {
+    const key = row.map((item) => String(item ?? '')).join('\u001F');
+    if (seenRows.has(key)) continue;
     seenRows.add(key);
-    return true;
-  });
-  return [previous[0], ...body];
+
+    const ticket = ticketIdx >= 0 ? cell(row, ticketIdx).toLowerCase() : '';
+    if (ticket && ticketIndex.has(ticket)) {
+      body[ticketIndex.get(ticket)!] = row;
+      continue;
+    }
+    if (ticket) ticketIndex.set(ticket, body.length);
+    body.push(row);
+  }
+  return [header, ...body];
 }
 
 function mergeScheduleSheetData(previous: SheetData, current: SheetData): SheetData {
@@ -376,10 +396,10 @@ export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsDa
   return {
     csid: mergeSheetData(previous.csid, current.csid),
     productivity: mergeSheetData(previous.productivity, current.productivity),
-    csatSc: mergeSheetData(previous.csatSc, current.csatSc),
-    sla: mergeSheetData(previous.sla, current.sla),
+    csatSc: mergeSheetData(previous.csatSc, current.csatSc, ['ticket id', 'ticket', 'chat id']),
+    sla: mergeSheetData(previous.sla, current.sla, ['ticket id', 'ticket']),
     schedule: mergeScheduleSheetData(previous.schedule, current.schedule),
-    qa: mergeSheetData(previous.qa, current.qa),
+    qa: mergeSheetData(previous.qa, current.qa, ['ticket id', 'ticket', 'chat id']),
   };
 }
 

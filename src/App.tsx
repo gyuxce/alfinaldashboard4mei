@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
 import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, getPreviousCalendarMonthRange, normalizeDateStr } from './lib/dataProcessor';
+import { cell, pickColumn, resolveProductivityColumns, resolveRowCsId } from './lib/sheetHeaders';
 
 import { 
   LayoutDashboard, 
@@ -161,30 +162,31 @@ function extractCsIds(data: any[][]) {
 
 function getProductivityDuplicateCount(data: any[][]) {
   const seen = new Map<string, number>();
+  const columns = resolveProductivityColumns(data);
+  const startRow = data.length > 2 ? 2 : 1;
 
-  for (let r = 2; r < data.length; r++) {
+  for (let r = startRow; r < data.length; r++) {
     const row = data[r];
     if (!row || row.length < 2) continue;
 
-    const idIdx = row.findIndex((cell) =>
-      String(cell || "")
-        .trim()
-        .startsWith("3-1-"),
-    );
-    if (idIdx === -1) continue;
+    const resolved = resolveRowCsId(row, columns.csId);
+    if (!resolved.id) continue;
 
-    const rawDate = String(row[0] || "").trim();
+    const dateIdx = pickColumn(columns.date, resolved.index > 0 ? 0 : -1);
+    const rawDate = cell(row, dateIdx);
     const normDate = normalizeDateStr(rawDate) || rawDate;
-    const agentId = String(row[idIdx] || "").trim();
+    const agentId = resolved.id;
     if (!agentId || !normDate) continue;
 
     const key = [
       agentId,
       normDate,
-      String(row[idIdx + 8] || "").trim(),
-      String(row[idIdx + 1] || "").trim(),
-      String(row[idIdx + 15] || "").trim(),
-      [3, 4, 5, 6, 7].map((idx) => String(row[idx] || "").trim()).join("/"),
+      cell(row, pickColumn(columns.productivity, resolved.index >= 0 ? resolved.index + 8 : -1)),
+      cell(row, pickColumn(columns.csatAsli, resolved.index >= 0 ? resolved.index + 1 : -1)),
+      cell(row, pickColumn(columns.whu, resolved.index >= 0 ? resolved.index + 15 : -1)),
+      [columns.star5, columns.star4, columns.star3, columns.star2, columns.star1]
+        .map((idx, i) => cell(row, pickColumn(idx, 3 + i)))
+        .join("/"),
     ].join("|").toLowerCase();
 
     seen.set(key, (seen.get(key) || 0) + 1);

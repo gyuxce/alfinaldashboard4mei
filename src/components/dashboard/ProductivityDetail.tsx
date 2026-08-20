@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef } from "react";
-import { AgentKPI, normalizeDateStr } from "../../lib/dataProcessor";
-import { formatNum, getKpiColor } from "../../lib/utils";
+import { AgentKPI } from "../../lib/dataProcessor";
+import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, getByCalendarDate } from "../../lib/utils";
 import { chart } from "../../lib/themeColors";
 import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
@@ -62,22 +62,10 @@ export const ProductivityDetail: React.FC<{
 
   // One column per calendar day (normDate), preferring schedule date labels
   const uniqueDates = useMemo(() => {
-    const byNorm = new Map<string, string>();
-
-    filteredData.forEach((a) => {
-      a.dailyHistory?.schedule?.forEach((s) => {
-        const nd = s.normDate || normalizeDateStr(s.date);
-        if (nd && !byNorm.has(nd)) byNorm.set(nd, s.date);
-      });
-      a.dailyHistory?.productivity?.forEach((h) => {
-        const nd = normalizeDateStr(h.date);
-        if (nd && !byNorm.has(nd)) byNorm.set(nd, h.date);
-      });
-    });
-
-    return Array.from(byNorm.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([, date]) => date);
+    return uniqueCalendarDates(filteredData.flatMap((a) => [
+      a.dailyHistory?.schedule,
+      a.dailyHistory?.productivity,
+    ]));
   }, [filteredData]);
 
   const tableData = useMemo(() => {
@@ -612,6 +600,8 @@ export const ProductivityDetail: React.FC<{
               const localGap = agent.productivityTotal - localTargetQuota;
               const localAvg =
                 localManDays > 0 ? agent.productivityTotal / localManDays : 0;
+              const prodByDate = indexByDate(agent.dailyHistory?.productivity);
+              const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
 
               return (
                 <tr
@@ -636,17 +626,8 @@ export const ProductivityDetail: React.FC<{
                     {agent.teamLeader || "-"}
                   </td>
                   {uniqueDates.map((date) => {
-                    const dateNorm = normalizeDateStr(date);
-                    const daily = agent.dailyHistory?.productivity?.find(
-                      (h) =>
-                        h.date === date ||
-                        normalizeDateStr(h.date) === dateNorm,
-                    );
-                    const sched = agent.dailyHistory?.schedule?.find(
-                      (h) =>
-                        h.date === date ||
-                        (dateNorm != null && h.normDate === dateNorm),
-                    );
+                    const daily = getByCalendarDate(prodByDate, date);
+                    const sched = getByCalendarDate(scheduleByDate, date);
                     const status = sched?.status?.toUpperCase() || "";
 
                     const isOff = status === "OFF" || status === "C";

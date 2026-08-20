@@ -1,3 +1,16 @@
+import {
+  cell,
+  findLegacyCsIdIndex,
+  isLegacyCsId,
+  pickColumn,
+  resolveCsatScColumns,
+  resolveProductivityColumns,
+  resolveQaColumns,
+  resolveRowCsId,
+  resolveScheduleIdentityColumns,
+  resolveSlaColumns,
+} from './sheetHeaders';
+
 export interface CSATEntry {
   date: string;
   normDate?: string | null;
@@ -506,26 +519,24 @@ export function normalizeScheduleStatus(statusRaw: string): string {
   return status;
 }
 
-function findDateColumnIndex(data: any[][], startRow: number = 0) {
-  const headers = data[startRow] || [];
-  for (let c = 0; c < headers.length; c++) {
-    const h = String(headers[c]).toLowerCase();
-    if (
-      h.includes("date") ||
-      h.includes("tanggal") ||
-      h.includes("time") ||
-      h.includes("close")
-    )
-      return c;
-  }
-  // fallback scan
-  for (let i = startRow + 1; i < Math.min(data.length, startRow + 10); i++) {
-    const row = data[i];
-    for (let c = 0; c < row.length; c++) {
-      if (normalizeDateStr(String(row[c]))) return c;
-    }
-  }
-  return -1;
+function readStarCount(row: unknown[] | undefined, index: number) {
+  const raw = cell(row, index);
+  if (!raw || isLegacyCsId(raw)) return 0;
+  return parseFloat(raw.replace(",", ".")) || 0;
+}
+
+function transactionKey(parts: Array<string | number | null | undefined>) {
+  const ticket = String(parts[0] || "").trim();
+  if (ticket) return `ticket:${ticket.toLowerCase()}`;
+  return parts.map((part) => String(part || "").trim().toLowerCase()).join("|");
+}
+
+function productivityDataStartRow(data: any[][]) {
+  if (data.length <= 1) return data.length;
+  const probe = data[1] || [];
+  const looksLikeData =
+    findLegacyCsIdIndex(probe) >= 0 || !!normalizeDateStr(String(probe[0] || ""));
+  return looksLikeData ? 1 : 2;
 }
 
 export const processKPIs = (
@@ -731,16 +742,18 @@ export const processKPIs = (
     });
   }
 
+  const scheduleColumns = resolveScheduleIdentityColumns(schedData[0] || []);
+
   if (schedData.length > 1) {
     const scheduleHeaders = schedData[0] || [];
-    for (let c = 5; c < scheduleHeaders.length; c++) {
+    for (let c = scheduleColumns.firstDateColumn; c < scheduleHeaders.length; c++) {
       const dateLabel = String(scheduleHeaders[c] || "").trim();
       const normDate = dateLabel ? normalizeDateStr(dateLabel) : null;
       if (!normDate) continue;
 
       for (let r = 1; r < schedData.length; r++) {
         const row = schedData[r];
-        const agentId = String(row?.[1] || "").trim();
+        const agentId = cell(row, scheduleColumns.csId);
         if (!agentId) continue;
 
         const status = String(row?.[c] || "").trim().toUpperCase();
@@ -756,8 +769,8 @@ export const processKPIs = (
   // 0. Schedule Logic
   if (schedData.length > 1) {
     const headers = schedData[0] || [];
-    // Index 5 ke kanan adalah tanggal (Format DD/MM/YYYY)
-    for (let c = 5; c < headers.length; c++) {
+    // Date columns start after identity fields (CS ID / Name / TL / BPO).
+    for (let c = scheduleColumns.firstDateColumn; c < headers.length; c++) {
       const hd = String(headers[c]).trim();
       if (!hd) continue;
 
@@ -768,13 +781,13 @@ export const processKPIs = (
       for (let r = 1; r < schedData.length; r++) {
         const row = schedData[r];
         if (!row) continue;
-        const agentId = String(row[1] || "").trim(); // Index 1 is CS ID
+        const agentId = cell(row, scheduleColumns.csId);
         const agent = getAgent(agentId);
         if (!agent) continue;
 
-        const schedName = String(row[2] || "").trim(); // Index 2
-        const schedTL = String(row[3] || "").trim(); // Index 3
-        const schedBPO = String(row[4] || "").trim(); // Index 4
+        const schedName = cell(row, scheduleColumns.name);
+        const schedTL = cell(row, scheduleColumns.teamLeader);
+        const schedBPO = cell(row, scheduleColumns.bpo);
 
         if (schedName && !agent.name) agent.name = schedName;
         if (schedTL && !agent.teamLeader) agent.teamLeader = schedTL;
@@ -845,43 +858,27 @@ export const processKPIs = (
   let totalProdCsatAsliSum: Record<string, { sum: number; count: number }> = {};
   let totalWhuSum: Record<string, { sum: number; count: number }> = {};
   const seenProductivityEntries = new Set<string>();
+  const prodColumns = resolveProductivityColumns(prodData);
+  const prodStartRow = productivityDataStartRow(prodData);
 
-  let whuActualIdx = -1;
-  if (prodData.length > 0) {
-    for (let r = 0; r < 3 && r < prodData.length; r++) {
-      const idx = prodData[r].findIndex(
-        (cell) =>
-          String(cell || "")
-            .toLowerCase()
-            .trim() === "whu",
-      );
-      if (idx !== -1) {
-        whuActualIdx = idx;
-        break;
-      }
-    }
-  }
-
-  if (prodData.length > 2) {
-    for (let i = 2; i < prodData.length; i++) {
+  if (prodData.length > prodStartRow) {
+    for (let i = prodStartRow; i < prodData.length; i++) {
       const row = prodData[i];
       if (!row || row.length < 2) continue;
 
-      const idIdx = row.findIndex((cell) =>
-        String(cell || "")
-          .trim()
-          .startsWith("3-1-"),
-      );
-      if (idIdx === -1) continue;
+      const resolvedId = resolveRowCsId(row, prodColumns.csId);
+      if (!resolvedId.id) continue;
+      const idIdx = resolvedId.index;
 
-      const rawDateStr = idIdx > 0 ? String(row[0] || "") : "";
+      const dateIdx = pickColumn(prodColumns.date, idIdx > 0 ? 0 : -1);
+      const rawDateStr = cell(row, dateIdx);
       let normDate = rawDateStr ? normalizeDateStr(rawDateStr) : null;
       if (!rawDateStr || !normDate) continue;
 
       let targetDateLabel = rawDateStr;
       const hour = extractTimestampHour(rawDateStr);
 
-      const agentId = String(row[idIdx]).trim();
+      const agentId = resolvedId.id;
       const agent = getAgent(agentId);
       if (!agent) continue;
 
@@ -890,27 +887,25 @@ export const processKPIs = (
 
       if (!isWithin(normDate)) continue;
 
-      // Productivity: Column L (ID D + 8)
-      const prodBase =
-        parseFloat(String(row[idIdx + 8] || "").replace(",", ".")) || 0;
-      let csatAsliStr = String(row[idIdx + 1] || "").trim(); // Column E (ID D + 1)
-      let whuStr =
-        whuActualIdx !== -1
-          ? String(row[whuActualIdx] || "").trim()
-          : String(row[idIdx + 15] || "").trim();
+      const prodIdx = pickColumn(prodColumns.productivity, idIdx >= 0 ? idIdx + 8 : -1);
+      const csatIdx = pickColumn(prodColumns.csatAsli, idIdx >= 0 ? idIdx + 1 : -1);
+      const whuIdx = pickColumn(prodColumns.whu, idIdx >= 0 ? idIdx + 15 : -1);
+
+      const prodBase = parseFloat(cell(row, prodIdx).replace(",", ".")) || 0;
+      let csatAsliStr = cell(row, csatIdx);
+      let whuStr = cell(row, whuIdx);
 
       if (csatAsliStr.includes("%")) csatAsliStr = csatAsliStr.replace("%", "");
       csatAsliStr = csatAsliStr.replace(",", ".");
-      const csatAsliNum = parseFloat(csatAsliStr);
 
       whuStr = whuStr.replace(",", ".");
       const whuNum = parseFloat(whuStr);
 
-      const dVal = parseFloat(String(row[3] || "").replace(",", ".")) || 0;
-      const eVal = parseFloat(String(row[4] || "").replace(",", ".")) || 0;
-      const fVal = parseFloat(String(row[5] || "").replace(",", ".")) || 0;
-      const gVal = parseFloat(String(row[6] || "").replace(",", ".")) || 0;
-      const hVal = parseFloat(String(row[7] || "").replace(",", ".")) || 0;
+      const dVal = readStarCount(row, pickColumn(prodColumns.star5, 3));
+      const eVal = readStarCount(row, pickColumn(prodColumns.star4, 4));
+      const fVal = readStarCount(row, pickColumn(prodColumns.star3, 5));
+      const gVal = readStarCount(row, pickColumn(prodColumns.star2, 6));
+      const hVal = readStarCount(row, pickColumn(prodColumns.star1, 7));
       // Consecutive monthly exports commonly overlap at period boundaries.
       // Ignore exact repeated source facts before they reach any aggregate.
       const sourceKey = [
@@ -1015,31 +1010,24 @@ export const processKPIs = (
   // 2. CSAT SC
   if (csatData.length > 1) {
     const headerRow = csatData[0] || [];
-    const timestampIdx = headerRow.findIndex((h: unknown) => {
-      const header = String(h || '').trim().toLowerCase();
-      return header.includes('timestamp') || header.includes('close time') || header.includes('waktu close');
-    });
-    const rcaAgentIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca agent area');
-    const rcaCustomerIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca customer area');
-    const rcaAkulakuIdx = headerRow.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'rca akulaku process');
+    const csatColumns = resolveCsatScColumns(headerRow);
     const seenCsatScEntries = new Set<string>();
+    const seenCsatTickets = new Set<string>();
 
     for (let i = 1; i < csatData.length; i++) {
       const row = csatData[i];
       if (!row || row.length < 2) continue;
 
-      const idIdx = row.findIndex((cell) =>
-        String(cell || "")
-          .trim()
-          .startsWith("3-1-"),
-      );
-      if (idIdx === -1) continue;
+      const resolvedId = resolveRowCsId(row, csatColumns.csId);
+      if (!resolvedId.id) continue;
+      const idIdx = resolvedId.index;
 
-      const agentId = String(row[idIdx]).trim();
-      const dateStr = idIdx > 0 ? String(row[0] || "") : "";
+      const agentId = resolvedId.id;
+      const dateIdx = pickColumn(csatColumns.date, idIdx > 0 ? 0 : -1);
+      const dateStr = cell(row, dateIdx);
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
-      // Prefer schema header; retain legacy W-column fallback for old exports.
-      const timestampStr = String(row[timestampIdx >= 0 ? timestampIdx : 22] || "").trim();
+      const timestampIdx = pickColumn(csatColumns.timestamp, 22);
+      const timestampStr = cell(row, timestampIdx);
       const hour = extractTimestampHour(timestampStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
       if (dateStr && normDate && !isWithin(normDate)) continue;
@@ -1052,23 +1040,23 @@ export const processKPIs = (
           : dateStr
         : dateStr;
 
-      // Score: Column O (ID D + 11)
-      const scoreStr = String(row[idIdx + 11] || "")
-        .replace(",", ".")
-        .trim();
+      const scoreIdx = pickColumn(csatColumns.score, idIdx >= 0 ? idIdx + 11 : -1);
+      const categoryIdx = pickColumn(csatColumns.category, idIdx >= 0 ? idIdx + 8 : -1);
+      const responseIdx = pickColumn(csatColumns.response, idIdx >= 0 ? idIdx + 15 : -1);
+      const ticketIdx = pickColumn(csatColumns.ticketId, idIdx >= 0 ? idIdx + 1 : -1);
+      const chatIdx = pickColumn(csatColumns.chatId, idIdx > 0 ? idIdx - 1 : -1);
+      const uidIdx = pickColumn(csatColumns.uid, idIdx >= 0 ? idIdx + 5 : -1);
+
+      const scoreStr = cell(row, scoreIdx).replace(",", ".");
       const score = parseFloat(scoreStr);
 
-      // Category: Column L (ID D + 8)
-      const category = String(row[idIdx + 8] || "")
-        .toLowerCase()
-        .trim();
-        
-      const response = String(row[idIdx + 15] || "").trim();
-      const ticketId = String(row[idIdx + 1] || "").trim();
-      const chatId = String(row[idIdx - 1] || "").trim();
-      const uid = String(row[idIdx + 5] || "").trim();
+      const category = cell(row, categoryIdx).toLowerCase();
+      const response = cell(row, responseIdx);
+      const ticketId = cell(row, ticketIdx);
+      const chatId = cell(row, chatIdx);
+      const uid = cell(row, uidIdx);
 
-      // Extract hour from column W (index 22) for hourly productivity
+      // Extract hour from timestamp for hourly productivity
       if (timestampStr) {
         if (hour >= 0 && hour < 24) {
              const hr = hour;
@@ -1080,14 +1068,22 @@ export const processKPIs = (
         }
       }
 
-      const rcaAgent = rcaAgentIdx !== -1 ? String(row[rcaAgentIdx] || '').trim() : '';
-      const rcaCustomer = rcaCustomerIdx !== -1 ? String(row[rcaCustomerIdx] || '').trim() : '';
-      const rcaAkulaku = rcaAkulakuIdx !== -1 ? String(row[rcaAkulakuIdx] || '').trim() : '';
+      const rcaAgent = cell(row, csatColumns.rcaAgent);
+      const rcaCustomer = cell(row, csatColumns.rcaCustomer);
+      const rcaAkulaku = cell(row, csatColumns.rcaAkulaku);
 
-      const csatScEntryKey = [
+      const csatTicketKey = ticketId
+        ? ticketId.toLowerCase()
+        : (chatId || uid)
+          ? [chatId, uid, normDate || dateStr.trim()].join("|").toLowerCase()
+          : "";
+      if (csatTicketKey && seenCsatTickets.has(csatTicketKey)) continue;
+      if (csatTicketKey) seenCsatTickets.add(csatTicketKey);
+
+      const csatScEntryKey = transactionKey([
+        ticketId,
         agentId,
         normDate || dateStr.trim(),
-        ticketId,
         chatId,
         uid,
         scoreStr,
@@ -1097,7 +1093,7 @@ export const processKPIs = (
         rcaCustomer,
         rcaAkulaku,
         timestampStr,
-      ].join("|").toLowerCase();
+      ]);
 
       if (seenCsatScEntries.has(csatScEntryKey)) continue;
       seenCsatScEntries.add(csatScEntryKey);
@@ -1244,33 +1240,20 @@ export const processKPIs = (
 
   if (slaData.length > 1) {
     const seenSlaEntries = new Set<string>();
-    const findSlaHeader = (terms: string[]) => {
-      for (const header of slaData.slice(0, 2)) {
-        const index = header.findIndex((cell) => {
-          const value = String(cell || '').trim().toLowerCase();
-          return terms.some((term) => value.includes(term));
-        });
-        if (index >= 0) return index;
-      }
-      return -1;
-    };
-    const sla1HeaderIdx = findSlaHeader(['sla 1m', 'sla1m', 'sla 1 min']);
-    const sla3HeaderIdx = findSlaHeader(['sla 3m', 'sla3m', 'sla 3 min']);
-    const slaDateHeaderIdx = findSlaHeader(['date', 'tanggal', 'time', 'waktu']);
+    const slaColumns = resolveSlaColumns(slaData);
+    const seenSlaTickets = new Set<string>();
 
     for (let i = 1; i < slaData.length; i++) {
       const row = slaData[i];
       if (!row || row.length < 2) continue;
 
-      const idIdx = row.findIndex((cell) =>
-        String(cell || "")
-          .trim()
-          .startsWith("3-1-"),
-      );
-      if (idIdx === -1) continue;
+      const resolvedId = resolveRowCsId(row, slaColumns.csId);
+      if (!resolvedId.id) continue;
+      const idIdx = resolvedId.index;
 
-      const agentId = String(row[idIdx]).trim();
-      const dateStr = String(row[slaDateHeaderIdx >= 0 ? slaDateHeaderIdx : (idIdx > 0 ? 0 : -1)] || "");
+      const agentId = resolvedId.id;
+      const dateIdx = pickColumn(slaColumns.date, idIdx > 0 ? 0 : -1);
+      const dateStr = cell(row, dateIdx);
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
       const hour = extractTimestampHour(dateStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
@@ -1292,17 +1275,27 @@ export const processKPIs = (
         return isNaN(n) ? null : n * 100;
       };
 
-      const sla1ValueIdx = sla1HeaderIdx >= 0 ? sla1HeaderIdx : idIdx + 11;
-      const sla3ValueIdx = sla3HeaderIdx >= 0 ? sla3HeaderIdx : idIdx + 13;
-      const sla1 = parseSla(String(row[sla1ValueIdx] || ""));
-      const sla3 = parseSla(String(row[sla3ValueIdx] || ""));
+      const sla1ValueIdx = pickColumn(slaColumns.sla1m, idIdx >= 0 ? idIdx + 11 : -1);
+      const sla3ValueIdx = pickColumn(slaColumns.sla3m, idIdx >= 0 ? idIdx + 13 : -1);
+      const sla1Raw = cell(row, sla1ValueIdx);
+      const sla3Raw = cell(row, sla3ValueIdx);
+      const sla1 = parseSla(sla1Raw);
+      const sla3 = parseSla(sla3Raw);
+      const ticketId = cell(row, slaColumns.ticketId);
 
-      const slaEntryKey = [
+      const slaTicketKey = ticketId
+        ? ticketId.toLowerCase()
+        : '';
+      if (slaTicketKey && seenSlaTickets.has(slaTicketKey)) continue;
+      if (slaTicketKey) seenSlaTickets.add(slaTicketKey);
+
+      const slaEntryKey = transactionKey([
+        ticketId,
         agentId,
         normDate || dateStr.trim(),
-        String(row[sla1ValueIdx] || "").trim(),
-        String(row[sla3ValueIdx] || "").trim(),
-      ].join("|").toLowerCase();
+        sla1Raw,
+        sla3Raw,
+      ]);
 
       if (seenSlaEntries.has(slaEntryKey)) continue;
       seenSlaEntries.add(slaEntryKey);
@@ -1311,13 +1304,13 @@ export const processKPIs = (
         if (!sla1mSum[agent.csId]) sla1mSum[agent.csId] = { sum: 0, count: 0 };
         sla1mSum[agent.csId].sum += sla1;
         sla1mSum[agent.csId].count += 1;
-        agent.dailyHistory.sla1m.push({ date: targetDateLabel, value: sla1 });
+        agent.dailyHistory.sla1m.push({ date: targetDateLabel, normDate, value: sla1 });
       }
       if (sla3 !== null && !isNaN(sla3)) {
         if (!sla3mSum[agent.csId]) sla3mSum[agent.csId] = { sum: 0, count: 0 };
         sla3mSum[agent.csId].sum += sla3;
         sla3mSum[agent.csId].count += 1;
-        agent.dailyHistory.sla3m.push({ date: targetDateLabel, value: sla3 });
+        agent.dailyHistory.sla3m.push({ date: targetDateLabel, normDate, value: sla3 });
       }
     }
   }
@@ -1325,14 +1318,19 @@ export const processKPIs = (
   // 4. QA Score (Index starts at 1)
   if (qaData.length > 1) {
     const seenQaEntries = new Set<string>();
+    const seenQaTickets = new Set<string>();
+    const qaColumns = resolveQaColumns(qaData[0] || []);
 
     for (let i = 1; i < qaData.length; i++) {
       const row = qaData[i];
-      if (!row || row.length < 16) continue; // Changed from 18 to 16, to at least cover P (Mistake Level)
+      if (!row || row.length < 2) continue;
 
-      // Column N (Index 13) is Checking Date
-      const dateStr = String(row[13] || "");
-      const agentId = String(row[0]).trim();
+      const resolvedId = resolveRowCsId(row, pickColumn(qaColumns.csId, 0));
+      if (!resolvedId.id) continue;
+      const agentId = resolvedId.id;
+
+      const dateIdx = pickColumn(qaColumns.date, 13);
+      const dateStr = cell(row, dateIdx);
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
       const hour = extractTimestampHour(dateStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
@@ -1343,28 +1341,23 @@ export const processKPIs = (
           : dateStr
         : dateStr;
 
-      // Column A (Index 0) is CS ID
       const agent = getAgent(agentId);
       if (!agent) continue;
 
-      // QA Detail Extractor
-      const ticketId = String(row[4] || "").trim(); // E
-      const uid = String(row[5] || "").trim(); // F
-      const chatId = String(row[6] || "").trim(); // G
-      const caseDate = String(row[8] || "").trim(); // I
-      const systemCheckingType = String(row[12] || "").trim(); // M
-      const qcName = String(row[14] || "").trim(); // O
-      const mistakeLevel = String(row[15] || "").trim(); // P
-      const deduction = 0; // Not mentioned, defaulting to 0
-      const category = String(row[30] || "").trim(); // AE
-      const remarks = String(row[32] || "").trim(); // AG
-      const feedback = ""; // Not mentioned, left empty
-      const crmKode = String(row[28] || "").trim(); // AC
+      const ticketId = cell(row, pickColumn(qaColumns.ticketId, 4));
+      const uid = cell(row, pickColumn(qaColumns.uid, 5));
+      const chatId = cell(row, pickColumn(qaColumns.chatId, 6));
+      const caseDate = cell(row, pickColumn(qaColumns.caseDate, 8));
+      const systemCheckingType = cell(row, pickColumn(qaColumns.systemCheckingType, 12));
+      const qcName = cell(row, pickColumn(qaColumns.qcName, 14));
+      const mistakeLevel = cell(row, pickColumn(qaColumns.mistakeLevel, 15));
+      const deduction = 0;
+      const category = cell(row, pickColumn(qaColumns.category, 30));
+      const remarks = cell(row, pickColumn(qaColumns.remarks, 32));
+      const feedback = "";
+      const crmKode = cell(row, pickColumn(qaColumns.crmKode, 28));
 
-      // Column R (Index 17) is QC Score
-      const scoreStr = String(row[17] || "")
-        .replace(",", ".")
-        .trim();
+      const scoreStr = cell(row, pickColumn(qaColumns.score, 17)).replace(",", ".");
       let score = Number.NaN;
       if (scoreStr.includes("%")) {
         score = parseFloat(scoreStr.replace("%", ""));
@@ -1372,10 +1365,18 @@ export const processKPIs = (
         score = parseFloat(scoreStr);
       }
 
-      const qaEntryKey = [
+      const qaTicketKey = ticketId
+        ? ticketId.toLowerCase()
+        : (chatId || uid)
+          ? [chatId, uid, normDate || dateStr.trim()].join("|").toLowerCase()
+          : "";
+      if (qaTicketKey && seenQaTickets.has(qaTicketKey)) continue;
+      if (qaTicketKey) seenQaTickets.add(qaTicketKey);
+
+      const qaEntryKey = transactionKey([
+        ticketId,
         agentId,
         normalizeDateStr(dateStr) || dateStr.trim(),
-        ticketId,
         uid,
         chatId,
         caseDate,
@@ -1386,7 +1387,7 @@ export const processKPIs = (
         remarks,
         crmKode,
         scoreStr,
-      ].join("|").toLowerCase();
+      ]);
 
       if (seenQaEntries.has(qaEntryKey)) continue;
       seenQaEntries.add(qaEntryKey);

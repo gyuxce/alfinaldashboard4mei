@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI, QAEntry } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, parseDateForSort, cn, indexByDate, groupByDate } from '../../lib/utils';
+import { formatNum, getKpiColor, indexByDate, groupByDate, uniqueCalendarDates, getByCalendarDate, getGroupByCalendarDate } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -75,11 +75,10 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   }, [data, search, filterTL]);
 
   const uniqueDates = useMemo(() => {
-    const dates = new Set<string>();
-    tableData.forEach(a => {
-      a.qaHistory?.forEach(h => dates.add(h.date));
-    });
-    return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+    return uniqueCalendarDates(tableData.flatMap((a) => [
+      a.dailyHistory?.schedule,
+      a.qaHistory,
+    ]));
   }, [tableData]);
 
   const defectData = useMemo(() => {
@@ -422,8 +421,8 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                       
                       {uniqueDates.map(date => {
-                        const dailyQA = qaByDate.get(date) || [];
-                        const sched = scheduleByDate.get(date);
+                        const dailyQA = getGroupByCalendarDate(qaByDate, date);
+                        const sched = getByCalendarDate(scheduleByDate, date);
                         const status = sched?.status?.toUpperCase() || '';
                         
                         const isOff = status === 'OFF' || status === 'C';

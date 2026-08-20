@@ -1,16 +1,10 @@
+import { findHeader } from './sheetHeaders';
+
 export type AgentDictionary = Record<string, {
   name: string;
   bpo: string;
   teamLeader: string;
 }>;
-
-const normalizeHeader = (value: unknown) =>
-  String(value || '').toLowerCase().replace(/[\s_-]/g, '');
-
-const findHeader = (headers: unknown[], aliases: string[]) => {
-  const normalizedAliases = aliases.map(normalizeHeader);
-  return headers.findIndex((header) => normalizedAliases.includes(normalizeHeader(header)));
-};
 
 /** Resolve the aliases accepted by CSV validation before parsing CSID rows. */
 export function resolveCsidColumns(headers: unknown[]) {

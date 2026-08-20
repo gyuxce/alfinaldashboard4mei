@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate } from '../../lib/utils';
+import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate, uniqueCalendarDates, getByCalendarDate } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -90,12 +90,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   }, [data, search, filterTL, viewMode]);
 
   const uniqueDates = useMemo(() => {
-    const dates = new Set<string>();
-    tableData.forEach(a => {
-      a.dailyHistory?.csatScFull?.forEach(h => dates.add(h.date));
-      a.dailyHistory?.csatScFair?.forEach(h => dates.add(h.date));
-    });
-    return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
+    return uniqueCalendarDates(tableData.flatMap((a) => [
+      a.dailyHistory?.schedule,
+      a.dailyHistory?.csatScFull,
+      a.dailyHistory?.csatScFair,
+    ]));
   }, [tableData]);
 
   const topCategories = useMemo(() => {
@@ -146,9 +145,10 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     tableData.forEach(a => {
       const dailyArr = viewMode === 'full' ? a.dailyHistory?.csatScFull : a.dailyHistory?.csatScFair;
       dailyArr?.forEach(h => {
-        if (!h.count) return;
-        const current = dailyMap.get(h.date) || { good: 0, total: 0 };
-        dailyMap.set(h.date, {
+        const key = h.normDate || h.date;
+        if (!key || !h.count) return;
+        const current = dailyMap.get(key) || { good: 0, total: 0 };
+        dailyMap.set(key, {
           good: current.good + h.score,
           total: current.total + h.count,
         });
@@ -944,8 +944,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                   
                   {uniqueDates.map(date => {
-                    const daily = dailyByDate.get(date);
-                    const sched = scheduleByDate.get(date);
+                    const daily = getByCalendarDate(dailyByDate, date);
+                    const sched = getByCalendarDate(scheduleByDate, date);
                     const status = sched?.status?.toUpperCase() || '';
                       
                     const isOff = status === 'OFF' || status === 'C';
