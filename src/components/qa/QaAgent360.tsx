@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI, QAEntry, normalizeDateStr } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, indexByDate, groupByDate, uniqueCalendarDates, getByCalendarDate, getGroupByCalendarDate, formatCalendarHeader } from '../../lib/utils';
+import { formatNum, getKpiColor, parseDateForSort, indexByDate, groupByDate, getByCalendarDate, getGroupByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -75,9 +75,13 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   }, [data, search, filterTL]);
 
   const uniqueDates = useMemo(() => {
-    // QA is sparse (not every roster day). Using schedule dates fills the
-    // matrix with "-" and hides the days that actually have scores.
-    return uniqueCalendarDates(tableData.map((a) => a.qaHistory));
+    const dates = new Set<string>();
+    tableData.forEach((a) => {
+      a.qaHistory?.forEach((h) => {
+        if (h.date) dates.add(h.date);
+      });
+    });
+    return Array.from(dates).sort((a, b) => parseDateForSort(a) - parseDateForSort(b));
   }, [tableData]);
 
   const defectData = useMemo(() => {
@@ -384,7 +388,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="TL" sortKey="teamLeader" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                   {uniqueDates.map(date => (
                     <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[76px]">
-                      {formatCalendarHeader(date)}
+                      {date}
                     </th>
                   ))}
                   <SortableHeader label="Rata-rata QA" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
@@ -420,19 +424,17 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                       
                       {uniqueDates.map(date => {
-                        const dailyQA = getGroupByCalendarDate(qaByDate, date);
-                        const sched = getByCalendarDate(scheduleByDate, date);
+                        const dailyQA = (qaByDate.get(date) && qaByDate.get(date)!.length > 0)
+                          ? qaByDate.get(date)!
+                          : getGroupByCalendarDate(qaByDate, date);
+                        const sched = scheduleByDate.get(date) || getByCalendarDate(scheduleByDate, date);
                         const status = sched?.status?.toUpperCase() || '';
                         
                         const isOff = status === 'OFF' || status === 'C';
                         const isPullout = status === 'PULLOUT';
                         const bgClass = isOff ? 'text-text-muted' : '';
                         
-                        const validQA = dailyQA.filter((h) => (
-                          h.hasScore !== false
-                          && typeof h.score === 'number'
-                          && !isNaN(h.score)
-                        ));
+                        const validQA = dailyQA.filter(h => h.hasScore);
                         if (dailyQA.length === 0) {
                           return <td key={date} className={`p-2 text-center text-text-disabled z-10 ${bgClass} min-w-[76px]`}>-</td>;
                         }

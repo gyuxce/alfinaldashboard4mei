@@ -1352,7 +1352,7 @@ export const processKPIs = (
       let normDate = dateStr ? normalizeDateStr(dateStr) : null;
       const hour = extractTimestampHour(dateStr);
       normDate = getShiftAdjustedDate(agentId, normDate, hour);
-      if (!isWithin(normDate)) continue;
+      if (dateStr && normDate && !isWithin(normDate)) continue;
       const targetDateLabel = dateStr
         ? normDate
           ? getScheduleDateLabel(agentId, normDate)
