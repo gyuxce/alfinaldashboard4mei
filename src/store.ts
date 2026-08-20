@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError } from './lib/sheetsApi';
+import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError, getDateRangeForSheetMonth } from './lib/sheetsApi';
 import { buildAgentDictionary } from './lib/csid';
 
 let sheetsSyncGeneration = 0;
 let sheetsAbortController: AbortController | null = null;
 let hydratePromise: Promise<void> | null = null;
 let inFlightSheetsFetch: { month: string; promise: Promise<void> } | null = null;
+let storageEpoch = 0;
+let sheetsPersistChain: Promise<void> = Promise.resolve();
 
 function formatLocalDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -194,7 +196,13 @@ export const useStore = create<AppState>((set, get) => ({
   clearPendingTab: () => set(() => ({ pendingTab: null })),
 
   clearFiles: async () => {
-    // Clear Zustand
+    storageEpoch += 1;
+    sheetsSyncGeneration += 1;
+    sheetsAbortController?.abort();
+    sheetsAbortController = null;
+    inFlightSheetsFetch = null;
+    hydratePromise = null;
+
     set(() => ({
       productivityFile: null,
       csatScFile: null,
@@ -215,10 +223,14 @@ export const useStore = create<AppState>((set, get) => ({
       activeMonthRowCounts: null,
       selectedBpo: 'All BPO',
       selectedTL: 'All TL',
-      persistedKeys: []
+      persistedKeys: [],
+      lastSyncTime: null,
+      dataSource: 'csv',
+      isFetchingSheets: false,
+      sheetsSyncProgress: null,
+      sheetsFetchError: null,
     }));
     
-    // Clear IndexedDb
     await clearAllData();
   },
 
@@ -228,13 +240,22 @@ export const useStore = create<AppState>((set, get) => ({
     hydratePromise = (async () => {
       set({ isHydrating: true });
       const hydrateStartedAt = Date.now();
+      const hydrateEpoch = storageEpoch;
       try {
         const keys = await listKeys();
+        if (hydrateEpoch !== storageEpoch) {
+          set({ isHydrating: false });
+          return;
+        }
         const filesToLoad = ['productivityFile', 'csatScFile', 'slaFile', 'scheduleFile', 'csidFile', 'qaFile'];
 
         const fileData: Partial<AppState> = { fileValidations: {}, fileNames: {} };
 
         for (const k of filesToLoad) {
+          if (hydrateEpoch !== storageEpoch) {
+            set({ isHydrating: false });
+            return;
+          }
           if (keys.includes(k)) {
             const loadedData = await loadData(k);
             if (loadedData) {
@@ -288,9 +309,24 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
 
-        // A live Sheets fetch won the race; do not clobber it with IndexedDB.
-        const liveSync = get().lastSyncTime?.getTime() || 0;
-        if (get().isFetchingSheets || liveSync > hydrateStartedAt) {
+        const monthForFilter = fileData.selectedSheetMonth || get().selectedSheetMonth;
+        if (fileData.dataSource === 'sheets' && monthForFilter) {
+          const monthRange = getDateRangeForSheetMonth(monthForFilter);
+          if (monthRange) {
+            fileData.startDate = monthRange.start;
+            fileData.endDate = monthRange.end;
+          }
+        }
+
+        // Re-check immediately before applying IndexedDB so a live/completed
+        // Sheets sync cannot be clobbered by a slower hydrate.
+        if (hydrateEpoch !== storageEpoch) {
+          set({ isHydrating: false });
+          return;
+        }
+        const live = get();
+        const liveSync = live.lastSyncTime?.getTime() || 0;
+        if (live.isFetchingSheets || liveSync > hydrateStartedAt) {
           set({ isHydrating: false });
           return;
         }
@@ -467,6 +503,7 @@ export const useStore = create<AppState>((set, get) => ({
           qaFile: `QA (${loadedMonthLabel})`,
         };
         const agentDictionary = agentDictionaryByMonth[selectedMonth] || newAgentDict;
+        const monthRange = getDateRangeForSheetMonth(selectedMonth);
 
         set({
           csidFile: new File([], fileNames.csidFile),
@@ -491,29 +528,37 @@ export const useStore = create<AppState>((set, get) => ({
           sheetsSyncProgress: null,
           dataSource: 'sheets',
           fileNames,
+          ...(monthRange ? { startDate: monthRange.start, endDate: monthRange.end } : {}),
         });
 
-        Promise.all([
-          saveData('csidFile', csvCsid.data),
-          saveData('productivityFile', csvProductivity.data),
-          saveData('csatScFile', csvCsatSc.data),
-          saveData('slaFile', csvSla.data),
-          saveData('scheduleFile', csvSchedule.data),
-          saveData('qaFile', csvQa.data),
-          saveData('sheetsMeta', {
-            dataSource: 'sheets',
-            selectedSheetMonth: selectedMonth,
-            lastSyncTime: syncedAt.toISOString(),
-            activeMonthRowCounts: currentMonthRows,
-            agentDictionary,
-            agentDictionaryByMonth,
-            fileNames,
-          }),
-        ]).then(() => {
-          if (gen !== sheetsSyncGeneration) return;
-          listKeys().then((keys) => set({ persistedKeys: keys }));
-        }).catch((err) => {
-          console.warn('Failed to persist sheets snapshot', err);
+        const persistGen = gen;
+        sheetsPersistChain = sheetsPersistChain.then(async () => {
+          if (persistGen !== sheetsSyncGeneration) return;
+          try {
+            await Promise.all([
+              saveData('csidFile', csvCsid.data),
+              saveData('productivityFile', csvProductivity.data),
+              saveData('csatScFile', csvCsatSc.data),
+              saveData('slaFile', csvSla.data),
+              saveData('scheduleFile', csvSchedule.data),
+              saveData('qaFile', csvQa.data),
+              saveData('sheetsMeta', {
+                dataSource: 'sheets',
+                selectedSheetMonth: selectedMonth,
+                lastSyncTime: syncedAt.toISOString(),
+                activeMonthRowCounts: currentMonthRows,
+                agentDictionary,
+                agentDictionaryByMonth,
+                fileNames,
+              }),
+            ]);
+            if (persistGen !== sheetsSyncGeneration) return;
+            const persisted = await listKeys();
+            if (persistGen !== sheetsSyncGeneration) return;
+            set({ persistedKeys: persisted });
+          } catch (err) {
+            console.warn('Failed to persist sheets snapshot', err);
+          }
         });
 
       } catch (error) {

@@ -7,8 +7,14 @@ export const normalizeHeader = (value: unknown) =>
   String(value || '').toLowerCase().replace(/[\s_-]/g, '');
 
 export function findHeader(headers: unknown[], aliases: readonly string[]) {
-  const normalizedAliases = aliases.map(normalizeHeader);
-  return headers.findIndex((header) => normalizedAliases.includes(normalizeHeader(header)));
+  // Prefer earlier aliases so "CS ID" wins over a generic "ID" column.
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeHeader(alias);
+    if (!normalizedAlias) continue;
+    const index = headers.findIndex((header) => normalizeHeader(header) === normalizedAlias);
+    if (index >= 0) return index;
+  }
+  return -1;
 }
 
 export function findHeaderIncludes(headers: unknown[], terms: readonly string[]) {
@@ -181,17 +187,33 @@ export function resolveSlaColumns(data: unknown[][]): SlaColumns {
 }
 
 export function resolveQaColumns(headers: unknown[]): QaColumns {
+  const caseDate = findHeaderIncludes(headers, ['case date', 'tanggal case', 'tgl case']);
+  const checkingDate = findHeaderIncludes(headers, [
+    'checking date',
+    'check date',
+    'qa date',
+    'qc date',
+    'tanggal checking',
+    'tgl checking',
+    'tanggal qc',
+    'tgl qc',
+  ]);
+  const genericDate = findHeaderIncludes(headers, ['date', 'tanggal']);
+  const qcScore = findHeaderIncludes(headers, ['qc score', 'qa score', 'final score', 'nilai qc', 'nilai qa']);
+
   return {
     csId: findHeader(headers, CS_ID_ALIASES),
-    date: findHeaderIncludes(headers, ['checking date', 'check date', 'qa date', 'date', 'tanggal']),
-    ticketId: findHeaderIncludes(headers, TICKET_ALIASES),
+    date: checkingDate >= 0
+      ? checkingDate
+      : (genericDate >= 0 && genericDate !== caseDate ? genericDate : -1),
+    ticketId: findHeaderIncludes(headers, ['ticket id', 'ticketid', 'id ticket']),
     uid: findHeaderIncludes(headers, UID_ALIASES),
     chatId: findHeaderIncludes(headers, CHAT_ALIASES),
-    caseDate: findHeaderIncludes(headers, ['case date', 'tanggal case']),
+    caseDate,
     systemCheckingType: findHeaderIncludes(headers, ['system checking', 'checking type', 'tipe checking']),
-    qcName: findHeaderIncludes(headers, ['qc name', 'qa name', 'auditor', 'qc']),
+    qcName: findHeaderIncludes(headers, ['qc name', 'qa name', 'auditor', 'checker']),
     mistakeLevel: findHeaderIncludes(headers, ['mistake level', 'defect level', 'severity']),
-    score: findHeaderIncludes(headers, ['qc score', 'qa score', 'score']),
+    score: qcScore >= 0 ? qcScore : findHeader(headers, ['Score', 'Nilai']),
     category: findHeaderIncludes(headers, ['category', 'kategori', 'defect category']),
     remarks: findHeaderIncludes(headers, ['remarks', 'remark', 'catatan', 'notes']),
     crmKode: findHeaderIncludes(headers, ['crm kode', 'crm code', 'kode crm']),

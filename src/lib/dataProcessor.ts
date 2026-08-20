@@ -1366,9 +1366,9 @@ export const processKPIs = (
       }
 
       const qaTicketKey = ticketId
-        ? ticketId.toLowerCase()
+        ? `${agentId}|${ticketId}`.toLowerCase()
         : (chatId || uid)
-          ? [chatId, uid, normDate || dateStr.trim()].join("|").toLowerCase()
+          ? [agentId, chatId, uid, normDate || dateStr.trim()].join("|").toLowerCase()
           : "";
       if (qaTicketKey && seenQaTickets.has(qaTicketKey)) continue;
       if (qaTicketKey) seenQaTickets.add(qaTicketKey);

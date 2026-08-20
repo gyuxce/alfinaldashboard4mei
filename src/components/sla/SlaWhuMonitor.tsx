@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, getByCalendarDate } from '../../lib/utils';
+import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 import { Search } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -130,7 +130,7 @@ export const SlaWhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <SortableHeader label="Team Leader" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                 {uniqueDates.map(date => (
                   <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface ">
-                    {date}
+                    {formatCalendarHeader(date)}
                   </th>
                 ))}
                 <SortableHeader label="Total SLA Average" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />

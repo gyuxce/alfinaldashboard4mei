@@ -116,31 +116,36 @@ export function groupByDate<T extends readonly DatedEntry[]>(
   return map;
 }
 
+export function formatCalendarHeader(dateKey: string): string {
+  const nd = /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : (normalizeDateStr(dateKey) || '');
+  const match = nd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return dateKey;
+  return `${Number(match[3])}/${Number(match[2])}/${match[1]}`;
+}
+
 export function uniqueCalendarDates(
   series: Array<readonly DatedEntry[] | null | undefined>,
 ): string[] {
-  const byNorm = new Map<string, string>();
+  const byNorm = new Set<string>();
   for (const entries of series) {
     if (!entries) continue;
     for (const entry of entries) {
       const label = String(entry.date || '').trim();
       const nd = String(entry.normDate || '').trim() || normalizeDateStr(label);
       if (!nd) continue;
-      if (!byNorm.has(nd)) byNorm.set(nd, label || nd);
+      byNorm.add(nd);
     }
   }
-  return Array.from(byNorm.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([, date]) => date);
+  return Array.from(byNorm).sort((a, b) => a.localeCompare(b));
 }
 
 export function getByCalendarDate<T extends DatedEntry>(
   indexed: Map<string, T>,
   dateLabel: string,
 ): T | undefined {
-  if (indexed.has(dateLabel)) return indexed.get(dateLabel);
-  const nd = normalizeDateStr(dateLabel);
+  const nd = /^\d{4}-\d{2}-\d{2}$/.test(dateLabel) ? dateLabel : normalizeDateStr(dateLabel);
   if (nd && indexed.has(nd)) return indexed.get(nd);
+  if (indexed.has(dateLabel)) return indexed.get(dateLabel);
   return undefined;
 }
 
@@ -148,9 +153,9 @@ export function getGroupByCalendarDate<T extends DatedEntry>(
   grouped: Map<string, T[]>,
   dateLabel: string,
 ): T[] {
-  if (grouped.has(dateLabel)) return grouped.get(dateLabel) || [];
-  const nd = normalizeDateStr(dateLabel);
+  const nd = /^\d{4}-\d{2}-\d{2}$/.test(dateLabel) ? dateLabel : normalizeDateStr(dateLabel);
   if (nd && grouped.has(nd)) return grouped.get(nd) || [];
+  if (grouped.has(dateLabel)) return grouped.get(dateLabel) || [];
   return [];
 }
 

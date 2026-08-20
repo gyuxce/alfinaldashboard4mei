@@ -7,7 +7,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { VirtualizedTbody } from '../ui/VirtualizedTbody';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
-import { uniqueCalendarDates, indexByDate, getByCalendarDate } from '../../lib/utils';
+import { uniqueCalendarDates, indexByDate, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 
 export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -68,7 +68,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <th className="p-2 font-bold  md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]">Team Leader</th>
                 {uniqueDates.map(date => (
                   <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface ">
-                    {date}
+                    {formatCalendarHeader(date)}
                   </th>
                 ))}
                 <th className="p-2 font-bold text-center text-text-primary  bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">

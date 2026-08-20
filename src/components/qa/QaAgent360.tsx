@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { AgentKPI, QAEntry } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, indexByDate, groupByDate, uniqueCalendarDates, getByCalendarDate, getGroupByCalendarDate } from '../../lib/utils';
+import { AgentKPI, QAEntry, normalizeDateStr } from '../../lib/dataProcessor';
+import { formatNum, getKpiColor, indexByDate, groupByDate, uniqueCalendarDates, getByCalendarDate, getGroupByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -385,7 +385,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="TL" sortKey="teamLeader" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                   {uniqueDates.map(date => (
                     <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border">
-                      {date}
+                      {formatCalendarHeader(date)}
                     </th>
                   ))}
                   <SortableHeader label="Rata-rata QA" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
@@ -592,7 +592,12 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
            });
         }
         
-        const filteredDefects = selectedAgent.date ? filteredDefectsList.filter(q => q.date === selectedAgent.date) : filteredDefectsList;
+        const filteredDefects = selectedAgent.date
+          ? filteredDefectsList.filter((q) => {
+              const nd = q.normDate || normalizeDateStr(q.date || '');
+              return nd === selectedAgent.date || q.date === selectedAgent.date;
+            })
+          : filteredDefectsList;
 
         const categoryCounts: Record<string, number> = {};
         filteredDefects.forEach(d => {
@@ -625,7 +630,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     <h3 className="font-bold text-base md:text-lg text-text-primary flex flex-wrap items-center gap-1.5 md:gap-2">
                       <AlertCircle className={`w-4 h-4 md:w-5 md:h-5 ${selectedAgent.type === 'defects' ? 'text-danger' : selectedAgent.type === 'no_mistake' ? 'text-success' : 'text-primary'}`} />
                       {selectedAgent.type === 'all' ? 'Riwayat evaluasi QA:' : selectedAgent.type === 'no_mistake' ? 'Evaluasi tanpa temuan:' : 'Riwayat audit:'} {selectedAgent.agent.name || selectedAgent.agent.csId} 
-                      {selectedAgent.date && <span className="text-text-muted font-normal text-xs md:text-sm ml-1 md:ml-2">({selectedAgent.date})</span>}
+                      {selectedAgent.date && <span className="text-text-muted font-normal text-xs md:text-sm ml-1 md:ml-2">({formatCalendarHeader(selectedAgent.date)})</span>}
                     </h3>
                     <p className="text-[10px] md:text-xs text-text-muted mt-0.5 md:mt-1 ml-6 md:ml-7 flex flex-wrap items-center gap-1">
                       <span>CS ID: <span className="font-semibold text-text-primary">{selectedAgent.agent.csId}</span></span>

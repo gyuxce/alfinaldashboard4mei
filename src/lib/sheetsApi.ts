@@ -215,6 +215,29 @@ export function getCurrentSheetMonthKey(): string {
   return getSheetMonthOptions().some(option => option.key === key) ? key : 'legacy';
 }
 
+function padMonthDay(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+/** Calendar range for a File Center month key (`AUG_2026`, `legacy` → Mei 2026). */
+export function getDateRangeForSheetMonth(monthKey: string): { start: string; end: string } | null {
+  const option = getSheetMonthOption(monthKey);
+  if (!option.suffix) {
+    return { start: '2026-05-01', end: '2026-05-31' };
+  }
+
+  const [monthCode, yearValue] = option.key.split('_');
+  const month = MONTHS.find((item) => item.code === monthCode);
+  const year = Number(yearValue);
+  if (!month || !year) return null;
+
+  const lastDay = new Date(year, month.number, 0).getDate();
+  return {
+    start: `${year}-${padMonthDay(month.number)}-01`,
+    end: `${year}-${padMonthDay(month.number)}-${padMonthDay(lastDay)}`,
+  };
+}
+
 export function getPreviousSheetMonthKey(monthKey: string): string | null {
   const option = getSheetMonthOption(monthKey);
   if (!option.suffix) return null;
@@ -321,7 +344,7 @@ export async function fetchAllSheets(
     await sleep(1000 * Math.pow(2, attempt));
   }
 
-  return emptyAllSheetsData();
+  throw new Error('Koneksi ke Google Sheets terputus. Coba Sync lagi.');
 }
 
 function mergeSheetData(
@@ -434,7 +457,7 @@ export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsDa
     csatSc: mergeSheetData(previous.csatSc, current.csatSc, ['ticket id', 'ticket', 'chat id']),
     sla: mergeSheetData(previous.sla, current.sla, ['ticket id', 'ticket']),
     schedule: mergeScheduleSheetData(previous.schedule, current.schedule),
-    qa: mergeSheetData(previous.qa, current.qa, ['ticket id', 'ticket', 'chat id']),
+    qa: mergeSheetData(previous.qa, current.qa, ['ticket id', 'ticketid', 'id ticket']),
   };
 }
 

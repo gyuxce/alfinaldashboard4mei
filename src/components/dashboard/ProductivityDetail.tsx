@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef } from "react";
 import { AgentKPI } from "../../lib/dataProcessor";
-import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, getByCalendarDate } from "../../lib/utils";
+import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, getByCalendarDate, formatCalendarHeader } from "../../lib/utils";
 import { chart } from "../../lib/themeColors";
 import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
@@ -570,7 +570,7 @@ export const ProductivityDetail: React.FC<{
                   key={date}
                   className="p-2 font-bold text-center text-text-muted bg-surface"
                 >
-                  {date}
+                  {formatCalendarHeader(date)}
                 </th>
               ))}
               <th className="p-2 font-bold text-center text-text-primary  bg-surface shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] z-30 relative">
