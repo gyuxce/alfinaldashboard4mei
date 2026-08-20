@@ -1336,7 +1336,7 @@ export const processKPIs = (
   // 4. QA Score (Index starts at 1)
   if (qaData.length > 1) {
     const seenQaEntries = new Set<string>();
-    const seenQaTickets = new Set<string>();
+    const seenQaTicketScores = new Set<string>();
     const qaColumns = resolveQaColumns(qaData[0] || []);
 
     for (let i = 1; i < qaData.length; i++) {
@@ -1384,8 +1384,6 @@ export const processKPIs = (
         ticketId,
         [chatId, uid],
       );
-      if (qaTicketKey && seenQaTickets.has(qaTicketKey)) continue;
-      if (qaTicketKey) seenQaTickets.add(qaTicketKey);
 
       const qaEntryKey = transactionKey([
         ticketId,
@@ -1406,11 +1404,18 @@ export const processKPIs = (
       if (seenQaEntries.has(qaEntryKey)) continue;
       seenQaEntries.add(qaEntryKey);
 
-      if (!isNaN(score)) {
+      // One ticket often has several QC line-items; QC Score is filled on
+      // only one of them. Keep every line for defect analysis, but count
+      // the numeric score once per agent + day + ticket.
+      const rowHasScore = !isNaN(score);
+      const alreadyScored = Boolean(qaTicketKey && seenQaTicketScores.has(qaTicketKey));
+      const countScore = rowHasScore && !alreadyScored;
+      if (countScore) {
+        if (qaTicketKey) seenQaTicketScores.add(qaTicketKey);
         agent.qaScoreSum += score;
         agent.qaScoreCount += 1;
       }
-      
+
       agent.qaHistory.push({
         date: targetDateLabel,
         normDate,
@@ -1424,8 +1429,8 @@ export const processKPIs = (
         category,
         remarks,
         deduction,
-        score: isNaN(score) ? 0 : score,
-        hasScore: !isNaN(score),
+        score: rowHasScore ? score : 0,
+        hasScore: countScore,
         feedback,
         crmKode,
       });

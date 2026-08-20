@@ -351,6 +351,7 @@ function mergeSheetData(
   previous: SheetData,
   current: SheetData,
   ticketAliases: string[] = [],
+  lineIdentityAliases: string[][] = [],
 ): SheetData {
   if (!previous.length) return current;
   if (!current.length) return previous;
@@ -359,9 +360,11 @@ function mergeSheetData(
   const ticketIdx = ticketAliases.length ? findHeaderIncludes(header, ticketAliases) : -1;
   const csIdIdx = findHeader(header, ['CS ID', 'csid', 'cs_id', 'agent id', 'csid agent']);
   const dateIdx = findHeaderIncludes(header, ['checking date', 'check date', 'qa date', 'date', 'tanggal']);
+  const lineIdxs = lineIdentityAliases.map((aliases) => findHeaderIncludes(header, aliases));
 
   // History tabs can overlap at month boundaries. Drop exact duplicate rows,
-  // then keep the latest row for the same agent + calendar day + ticket.
+  // then keep the latest row for the same agent + calendar day + ticket
+  // (+ QA line identity: one ticket often has several mistake rows).
   const seenRows = new Set<string>();
   const ticketIndex = new Map<string, number>();
   const body: SheetRow[] = [];
@@ -375,7 +378,8 @@ function mergeSheetData(
     const csId = csIdIdx >= 0 ? cell(row, csIdIdx).toLowerCase() : '';
     const rawDate = dateIdx >= 0 ? cell(row, dateIdx) : '';
     const day = (normalizeDateStr(rawDate) || rawDate).toLowerCase();
-    const mergeKey = ticket ? [csId, day, ticket].filter(Boolean).join('|') : '';
+    const lineParts = lineIdxs.map((idx) => (idx >= 0 ? cell(row, idx).toLowerCase() : ''));
+    const mergeKey = ticket ? [csId, day, ticket, ...lineParts].join('|') : '';
     if (mergeKey && ticketIndex.has(mergeKey)) {
       body[ticketIndex.get(mergeKey)!] = row;
       continue;
@@ -463,7 +467,17 @@ export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsDa
     csatSc: mergeSheetData(previous.csatSc, current.csatSc, ['ticket id', 'ticket', 'chat id']),
     sla: mergeSheetData(previous.sla, current.sla, ['ticket id', 'ticket']),
     schedule: mergeScheduleSheetData(previous.schedule, current.schedule),
-    qa: mergeSheetData(previous.qa, current.qa, ['ticket id', 'ticketid', 'id ticket']),
+    qa: mergeSheetData(
+      previous.qa,
+      current.qa,
+      ['ticket id', 'ticketid', 'id ticket'],
+      [
+        ['mistake level', 'defect level', 'severity'],
+        ['crm kode', 'crm code', 'kode crm'],
+        ['nilai pengurang', 'deduction', 'pengurang'],
+        ['detail mistake', 'remarks', 'remark', 'catatan'],
+      ],
+    ),
   };
 }
 
