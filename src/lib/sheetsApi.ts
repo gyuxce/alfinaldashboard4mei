@@ -15,6 +15,29 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 export type SheetRow = string[];
 export type SheetData = SheetRow[];
 
+export function emptyAllSheetsData(): AllSheetsData {
+  return { csid: [], productivity: [], csatSc: [], sla: [], schedule: [], qa: [] };
+}
+
+export function isAbortError(error: unknown) {
+  return (
+    (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
+    || (error instanceof Error && (error.name === 'AbortError' || /aborted|AbortError/i.test(error.message)))
+  );
+}
+
+export function isTransientNetworkError(error: unknown) {
+  if (isAbortError(error)) return true;
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /failed to fetch|networkerror|load failed|the user aborted/i.test(message);
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+}
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function readGoogleSheetsError(response: Response): Promise<string> {
@@ -61,17 +84,23 @@ export async function fetchSheet(
   const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!${range}?key=${API_KEY}`;
 
   for (let attempt = 0; attempt < 4; attempt++) {
-    const response = await fetch(url, { signal });
+    throwIfAborted(signal);
+    try {
+      const response = await fetch(url, { signal });
 
-    if (response.ok) {
-      const json = await response.json();
-      return json.values || [];
-    }
+      if (response.ok) {
+        const json = await response.json();
+        return json.values || [];
+      }
 
-    const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
-    if (!shouldRetry) {
-      const apiMessage = await readGoogleSheetsError(response);
-      throw buildSheetFetchError(sheetName, response.status, response.statusText, apiMessage);
+      const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
+      if (!shouldRetry) {
+        const apiMessage = await readGoogleSheetsError(response);
+        throw buildSheetFetchError(sheetName, response.status, response.statusText, apiMessage);
+      }
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) throw error;
+      if (attempt >= 3 || !isTransientNetworkError(error)) throw error;
     }
 
     await sleep(1000 * Math.pow(2, attempt));
@@ -266,27 +295,33 @@ export async function fetchAllSheets(
   const url = `${BASE_URL}/${spreadsheetId}/values:batchGet?${params.toString()}`;
 
   for (let attempt = 0; attempt < 4; attempt++) {
-    const response = await fetch(url, { signal });
+    throwIfAborted(signal);
+    try {
+      const response = await fetch(url, { signal });
 
-    if (response.ok) {
-      const json = await response.json();
-      const valueRanges: Array<{ values?: SheetData }> = json.valueRanges || [];
-      return sheetEntries.reduce((result, [key], index) => {
-        result[key] = valueRanges[index]?.values || [];
-        return result;
-      }, {} as AllSheetsData);
-    }
+      if (response.ok) {
+        const json = await response.json();
+        const valueRanges: Array<{ values?: SheetData }> = json.valueRanges || [];
+        return sheetEntries.reduce((result, [key], index) => {
+          result[key] = valueRanges[index]?.values || [];
+          return result;
+        }, {} as AllSheetsData);
+      }
 
-    const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
-    if (!shouldRetry) {
-      const apiMessage = await readGoogleSheetsError(response);
-      throw buildSheetFetchError('beberapa tab Google Sheets', response.status, response.statusText, apiMessage);
+      const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
+      if (!shouldRetry) {
+        const apiMessage = await readGoogleSheetsError(response);
+        throw buildSheetFetchError('beberapa tab Google Sheets', response.status, response.statusText, apiMessage);
+      }
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) throw error;
+      if (attempt >= 3 || !isTransientNetworkError(error)) throw error;
     }
 
     await sleep(1000 * Math.pow(2, attempt));
   }
 
-  return { csid: [], productivity: [], csatSc: [], sla: [], schedule: [], qa: [] };
+  return emptyAllSheetsData();
 }
 
 function mergeSheetData(

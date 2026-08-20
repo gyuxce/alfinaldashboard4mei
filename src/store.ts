@@ -1,18 +1,13 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult } from './lib/sheetsApi';
+import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError } from './lib/sheetsApi';
 import { buildAgentDictionary } from './lib/csid';
 
 let sheetsSyncGeneration = 0;
 let sheetsAbortController: AbortController | null = null;
-
-function isAbortError(error: unknown) {
-  return (
-    (error instanceof DOMException && error.name === 'AbortError')
-    || (error instanceof Error && error.name === 'AbortError')
-  );
-}
+let hydratePromise: Promise<void> | null = null;
+let inFlightSheetsFetch: { month: string; promise: Promise<void> } | null = null;
 
 function formatLocalDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -228,75 +223,90 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   hydrateFromStorage: async () => {
-    set({ isHydrating: true });
+    if (hydratePromise) return hydratePromise;
+
+    hydratePromise = (async () => {
+      set({ isHydrating: true });
+      const hydrateStartedAt = Date.now();
+      try {
+        const keys = await listKeys();
+        const filesToLoad = ['productivityFile', 'csatScFile', 'slaFile', 'scheduleFile', 'csidFile', 'qaFile'];
+
+        const fileData: Partial<AppState> = { fileValidations: {}, fileNames: {} };
+
+        for (const k of filesToLoad) {
+          if (keys.includes(k)) {
+            const loadedData = await loadData(k);
+            if (loadedData) {
+              const dataKey = k.replace('File', 'Data') as keyof AppState;
+
+              if (keys.includes(k + '_filename')) {
+                const savedName = await loadData(k + '_filename');
+                if (savedName && fileData.fileNames) {
+                  fileData.fileNames[k] = savedName;
+                }
+              }
+
+              const dummyFile = new File([], `Persisted Data (${k.replace('File', '')}.csv)`, { type: 'text/csv' });
+
+              // @ts-ignore
+              fileData[k as keyof AppState] = dummyFile;
+              // @ts-ignore
+              fileData[dataKey] = loadedData;
+
+              if (keys.includes(k + '_validation')) {
+                const valData = await loadData(k + '_validation');
+                if (valData && fileData.fileValidations) {
+                  fileData.fileValidations[k] = valData;
+                }
+              }
+            }
+          }
+        }
+
+        if (fileData.csidData) {
+          const data = fileData.csidData as any[][];
+          const dict = buildAgentDictionary(data);
+          fileData.agentDictionary = dict;
+          fileData.agentDictionaryByMonth = { legacy: dict };
+        }
+
+        if (keys.includes('sheetsMeta')) {
+          const meta = await loadData('sheetsMeta');
+          if (meta && typeof meta === 'object') {
+            if (meta.dataSource === 'sheets' || meta.dataSource === 'csv') {
+              fileData.dataSource = meta.dataSource;
+            }
+            if (meta.selectedSheetMonth) fileData.selectedSheetMonth = meta.selectedSheetMonth;
+            if (meta.lastSyncTime) fileData.lastSyncTime = new Date(meta.lastSyncTime);
+            if (meta.activeMonthRowCounts) fileData.activeMonthRowCounts = meta.activeMonthRowCounts;
+            if (meta.agentDictionaryByMonth) fileData.agentDictionaryByMonth = meta.agentDictionaryByMonth;
+            if (meta.agentDictionary) fileData.agentDictionary = meta.agentDictionary;
+            if (meta.fileNames) {
+              fileData.fileNames = { ...(fileData.fileNames || {}), ...meta.fileNames };
+            }
+          }
+        }
+
+        // A live Sheets fetch won the race; do not clobber it with IndexedDB.
+        const liveSync = get().lastSyncTime?.getTime() || 0;
+        if (get().isFetchingSheets || liveSync > hydrateStartedAt) {
+          set({ isHydrating: false });
+          return;
+        }
+
+        set({ ...fileData, persistedKeys: keys, isHydrating: false });
+      } catch (e) {
+        console.warn("Failed to hydrate from IndexedDB", e);
+        set({ isHydrating: false });
+      }
+    })();
+
     try {
-      const keys = await listKeys();
-      const filesToLoad = ['productivityFile', 'csatScFile', 'slaFile', 'scheduleFile', 'csidFile', 'qaFile'];
-      
-      const fileData: Partial<AppState> = { fileValidations: {}, fileNames: {} };
-      let hasData = false;
-
-      for (const k of filesToLoad) {
-        if (keys.includes(k)) {
-          const loadedData = await loadData(k);
-          if (loadedData) {
-            const dataKey = k.replace('File', 'Data') as keyof AppState;
-            
-            if (keys.includes(k + '_filename')) {
-              const savedName = await loadData(k + '_filename');
-              if (savedName && fileData.fileNames) {
-                fileData.fileNames[k] = savedName;
-              }
-            }
-
-            // Generate a dummy file object for UI display
-            const dummyFile = new File([], `Persisted Data (${k.replace('File', '')}.csv)`, { type: 'text/csv' });
-            
-            // @ts-ignore
-            fileData[k as keyof AppState] = dummyFile;
-            // @ts-ignore
-            fileData[dataKey] = loadedData;
-            hasData = true;
-
-            if (keys.includes(k + '_validation')) {
-              const valData = await loadData(k + '_validation');
-              if (valData && fileData.fileValidations) {
-                fileData.fileValidations[k] = valData;
-              }
-            }
-          }
-        }
-      }
-
-      // Re-build dictionary if csidData is present
-      if (fileData.csidData) {
-        const data = fileData.csidData as any[][];
-        const dict = buildAgentDictionary(data);
-        fileData.agentDictionary = dict;
-        fileData.agentDictionaryByMonth = { legacy: dict };
-      }
-
-      if (keys.includes('sheetsMeta')) {
-        const meta = await loadData('sheetsMeta');
-        if (meta && typeof meta === 'object') {
-          if (meta.dataSource === 'sheets' || meta.dataSource === 'csv') {
-            fileData.dataSource = meta.dataSource;
-          }
-          if (meta.selectedSheetMonth) fileData.selectedSheetMonth = meta.selectedSheetMonth;
-          if (meta.lastSyncTime) fileData.lastSyncTime = new Date(meta.lastSyncTime);
-          if (meta.activeMonthRowCounts) fileData.activeMonthRowCounts = meta.activeMonthRowCounts;
-          if (meta.agentDictionaryByMonth) fileData.agentDictionaryByMonth = meta.agentDictionaryByMonth;
-          if (meta.agentDictionary) fileData.agentDictionary = meta.agentDictionary;
-          if (meta.fileNames) {
-            fileData.fileNames = { ...(fileData.fileNames || {}), ...meta.fileNames };
-          }
-        }
-      }
-
-      set({ ...fileData, persistedKeys: keys, isHydrating: false });
-    } catch (e) {
-      console.warn("Failed to hydrate from IndexedDB", e);
-      set({ isHydrating: false });
+      await hydratePromise;
+    } catch (error) {
+      hydratePromise = null;
+      throw error;
     }
   },
 
@@ -304,193 +314,231 @@ export const useStore = create<AppState>((set, get) => ({
   setSelectedSheetMonth: (monthKey) => set({ selectedSheetMonth: monthKey }),
 
   fetchFromSheets: async () => {
-    const gen = ++sheetsSyncGeneration;
-    sheetsAbortController?.abort();
-    sheetsAbortController = new AbortController();
-    const signal = sheetsAbortController.signal;
+    const selectedMonth = get().selectedSheetMonth;
+    if (inFlightSheetsFetch && inFlightSheetsFetch.month === selectedMonth) {
+      return inFlightSheetsFetch.promise;
+    }
 
-    type StepState = 'pending' | 'active' | 'done' | 'error';
-    const sourceSteps: Array<{ id: string; label: string; state: StepState }> = [
-      { id: 'month', label: 'Data bulan aktif', state: 'pending' },
-      { id: 'history', label: 'Riwayat 3 bulan sebelumnya', state: 'pending' },
-      { id: 'master', label: 'Master CSID', state: 'pending' },
-      { id: 'productivity', label: 'Productivity', state: 'pending' },
-      { id: 'csat', label: 'CSAT SC', state: 'pending' },
-      { id: 'sla', label: 'SLA / WHU', state: 'pending' },
-      { id: 'schedule', label: 'Schedule', state: 'pending' },
-      { id: 'qa', label: 'QA', state: 'pending' },
-      { id: 'assemble', label: 'Menyusun dataset', state: 'pending' },
-    ];
-
-    const patchProgress = (
-      message: string,
-      patch: Partial<Record<string, StepState>>,
-    ) => {
-      if (gen !== sheetsSyncGeneration) return;
-      set({
-        sheetsSyncProgress: {
-          message,
-          steps: sourceSteps.map((step) => ({
-            ...step,
-            state: patch[step.id] ?? step.state,
-          })),
-        },
-      });
-      // Keep local step states in sync for subsequent patches.
-      sourceSteps.forEach((step) => {
-        const next = patch[step.id];
-        if (next) step.state = next;
-      });
-    };
-
-    set({
-      isFetchingSheets: true,
-      sheetsFetchError: null,
-      sheetsSyncProgress: { message: 'Menyiapkan sync...', steps: [...sourceSteps] },
+    let settle: (value: void | PromiseLike<void>) => void;
+    let fail: (reason?: unknown) => void;
+    const wrapper = new Promise<void>((resolve, reject) => {
+      settle = resolve;
+      fail = reject;
     });
-    
-    try {
-      const selectedMonth = get().selectedSheetMonth;
-      const sheetConfig = getSheetConfigForMonth(selectedMonth);
-      const monthOption = getSheetMonthOption(selectedMonth);
+    inFlightSheetsFetch = { month: selectedMonth, promise: wrapper };
 
-      patchProgress(`Mengambil data ${monthOption.label}...`, { month: 'active' });
-      const currentMonthData = await fetchAllSheets(
-        sheetConfig,
-        getSpreadsheetIdForMonth(selectedMonth),
-        signal,
-      );
-      if (gen !== sheetsSyncGeneration) return;
-      patchProgress(`Bulan ${monthOption.label} siap`, {
-        month: 'done',
-        master: 'done',
-        productivity: 'done',
-        csat: 'done',
-        sla: 'done',
-        schedule: 'done',
-        qa: 'done',
+    const run = (async () => {
+      const gen = ++sheetsSyncGeneration;
+      sheetsAbortController?.abort();
+      sheetsAbortController = new AbortController();
+      const signal = sheetsAbortController.signal;
+
+      type StepState = 'pending' | 'active' | 'done' | 'error';
+      const sourceSteps: Array<{ id: string; label: string; state: StepState }> = [
+        { id: 'month', label: 'Data bulan aktif', state: 'pending' },
+        { id: 'history', label: 'Riwayat 3 bulan sebelumnya', state: 'pending' },
+        { id: 'master', label: 'Master CSID', state: 'pending' },
+        { id: 'productivity', label: 'Productivity', state: 'pending' },
+        { id: 'csat', label: 'CSAT SC', state: 'pending' },
+        { id: 'sla', label: 'SLA / WHU', state: 'pending' },
+        { id: 'schedule', label: 'Schedule', state: 'pending' },
+        { id: 'qa', label: 'QA', state: 'pending' },
+        { id: 'assemble', label: 'Menyusun dataset', state: 'pending' },
+      ];
+
+      const patchProgress = (
+        message: string,
+        patch: Partial<Record<string, StepState>>,
+      ) => {
+        if (gen !== sheetsSyncGeneration) return;
+        set({
+          sheetsSyncProgress: {
+            message,
+            steps: sourceSteps.map((step) => ({
+              ...step,
+              state: patch[step.id] ?? step.state,
+            })),
+          },
+        });
+        sourceSteps.forEach((step) => {
+          const next = patch[step.id];
+          if (next) step.state = next;
+        });
+      };
+
+      set({
+        isFetchingSheets: true,
+        sheetsFetchError: null,
+        sheetsSyncProgress: { message: 'Menyiapkan sync...', steps: [...sourceSteps] },
       });
 
-      const currentMonthRows = {
-        csidData: countDataRows(sheetDataToParseResult(currentMonthData.csid).data),
-        productivityData: countDataRows(sheetDataToParseResult(currentMonthData.productivity).data),
-        csatScData: countDataRows(sheetDataToParseResult(currentMonthData.csatSc).data),
-        slaData: countDataRows(sheetDataToParseResult(currentMonthData.sla).data),
-        scheduleData: countDataRows(sheetDataToParseResult(currentMonthData.schedule).data),
-        qaData: countDataRows(sheetDataToParseResult(currentMonthData.qa).data),
-      };
-      // Cap history: selected month + 3 prior (MoM×3 / Incentive). Avoid unbounded RAM growth.
-      const historyMonthKeys = getSheetMonthHistoryKeys(selectedMonth);
+      try {
+        const sheetConfig = getSheetConfigForMonth(selectedMonth);
+        const monthOption = getSheetMonthOption(selectedMonth);
 
-      patchProgress('Mengambil riwayat bulan sebelumnya...', { history: 'active' });
-      const historicalSheets = await Promise.all(
-        historyMonthKeys.map(monthKey =>
-          monthKey === selectedMonth
-            ? Promise.resolve(currentMonthData)
-            : fetchAllSheets(
+        patchProgress(`Mengambil data ${monthOption.label}...`, { month: 'active' });
+        const currentMonthData = await fetchAllSheets(
+          sheetConfig,
+          getSpreadsheetIdForMonth(selectedMonth),
+          signal,
+        );
+        if (gen !== sheetsSyncGeneration) return;
+        patchProgress(`Bulan ${monthOption.label} siap`, {
+          month: 'done',
+          master: 'done',
+          productivity: 'done',
+          csat: 'done',
+          sla: 'done',
+          schedule: 'done',
+          qa: 'done',
+        });
+
+        const currentMonthRows = {
+          csidData: countDataRows(sheetDataToParseResult(currentMonthData.csid).data),
+          productivityData: countDataRows(sheetDataToParseResult(currentMonthData.productivity).data),
+          csatScData: countDataRows(sheetDataToParseResult(currentMonthData.csatSc).data),
+          slaData: countDataRows(sheetDataToParseResult(currentMonthData.sla).data),
+          scheduleData: countDataRows(sheetDataToParseResult(currentMonthData.schedule).data),
+          qaData: countDataRows(sheetDataToParseResult(currentMonthData.qa).data),
+        };
+        const historyMonthKeys = getSheetMonthHistoryKeys(selectedMonth);
+
+        patchProgress('Mengambil riwayat bulan sebelumnya...', { history: 'active' });
+        // History tabs are optional. A missing JUN/legacy sheet must not fail the
+        // first boot of the selected month.
+        const historicalSheets = [];
+        for (const monthKey of historyMonthKeys) {
+          if (gen !== sheetsSyncGeneration) return;
+          if (monthKey === selectedMonth) {
+            historicalSheets.push(currentMonthData);
+            continue;
+          }
+          try {
+            historicalSheets.push(
+              await fetchAllSheets(
                 getSheetConfigForMonth(monthKey),
                 getSpreadsheetIdForMonth(monthKey),
                 signal,
               ),
-        ),
-      );
-      if (gen !== sheetsSyncGeneration) return;
-      patchProgress('Riwayat siap', { history: 'done', assemble: 'active' });
+            );
+          } catch (error) {
+            if (isAbortError(error) || signal.aborted || gen !== sheetsSyncGeneration) throw error;
+            console.warn(`Riwayat ${monthKey} dilewati`, error);
+            historicalSheets.push(emptyAllSheetsData());
+          }
+        }
+        if (gen !== sheetsSyncGeneration) return;
+        patchProgress('Riwayat siap', { history: 'done', assemble: 'active' });
 
-      const allData = historicalSheets.reduce(
-        (merged, monthData) =>
-          merged ? mergeAllSheetsData(merged, monthData) : monthData,
-        null as typeof currentMonthData | null,
-      ) || currentMonthData;
-      const loadedMonthLabel = historyMonthKeys.length > 1
-        ? `${getSheetMonthOption(historyMonthKeys[0]).label} - ${monthOption.label}`
-        : monthOption.label;
-      
-      const csvCsid = sheetDataToParseResult(allData.csid);
-      const csvProductivity = sheetDataToParseResult(allData.productivity);
-      const csvCsatSc = sheetDataToParseResult(allData.csatSc);
-      const csvSla = sheetDataToParseResult(allData.sla);
-      const csvSchedule = sheetDataToParseResult(allData.schedule);
-      const csvQa = sheetDataToParseResult(allData.qa);
+        const allData = historicalSheets.reduce(
+          (merged, monthData) =>
+            merged ? mergeAllSheetsData(merged, monthData) : monthData,
+          null as typeof currentMonthData | null,
+        ) || currentMonthData;
+        const loadedMonthLabel = historyMonthKeys.length > 1
+          ? `${getSheetMonthOption(historyMonthKeys[0]).label} - ${monthOption.label}`
+          : monthOption.label;
 
-      const newAgentDict = buildAgentDictionary(csvCsid.data);
-      const agentDictionaryByMonth = historyMonthKeys.reduce((result, monthKey, index) => {
-        result[monthKey] = buildAgentDictionary(
-          sheetDataToParseResult(historicalSheets[index].csid).data,
-        );
-        return result;
-      }, {} as Record<string, Record<string, { name: string; bpo: string; teamLeader: string }>>);
+        const csvCsid = sheetDataToParseResult(allData.csid);
+        const csvProductivity = sheetDataToParseResult(allData.productivity);
+        const csvCsatSc = sheetDataToParseResult(allData.csatSc);
+        const csvSla = sheetDataToParseResult(allData.sla);
+        const csvSchedule = sheetDataToParseResult(allData.schedule);
+        const csvQa = sheetDataToParseResult(allData.qa);
 
-      patchProgress('Dataset siap', { assemble: 'done' });
-      if (gen !== sheetsSyncGeneration) return;
+        const newAgentDict = buildAgentDictionary(csvCsid.data);
+        const agentDictionaryByMonth = historyMonthKeys.reduce((result, monthKey, index) => {
+          result[monthKey] = buildAgentDictionary(
+            sheetDataToParseResult(historicalSheets[index].csid).data,
+          );
+          return result;
+        }, {} as Record<string, Record<string, { name: string; bpo: string; teamLeader: string }>>);
 
-      const syncedAt = new Date();
-      const fileNames = {
-        csidFile: `CSID (${loadedMonthLabel})`,
-        productivityFile: `Productivity (${loadedMonthLabel})`,
-        csatScFile: `CSAT SC (${loadedMonthLabel})`,
-        slaFile: `SLA (${loadedMonthLabel})`,
-        scheduleFile: `Schedule (${loadedMonthLabel})`,
-        qaFile: `QA (${loadedMonthLabel})`,
-      };
-      const agentDictionary = agentDictionaryByMonth[selectedMonth] || newAgentDict;
-      
-      set({
-        // We set dummy files so the UI knows data is "present"
-        csidFile: new File([], fileNames.csidFile),
-        productivityFile: new File([], fileNames.productivityFile),
-        csatScFile: new File([], fileNames.csatScFile),
-        slaFile: new File([], fileNames.slaFile),
-        scheduleFile: new File([], fileNames.scheduleFile),
-        qaFile: new File([], fileNames.qaFile),
+        patchProgress('Dataset siap', { assemble: 'done' });
+        if (gen !== sheetsSyncGeneration) return;
 
-        csidData: csvCsid.data,
-        productivityData: csvProductivity.data,
-        csatScData: csvCsatSc.data,
-        slaData: csvSla.data,
-        scheduleData: csvSchedule.data,
-        qaData: csvQa.data,
+        const syncedAt = new Date();
+        const fileNames = {
+          csidFile: `CSID (${loadedMonthLabel})`,
+          productivityFile: `Productivity (${loadedMonthLabel})`,
+          csatScFile: `CSAT SC (${loadedMonthLabel})`,
+          slaFile: `SLA (${loadedMonthLabel})`,
+          scheduleFile: `Schedule (${loadedMonthLabel})`,
+          qaFile: `QA (${loadedMonthLabel})`,
+        };
+        const agentDictionary = agentDictionaryByMonth[selectedMonth] || newAgentDict;
 
-        agentDictionary,
-        agentDictionaryByMonth,
-        activeMonthRowCounts: currentMonthRows,
-        lastSyncTime: syncedAt,
-        isFetchingSheets: false,
-        sheetsSyncProgress: null,
-        dataSource: 'sheets',
-        fileNames,
-      });
+        set({
+          csidFile: new File([], fileNames.csidFile),
+          productivityFile: new File([], fileNames.productivityFile),
+          csatScFile: new File([], fileNames.csatScFile),
+          slaFile: new File([], fileNames.slaFile),
+          scheduleFile: new File([], fileNames.scheduleFile),
+          qaFile: new File([], fileNames.qaFile),
 
-      Promise.all([
-        saveData('csidFile', csvCsid.data),
-        saveData('productivityFile', csvProductivity.data),
-        saveData('csatScFile', csvCsatSc.data),
-        saveData('slaFile', csvSla.data),
-        saveData('scheduleFile', csvSchedule.data),
-        saveData('qaFile', csvQa.data),
-        saveData('sheetsMeta', {
-          dataSource: 'sheets',
-          selectedSheetMonth: selectedMonth,
-          lastSyncTime: syncedAt.toISOString(),
-          activeMonthRowCounts: currentMonthRows,
+          csidData: csvCsid.data,
+          productivityData: csvProductivity.data,
+          csatScData: csvCsatSc.data,
+          slaData: csvSla.data,
+          scheduleData: csvSchedule.data,
+          qaData: csvQa.data,
+
           agentDictionary,
           agentDictionaryByMonth,
+          activeMonthRowCounts: currentMonthRows,
+          lastSyncTime: syncedAt,
+          isFetchingSheets: false,
+          sheetsSyncProgress: null,
+          dataSource: 'sheets',
           fileNames,
-        }),
-      ]).then(() => {
+        });
+
+        Promise.all([
+          saveData('csidFile', csvCsid.data),
+          saveData('productivityFile', csvProductivity.data),
+          saveData('csatScFile', csvCsatSc.data),
+          saveData('slaFile', csvSla.data),
+          saveData('scheduleFile', csvSchedule.data),
+          saveData('qaFile', csvQa.data),
+          saveData('sheetsMeta', {
+            dataSource: 'sheets',
+            selectedSheetMonth: selectedMonth,
+            lastSyncTime: syncedAt.toISOString(),
+            activeMonthRowCounts: currentMonthRows,
+            agentDictionary,
+            agentDictionaryByMonth,
+            fileNames,
+          }),
+        ]).then(() => {
+          if (gen !== sheetsSyncGeneration) return;
+          listKeys().then((keys) => set({ persistedKeys: keys }));
+        }).catch((err) => {
+          console.warn('Failed to persist sheets snapshot', err);
+        });
+
+      } catch (error) {
         if (gen !== sheetsSyncGeneration) return;
-        listKeys().then((keys) => set({ persistedKeys: keys }));
-      }).catch((err) => {
-        console.warn('Failed to persist sheets snapshot', err);
-      });
-      
-    } catch (error) {
-      if (gen !== sheetsSyncGeneration || isAbortError(error)) return;
-      set({ 
-        isFetchingSheets: false,
-        sheetsSyncProgress: null,
-        sheetsFetchError: error instanceof Error ? error.message : 'Gagal mengambil data dari Google Sheets',
-      });
+        if (isAbortError(error) || signal.aborted) {
+          set({ isFetchingSheets: false, sheetsSyncProgress: null });
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Gagal mengambil data dari Google Sheets';
+        const isFlakyNetwork = isTransientNetworkError(error);
+        set({
+          isFetchingSheets: false,
+          sheetsSyncProgress: null,
+          sheetsFetchError: isFlakyNetwork
+            ? 'Koneksi ke Google Sheets terputus saat loading pertama. Coba Sync lagi.'
+            : message,
+        });
+      }
+    })();
+
+    run.then(settle!, fail!);
+    try {
+      await wrapper;
+    } finally {
+      if (inFlightSheetsFetch?.promise === wrapper) inFlightSheetsFetch = null;
     }
   }
 }));
