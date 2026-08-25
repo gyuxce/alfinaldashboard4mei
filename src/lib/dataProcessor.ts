@@ -10,6 +10,7 @@ import {
   resolveScheduleIdentityColumns,
   resolveSlaColumns,
 } from './sheetHeaders';
+import { isAgentDictionaryPopulated } from './csid';
 
 export interface CSATEntry {
   date: string;
@@ -235,9 +236,11 @@ export const getAgentDictionaryForPeriod = (
   if (!year || !month || month < 1 || month > 12) return fallbackDictionary;
 
   const monthKey = `${PERIOD_MONTH_CODES[month - 1]}_${year}`;
+  const monthDictionary = dictionariesByMonth[monthKey];
+  const legacyDictionary = monthKey === "MAY_2026" ? dictionariesByMonth.legacy : undefined;
   return (
-    dictionariesByMonth[monthKey]
-    || (monthKey === "MAY_2026" ? dictionariesByMonth.legacy : undefined)
+    (isAgentDictionaryPopulated(monthDictionary) ? monthDictionary : undefined)
+    || (isAgentDictionaryPopulated(legacyDictionary) ? legacyDictionary : undefined)
     || fallbackDictionary
   );
 };
@@ -809,7 +812,11 @@ export const processKPIs = (
 
         if (schedName && !agent.name) agent.name = schedName;
         if (schedTL && !agent.teamLeader) agent.teamLeader = schedTL;
-        if (schedBPO && !agent.bpo) agent.bpo = schedBPO;
+        // Schedule often stores combined BPOs as "TC ID". Never let that
+        // overwrite a CSID roster value (e.g. Fadli: TCID X TIN).
+        if (schedBPO && !agent.bpo && !periodDictionary?.[agentId]?.bpo) {
+          agent.bpo = schedBPO;
+        }
 
         const statusRaw = String(row[c] || "").trim();
         if (!statusRaw) continue;

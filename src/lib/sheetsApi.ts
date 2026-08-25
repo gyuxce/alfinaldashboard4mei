@@ -452,7 +452,9 @@ function mergeScheduleSheetData(previous: SheetData, current: SheetData): SheetD
 
       const mergedRow = rowsById.get(csId)!;
       for (let i = 0; i < Math.min(5, row.length); i++) {
-        if (!mergedRow[i] && row[i]) mergedRow[i] = row[i];
+        // Later months win for name / TL / BPO so a CSID move is not stuck
+        // on the first history tab's identity columns.
+        if (row[i]) mergedRow[i] = row[i];
       }
 
       headerDates.forEach((date, idx) => {

@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
 import { SHEETS_SNAPSHOT_REVISION } from './lib/storage';
 import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, getPreviousCalendarMonthRange, normalizeDateStr } from './lib/dataProcessor';
+import { isAgentDictionaryPopulated } from './lib/csid';
 import { cell, pickColumn, resolveProductivityColumns, resolveRowCsId } from './lib/sheetHeaders';
 
 import { 
@@ -539,6 +540,12 @@ export default function App() {
       agentDictionary,
       agentDictionaryByMonth,
     );
+    const selectedMonthRoster = isAgentDictionaryPopulated(agentDictionaryByMonth[selectedSheetMonth])
+      ? agentDictionaryByMonth[selectedSheetMonth]
+      : currentRoster;
+    // Nama / BPO / TL follow the CSID tab of the File Center month, not
+    // Schedule's coarser "TC ID" label or an older history tab.
+    data = applyAgentRoster(data, selectedMonthRoster);
     const simulationData = activeTab === 'incentive' && simulationRange.start
       ? applyAgentRoster(
           processKPIs(
@@ -552,7 +559,7 @@ export default function App() {
             agentDictionary,
             agentDictionaryByMonth,
           ),
-          currentRoster,
+          selectedMonthRoster,
         )
       : [];
     const filterOptionData = activeTab === 'incentive' ? simulationData : data;
@@ -625,6 +632,7 @@ export default function App() {
     selectedTL,
     slaData,
     startDate,
+    selectedSheetMonth,
   ]);
 
   // Keep persisted/stale scope choices from mixing different BPO rosters.
@@ -912,7 +920,7 @@ export default function App() {
                 <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide w-10 shrink-0">Scope</span>
                 <div className="w-[100px] shrink-0 [&_button]:h-8 [&_button]:rounded-lg [&_button]:text-xs [&_button]:px-2.5">
                   <SearchableSelect 
-                    options={['TIN', 'TCID', 'TCID x TIN']}
+                    options={['TIN', 'TCID', 'TCID X TIN']}
                     value={selectedBpo}
                     onChange={handleBpoChange}
                     allOptionLabel="All BPO"

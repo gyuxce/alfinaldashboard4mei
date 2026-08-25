@@ -6,6 +6,12 @@ export type AgentDictionary = Record<string, {
   teamLeader: string;
 }>;
 
+export function isAgentDictionaryPopulated(
+  dictionary?: AgentDictionary | null,
+): dictionary is AgentDictionary {
+  return !!dictionary && Object.keys(dictionary).length > 0;
+}
+
 /** Resolve the aliases accepted by CSV validation before parsing CSID rows. */
 export function resolveCsidColumns(headers: unknown[]) {
   return {

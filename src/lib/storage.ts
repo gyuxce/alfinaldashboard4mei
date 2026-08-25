@@ -4,7 +4,7 @@ const DB_NAME = 'kpi-dashboard';
 const STORE_NAME = 'csv-data';
 // v2: drop snapshots that collapsed QA tickets to the empty follow-up row.
 const DB_VERSION = 2;
-export const SHEETS_SNAPSHOT_REVISION = 2;
+export const SHEETS_SNAPSHOT_REVISION = 3;
 
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {

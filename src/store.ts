@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys, SHEETS_SNAPSHOT_REVISION } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
 import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError, getDateRangeForSheetMonth } from './lib/sheetsApi';
-import { buildAgentDictionary } from './lib/csid';
+import { buildAgentDictionary, isAgentDictionaryPopulated } from './lib/csid';
 
 let sheetsSyncGeneration = 0;
 let sheetsAbortController: AbortController | null = null;
@@ -508,7 +508,8 @@ export const useStore = create<AppState>((set, get) => ({
           scheduleFile: `Schedule (${loadedMonthLabel})`,
           qaFile: `QA (${loadedMonthLabel})`,
         };
-        const agentDictionary = agentDictionaryByMonth[selectedMonth] || newAgentDict;
+        const monthDict = agentDictionaryByMonth[selectedMonth];
+        const agentDictionary = isAgentDictionaryPopulated(monthDict) ? monthDict : newAgentDict;
         const monthRange = getDateRangeForSheetMonth(selectedMonth);
 
         set({
