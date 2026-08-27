@@ -159,30 +159,64 @@ export function resolveProductivityColumns(data: unknown[][]): ProductivityColum
 }
 
 /**
+ * True for a bare 1–5 rating cell ("4", "5.0", "3,0").
+ * `parseFloat('5/8/2026') === 5`, so date strings must not count as scores.
+ */
+function isCsatScoreCell(value: unknown): boolean {
+  const cleaned = String(value ?? '').trim().replace(',', '.');
+  return /^[1-5](?:\.0+)?$/.test(cleaned);
+}
+
+function looksLikeDateCell(value: string): boolean {
+  const s = value.trim();
+  if (!s) return false;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return true;
+  if (/^\d{1,2}[/-]\d{1,2}[/-](?:\d{2}|20\d{2}|19\d{2})/.test(s)) return true;
+  if (/^\d{1,2}[-\s][A-Za-z]{3,}/.test(s)) return true;
+  if (/\d{1,2}:\d{2}/.test(s)) return true;
+  return false;
+}
+
+/**
  * Scan data rows to find the CSAT score column when headers are placeholders
  * ("Column1", "Column2"...). The score column has values 1-5 (or empty).
+ *
+ * Must skip the date column: `parseFloat('5/8/2026') === 5`, so a date column
+ * whose days are 1-5 looks like a perfect score column and wins over the real
+ * score column (e.g. column O). That made CSAT Room fill days 1-5 with the date
+ * number and leave 6+ empty. Date columns are detected by data (headers are
+ * placeholders too), so we skip any column whose cells look like dates.
  */
-function findScoreColumnByData(data: unknown[][], maxRows = 100): number {
+function findScoreColumnByData(
+  data: unknown[][],
+  excludeCols: Iterable<number> = [],
+  maxRows = 200,
+): number {
   if (!data || data.length < 2) return -1;
+  const excluded = new Set(
+    Array.from(excludeCols).filter((idx) => idx >= 0),
+  );
   const sample = data.slice(1, Math.min(data.length, maxRows + 1));
   let bestCol = -1;
   let bestScore = 0;
 
   for (let col = 0; col < (data[0]?.length || 0); col++) {
-    let valid = 0;
-    let total = 0;
+    if (excluded.has(col)) continue;
+    let scoreLike = 0;
+    let dateLike = 0;
+    let nonEmpty = 0;
     for (const row of sample) {
       if (!row || col >= row.length) continue;
-      const val = String(row[col] || '').trim();
-      total++;
+      const val = String(row[col] ?? '').trim();
       if (val === '') continue;
-      const num = parseFloat(val);
-      if (!isNaN(num) && num >= 1 && num <= 5) valid++;
+      nonEmpty++;
+      if (looksLikeDateCell(val)) dateLike++;
+      else if (isCsatScoreCell(val)) scoreLike++;
     }
-    // Score column: most values are 1-5 and at least 20% non-empty
-    const score = total > 0 ? valid / total : 0;
-    if (score > 0.2 && score > bestScore) {
-      bestScore = score;
+    if (nonEmpty === 0 || dateLike >= scoreLike) continue;
+    const ratio = scoreLike / nonEmpty;
+    if (ratio > 0.2 && ratio > bestScore) {
+      bestScore = ratio;
       bestCol = col;
     }
   }
@@ -190,20 +224,29 @@ function findScoreColumnByData(data: unknown[][], maxRows = 100): number {
 }
 
 export function resolveCsatScColumns(headers: unknown[], dataRows?: unknown[][]): CsatScColumns {
+  const date = findHeaderIncludes(headers, ['date', 'tanggal']);
+  const csId = findHeader(headers, CS_ID_ALIASES);
+  const ticketId = findHeaderIncludes(headers, TICKET_ALIASES);
+  const chatId = findHeader(headers, CHAT_ALIASES);
+  const uid = findHeader(headers, UID_ALIASES);
+  const category = findHeaderIncludes(headers, ['category', 'kategori', 'case category']);
+  const timestamp = findHeaderIncludes(headers, ['timestamp', 'close time', 'waktu close', 'close']);
   const scoreByHeader = findHeaderIncludes(headers, ['csat score', 'score', 'rating']);
+  // Exclude date + identity columns so the date column (whose days 1-5 look
+  // like scores) can't be picked over the real score column.
   const scoreByData = scoreByHeader < 0 && dataRows && dataRows.length > 1
-    ? findScoreColumnByData(dataRows)
+    ? findScoreColumnByData(dataRows, [date, csId, ticketId, chatId, uid, category, timestamp])
     : -1;
   return {
-    date: findHeaderIncludes(headers, ['date', 'tanggal']),
-    csId: findHeader(headers, CS_ID_ALIASES),
-    ticketId: findHeaderIncludes(headers, TICKET_ALIASES),
-    chatId: findHeaderIncludes(headers, CHAT_ALIASES),
-    uid: findHeaderIncludes(headers, UID_ALIASES),
-    category: findHeaderIncludes(headers, ['category', 'kategori', 'case category']),
+    date,
+    csId,
+    ticketId,
+    chatId,
+    uid,
+    category,
     score: scoreByHeader >= 0 ? scoreByHeader : scoreByData,
     response: findHeaderIncludes(headers, ['response', 'respon', 'feedback', 'comment', 'komentar']),
-    timestamp: findHeaderIncludes(headers, ['timestamp', 'close time', 'waktu close', 'close']),
+    timestamp,
     rcaAgent: findHeader(headers, ['RCA Agent Area', 'rca agent']),
     rcaCustomer: findHeader(headers, ['RCA Customer Area', 'rca customer']),
     rcaAkulaku: findHeader(headers, ['RCA Akulaku Process', 'rca akulaku']),
