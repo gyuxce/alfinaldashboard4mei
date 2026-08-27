@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from "react";
-import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
+import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X, Download } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
 import {
@@ -7,6 +7,7 @@ import {
   getCsatBadRatingCount,
 } from "../../lib/dataProcessor";
 import { cn, formatNum } from "../../lib/utils";
+import { downloadCsv } from "../../lib/exportCsv";
 import { VirtualizedTbody } from "../ui/VirtualizedTbody";
 import { useVirtualRows } from "../../hooks/useVirtualRows";
 
@@ -452,6 +453,33 @@ export const IncentiveSimulation: React.FC<{
         <p className="mt-1.5 text-[11px] text-text-muted">
           CSAT dari <strong>QA CSAT/DSAT tagging</strong> (QC audit), bukan CSAT SC survey. Angka bisa beda dengan Dashboard Summary.
         </p>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={() => downloadCsv(
+              `insentif_${safePeriod.start}_${safePeriod.end}.csv`,
+              rows,
+              [
+                { key: 'name', label: 'Agent' },
+                { key: 'csId', label: 'CS ID' },
+                { key: 'teamLeader', label: 'Team Leader' },
+                { key: 'qaPct', label: 'QA %' },
+                { key: 'qaPoints', label: 'QA Points' },
+                { key: 'csatPct', label: 'CSAT %' },
+                { key: 'csatPoints', label: 'CSAT Points' },
+                { key: 'productivityPoints', label: 'Prod Points' },
+                { key: 'totalScore', label: 'Total Score' },
+                { key: 'tier', label: 'Tier' },
+                { key: 'baseIncentive', label: 'Insentif' },
+                { key: 'totalIncentive', label: 'Total' },
+                { key: 'status', label: 'Status' },
+              ],
+            )}
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-[10px] font-medium text-text-secondary hover:bg-primary-soft hover:text-primary transition-colors"
+          >
+            <Download size={12} />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {!hasData ? (

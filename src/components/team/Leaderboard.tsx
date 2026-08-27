@@ -2,7 +2,8 @@ import React, { useMemo, useState, useRef } from "react";
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from "../../store";
 import { AgentKPI, getCsatBadRatingCount } from "../../lib/dataProcessor";
-import { ArrowRight, Trophy, Users, User } from "lucide-react";
+import { ArrowRight, Trophy, Users, User, Download } from "lucide-react";
+import { downloadCsv } from "../../lib/exportCsv";
 import { formatNum, cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
@@ -462,6 +463,34 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         <p className="text-[11px] text-text-muted mt-1">
           CSAT di Leaderboard dari <strong>QA CSAT/DSAT tagging</strong> (QC audit), bukan CSAT SC survey. Angka bisa beda dengan Dashboard Summary.
         </p>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={() => downloadCsv(
+              `leaderboard_${startDate || 'all'}_${endDate || ''}.csv`,
+              activeData,
+              [
+                { key: 'rank', label: 'Rank' },
+                { key: 'name', label: 'Nama' },
+                { key: 'csId', label: 'CS ID' },
+                { key: 'tl', label: 'Team Leader' },
+                { key: 'qa_pct', label: 'QA %' },
+                { key: 'qa_points', label: 'QA Points' },
+                { key: 'prod_achievement', label: 'Prod % Ach' },
+                { key: 'prod_total_chat', label: 'Total Chat' },
+                { key: 'prod_final_points', label: 'Prod Points' },
+                { key: 'csat_good', label: 'CSAT Good' },
+                { key: 'csat_bad', label: 'CSAT Bad' },
+                { key: 'csat_pct', label: 'CSAT %' },
+                { key: 'csat_points', label: 'CSAT Points' },
+                { key: 'score', label: 'Skor Akhir' },
+              ],
+            )}
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-[10px] font-medium text-text-secondary hover:bg-primary-soft hover:text-primary transition-colors"
+          >
+            <Download size={12} />
+            Export CSV
+          </button>
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] not-italic">
             <span className="rounded-full border border-border bg-surface px-2 py-1 font-semibold text-text-secondary">
               Periode: {startDate || "-"} s/d {endDate || "-"}
