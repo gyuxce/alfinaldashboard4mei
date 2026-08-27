@@ -459,6 +459,9 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         <p className="text-[13px] text-text-secondary mt-1">
           Bobot skor: QA 50% · Prod 20% · CSAT 20% · Training 5% · Quiz 5% · periode & filter global aktif
         </p>
+        <p className="text-[11px] text-text-muted mt-1">
+          CSAT di Leaderboard dari <strong>QA CSAT/DSAT tagging</strong> (QC audit), bukan CSAT SC survey. Angka bisa beda dengan Dashboard Summary.
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] not-italic">
             <span className="rounded-full border border-border bg-surface px-2 py-1 font-semibold text-text-secondary">
               Periode: {startDate || "-"} s/d {endDate || "-"}

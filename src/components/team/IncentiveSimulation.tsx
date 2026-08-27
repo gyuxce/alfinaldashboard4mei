@@ -449,6 +449,9 @@ export const IncentiveSimulation: React.FC<{
             QC 55% + CSAT 25% + Produktivitas 20%
           </span>
         </div>
+        <p className="mt-1.5 text-[11px] text-text-muted">
+          CSAT dari <strong>QA CSAT/DSAT tagging</strong> (QC audit), bukan CSAT SC survey. Angka bisa beda dengan Dashboard Summary.
+        </p>
       </div>
 
       {!hasData ? (
