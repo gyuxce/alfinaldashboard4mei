@@ -6,6 +6,7 @@ import { getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
 import { formatRelativeTime, isStaleSync, countDataRows, extractCsIds, getProductivityDuplicateCount } from './lib/dataQuality';
 import { useFilteredKpis } from './hooks/useFilteredKpis';
 import { formatLocalDate, getCurrentMonthValue, getMonthValue, getMonthRange, getCurrentMonthRange } from './lib/dates';
+import { getSheetMonthKeyFromDate } from './lib/sheetsApi';
 
 import { 
   LayoutDashboard, 
@@ -242,7 +243,7 @@ export default function App() {
   const {
     csidData, productivityData, csatScData, slaData, scheduleData, qaData,
     startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, agentDictionary, agentDictionaryByMonth, selectedSheetMonth,
-    setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
+    setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedSheetMonth,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, sheetsSyncProgress, activeMonthRowCounts,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode,
@@ -266,6 +267,7 @@ export default function App() {
     setSelectedBpo: s.setSelectedBpo,
     setSelectedTL: s.setSelectedTL,
     setSelectedGlobalAgent: s.setSelectedGlobalAgent,
+    setSelectedSheetMonth: s.setSelectedSheetMonth,
     isHydrating: s.isHydrating,
     hydrateFromStorage: s.hydrateFromStorage,
     isFetchingSheets: s.isFetchingSheets,
@@ -598,6 +600,9 @@ export default function App() {
   const applyMonthFilter = (monthValue: string) => {
     const range = getMonthRange(monthValue);
     setDateRange(range.start, range.end);
+    // Keep the roster aligned with the displayed period so TL/BPO
+    // follows the month the user is viewing, not just the File Center sync month.
+    setSelectedSheetMonth(getSheetMonthKeyFromDate(monthValue));
   };
   const resetPeriodToCurrentMonth = () => {
     setDateRange(defaultDateRange.start, defaultDateRange.end);

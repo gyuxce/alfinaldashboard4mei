@@ -213,6 +213,20 @@ export function getSheetMonthOption(monthKey: string): SheetMonthOption {
   return getSheetMonthOptions().find(option => option.key === monthKey) || LEGACY_MONTH_OPTION;
 }
 
+/** Convert a YYYY-MM filter value (e.g. "2026-08") to a sheet month key (e.g. "AUG_2026"). */
+export function getSheetMonthKeyFromDate(monthValue: string): string {
+  if (!monthValue) return getCurrentSheetMonthKey();
+  const [yearStr, monthStr] = monthValue.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!year || !month || month < 1 || month > 12) return getCurrentSheetMonthKey();
+  if (year < 2026 || (year === 2026 && month <= 5)) return 'legacy';
+  const monthCode = MONTHS[month - 1]?.code;
+  if (!monthCode) return 'legacy';
+  const key = `${monthCode}_${year}`;
+  return getSheetMonthOptions().some(option => option.key === key) ? key : 'legacy';
+}
+
 export function getCurrentSheetMonthKey(): string {
   const now = new Date();
   const year = now.getFullYear();
