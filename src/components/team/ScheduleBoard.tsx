@@ -49,6 +49,7 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
              <input
                type="text"
                placeholder="Cari CS ID atau nama..."
+              aria-label="Cari CS ID atau nama..."
                className="pl-9 pr-4 py-1.5 border border-border rounded-lg text-xs w-64 focus:outline-none focus:ring-1 focus:ring-primary bg-card text-text-primary"
                value={search}
                onChange={e => setSearch(e.target.value)}

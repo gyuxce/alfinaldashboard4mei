@@ -736,13 +736,13 @@ export default function App() {
         <div className={cn("py-3 text-[10px] text-text-muted border-t border-sidebar-border flex items-center transition-colors duration-300 overflow-hidden", isSidebarMinimized ? "md:flex-col md:px-2 md:gap-3 md:justify-center" : "justify-between px-4")}>
           <span className={cn("flex items-center text-sidebar-text transition-all duration-300 whitespace-nowrap", isSidebarMinimized ? "md:opacity-0 md:w-0 md:hidden" : "opacity-100")}>
             Status
-            <span className="flex items-center text-success font-medium ml-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-success mr-1.5"></span>
-              Live
+            <span className={cn("flex items-center font-medium ml-1.5", isFetchingSheets ? "text-primary" : sheetsFetchError ? "text-danger" : syncIsStale ? "text-warning" : "text-success")}>
+              <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", isFetchingSheets ? "bg-primary animate-pulse" : sheetsFetchError ? "bg-danger animate-pulse" : syncIsStale ? "bg-warning" : "bg-success")} />
+              {import.meta.env.VITE_SHEETS_API_KEY ? (isFetchingSheets ? 'Sync' : sheetsFetchError ? 'Error' : 'Live') : 'CSV'}
             </span>
           </span>
-          <span className={cn("items-center justify-center text-success hidden", isSidebarMinimized ? "md:flex" : "")}>
-             <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+          <span className={cn("items-center justify-center hidden", isSidebarMinimized ? "md:flex" : "")}>
+             <span className={cn("w-1.5 h-1.5 rounded-full", isFetchingSheets ? "bg-primary animate-pulse" : sheetsFetchError ? "bg-danger animate-pulse" : syncIsStale ? "bg-warning" : "bg-success")} />
           </span>
           <div className={cn("flex items-center", isSidebarMinimized ? "md:flex-col md:gap-3" : "gap-2")}>
             <button
@@ -762,16 +762,23 @@ export default function App() {
           {/* Mobile Filter Toggle */}
           <div className="flex md:hidden items-center justify-between w-full mb-2">
             <span className="text-[11px] font-medium text-text-muted tracking-wide pl-1">Filter</span>
-            <button
-              onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-surface border border-border hover:bg-surface-muted transition-colors cursor-pointer"
-            >
-              {isMobileFilterOpen ? (
-                <>Sembunyikan <ChevronUp size={14} /></>
-              ) : (
-                <>Tampilkan filter <ChevronDown size={14} /></>
+            <div className="flex items-center gap-2">
+              {activeFilters.length > 0 && !isMobileFilterOpen && (
+                <span className="inline-flex h-6 items-center rounded-full bg-primary-soft border border-primary/20 px-2 text-[10px] font-semibold text-primary">
+                  {activeFilters.length} aktif
+                </span>
               )}
-            </button>
+              <button
+                onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-surface border border-border hover:bg-surface-muted transition-colors cursor-pointer"
+              >
+                {isMobileFilterOpen ? (
+                  <>Sembunyikan <ChevronUp size={14} /></>
+                ) : (
+                  <>Tampilkan filter <ChevronDown size={14} /></>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Filter Content — 1 baris compact di desktop agar stabil saat zoom */}
@@ -855,7 +862,10 @@ export default function App() {
               {comparisonTabs && (
               <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 shrink-0">
                 <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide shrink-0">Cmp</span>
-                <div
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isComparisonEnabled}
                   className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2 transition-colors hover:bg-surface-muted group cursor-pointer"
                   onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
                 >
@@ -863,7 +873,7 @@ export default function App() {
                     <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200", isComparisonEnabled ? "translate-x-3" : "translate-x-0")} />
                   </div>
                   <span className="text-[10px] font-medium text-text-secondary group-hover:text-text-primary whitespace-nowrap">Bandingkan</span>
-                </div>
+                </button>
 
                 <div className={cn(
                   "flex h-8 items-center rounded-md border p-0.5 gap-0.5 transition-opacity",

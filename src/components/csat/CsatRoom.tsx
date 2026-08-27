@@ -508,7 +508,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input 
               type="text" 
-              placeholder="Cari CS ID..." 
+              placeholder="Cari CS ID..."
+              aria-label="Cari CS ID..." 
               className="pl-8 pr-3 py-1.5 border border-border rounded-lg text-xs focus:border-primary focus:outline-none w-full md:w-56"
               value={search}
               onChange={(e) => setSearch(e.target.value)}

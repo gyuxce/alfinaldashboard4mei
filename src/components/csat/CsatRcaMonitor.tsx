@@ -394,6 +394,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           <input
             type="text"
             placeholder="Cari nama / TL..."
+              aria-label="Cari nama / TL..."
             value={agentSearch}
             onChange={e => setAgentSearch(e.target.value)}
             className="bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary w-48 transition-colors"

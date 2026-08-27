@@ -108,7 +108,8 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input 
               type="text" 
-              placeholder="Cari CS ID atau nama..." 
+              placeholder="Cari CS ID atau nama..."
+              aria-label="Cari CS ID atau nama..." 
               className="pl-8 pr-3 py-1.5 border border-border rounded-lg text-xs focus:border-primary focus:outline-none w-full md:w-56"
               value={search}
               onChange={(e) => setSearch(e.target.value)}

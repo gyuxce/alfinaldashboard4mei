@@ -301,6 +301,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
             <input
               type="text"
               placeholder="Cari CS ID atau nama..."
+              aria-label="Cari CS ID atau nama..."
               className="pl-8 pr-3 py-1.5 border border-border bg-card text-text-primary rounded-xl text-xs focus:border-primary focus:outline-none w-full md:w-56"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
