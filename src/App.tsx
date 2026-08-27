@@ -423,6 +423,13 @@ export default function App() {
     || activeTab === 'csat';
   const needsComparisonData = isComparisonEnabled && comparisonTabs;
 
+  // Auto-disable comparison when switching to a tab that doesn't support it.
+  useEffect(() => {
+    if (!comparisonTabs && isComparisonEnabled) {
+      setIsComparisonEnabled(false);
+    }
+  }, [comparisonTabs, isComparisonEnabled, setIsComparisonEnabled]);
+
   const comparisonRanges = useMemo(() => {
     if (!needsComparisonData || !startDate || !endDate) {
       return { prev1: null, prev2: null, prev3: null } as const;
@@ -844,11 +851,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Compare */}
+              {/* Compare — only on tabs that support comparison */}
+              {comparisonTabs && (
               <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 shrink-0">
                 <span className="hidden lg:inline text-[10px] font-medium text-text-muted tracking-wide shrink-0">Cmp</span>
-                <div 
-                  className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2 transition-colors hover:bg-surface-muted group cursor-pointer" 
+                <div
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2 transition-colors hover:bg-surface-muted group cursor-pointer"
                   onClick={() => setIsComparisonEnabled(!isComparisonEnabled)}
                 >
                   <div className={cn("w-7 h-4 rounded-full relative transition-colors duration-200", isComparisonEnabled ? "bg-primary" : "bg-border")}>
@@ -891,6 +899,7 @@ export default function App() {
                   </button>
                 </div>
               </div>
+              )}
 
               {selectedTL && selectedTL !== 'All TL' && selectedTL !== 'All Team Leaders' && (
                 <div className="inline-flex h-8 items-center px-2.5 rounded-md bg-primary-soft text-primary-text text-[10px] font-medium border border-primary-soft-hover shrink-0 whitespace-nowrap">
