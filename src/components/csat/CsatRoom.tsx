@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
+import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore, normalizeDateStr } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate, uniqueCalendarDates, weekSeparatorClass, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -1152,7 +1152,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
         <CsatDetailModal
           title={<>Historical Audit Trail: {selectedAgent.agent.name || selectedAgent.agent.csId}</>}
           subtitle={<>CS ID: <span className="font-semibold text-text-primary">{selectedAgent.agent.csId}</span> &nbsp;&bull;&nbsp; TL: <span className="font-semibold text-text-primary">{selectedAgent.agent.teamLeader || '-'}</span></>}
-          surveys={selectedAgent.date ? selectedAgent.agent.csatHistory.filter((h: any) => h.date === selectedAgent.date) : selectedAgent.agent.csatHistory}
+          surveys={selectedAgent.date
+            ? selectedAgent.agent.csatHistory.filter((h) => {
+                const nd = h.normDate || normalizeDateStr(h.date || '') || h.date;
+                return nd === selectedAgent.date || h.date === selectedAgent.date;
+              })
+            : selectedAgent.agent.csatHistory}
           agentType={selectedAgent.type}
           onClose={() => setSelectedAgent(null)}
           expandedDates={expandedDates}
