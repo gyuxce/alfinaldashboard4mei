@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 're
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
-import { SHEETS_SNAPSHOT_REVISION } from './lib/storage';
 import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, getPreviousCalendarMonthRange, normalizeDateStr } from './lib/dataProcessor';
 import { isAgentDictionaryPopulated } from './lib/csid';
 import { cell, pickColumn, resolveProductivityColumns, resolveRowCsId } from './lib/sheetHeaders';
@@ -319,6 +318,8 @@ export default function App() {
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const hasAutoFetchedSheetsRef = useRef(false);
+  const autoRetryCountRef = useRef(0);
+  const autoRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const stored = localStorage.getItem('theme');
@@ -340,7 +341,6 @@ export default function App() {
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent,
     isHydrating, hydrateFromStorage,
     isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, sheetsSyncProgress, activeMonthRowCounts,
-    sheetsSnapshotRevision,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode,
     pendingTab, clearPendingTab,
   } = useStore(useShallow((s) => ({
@@ -370,7 +370,6 @@ export default function App() {
     sheetsFetchError: s.sheetsFetchError,
     sheetsSyncProgress: s.sheetsSyncProgress,
     activeMonthRowCounts: s.activeMonthRowCounts,
-    sheetsSnapshotRevision: s.sheetsSnapshotRevision,
     isComparisonEnabled: s.isComparisonEnabled,
     setIsComparisonEnabled: s.setIsComparisonEnabled,
     comparisonMode: s.comparisonMode,
@@ -389,15 +388,40 @@ export default function App() {
     clearPendingTab();
   }, [pendingTab, clearPendingTab]);
 
+  // Auto-sync on every page load — always fetch fresh data, even if cache
+  // exists. Cached data shows immediately while sync runs in background.
   useEffect(() => {
     if (!import.meta.env.VITE_SHEETS_API_KEY) return;
-    if (isHydrating || isFetchingSheets || hasAutoFetchedSheetsRef.current) return;
-    const staleQaSnapshot = sheetsSnapshotRevision !== SHEETS_SNAPSHOT_REVISION;
-    if (productivityData.length > 0 && !staleQaSnapshot) return;
+    if (isHydrating || isFetchingSheets) return;
+    if (hasAutoFetchedSheetsRef.current) return;
 
     hasAutoFetchedSheetsRef.current = true;
+    autoRetryCountRef.current = 0;
     void fetchFromSheets();
-  }, [fetchFromSheets, isFetchingSheets, isHydrating, productivityData.length, sheetsSnapshotRevision]);
+  }, [fetchFromSheets, isFetchingSheets, isHydrating]);
+
+  // Auto-retry on sync failure so loading never gets stuck on an error.
+  useEffect(() => {
+    if (!sheetsFetchError) return;
+    if (autoRetryCountRef.current >= 3) return;
+
+    const retryCount = ++autoRetryCountRef.current;
+    const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+    autoRetryTimerRef.current = setTimeout(() => {
+      hasAutoFetchedSheetsRef.current = false;
+      void fetchFromSheets();
+    }, delay);
+    return () => {
+      if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+    };
+  }, [sheetsFetchError, fetchFromSheets]);
+
+  // Reset retry counter when sync succeeds.
+  useEffect(() => {
+    if (!isFetchingSheets && !sheetsFetchError && lastSyncTime) {
+      autoRetryCountRef.current = 0;
+    }
+  }, [isFetchingSheets, sheetsFetchError, lastSyncTime]);
 
   const syncStatusText = isFetchingSheets
     ? 'Menyinkronkan data...'

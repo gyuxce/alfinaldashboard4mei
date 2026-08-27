@@ -40,6 +40,18 @@ function throwIfAborted(signal?: AbortSignal) {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Combine an external abort signal with a timeout so a stalled fetch
+ *  doesn't hang the entire sync. Works without AbortSignal.any. */
+function fetchWithTimeout(url: string, signal?: AbortSignal, timeoutMs = 25000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+}
+
 async function readGoogleSheetsError(response: Response): Promise<string> {
   try {
     const json = await response.json();
@@ -86,7 +98,7 @@ export async function fetchSheet(
   for (let attempt = 0; attempt < 4; attempt++) {
     throwIfAborted(signal);
     try {
-      const response = await fetch(url, { signal });
+      const response = await fetchWithTimeout(url, signal, 20000);
 
       if (response.ok) {
         const json = await response.json();
@@ -320,7 +332,7 @@ export async function fetchAllSheets(
   for (let attempt = 0; attempt < 4; attempt++) {
     throwIfAborted(signal);
     try {
-      const response = await fetch(url, { signal });
+      const response = await fetchWithTimeout(url, signal, 30000);
 
       if (response.ok) {
         const json = await response.json();
