@@ -28,7 +28,7 @@ export const DashboardAgentTable: React.FC<DashboardAgentTableProps> = ({ tableD
       <MobileScrollHint className="px-3 pt-2" label="Geser → untuk lihat semua kolom" />
       <div
         ref={scrollRef}
-        className="relative w-full overflow-auto bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] max-h-[calc(100vh-280px)]"
+        className="relative w-full overflow-auto bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] max-h-[calc(100vh-200px)]"
       >
         <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
           <thead className="bg-surface text-text-secondary sticky top-0 z-30">

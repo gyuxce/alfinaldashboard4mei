@@ -152,7 +152,7 @@ export function uniqueCalendarDates(
       byNorm.add(nd);
     }
   }
-  return Array.from(byNorm).sort((a, b) => a.localeCompare(b));
+  return Array.from(byNorm).sort((a, b) => b.localeCompare(a));
 }
 
 export function getByCalendarDate<T extends DatedEntry>(

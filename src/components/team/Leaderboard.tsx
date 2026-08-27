@@ -553,7 +553,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
       <div className="flex flex-col gap-4">
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div ref={tableScrollRef} className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-280px)]">
+      <div ref={tableScrollRef} className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-200px)]">
       {toggleMode === "agent" ? (
         <table className="kpi-data-table w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left">
           <colgroup>
