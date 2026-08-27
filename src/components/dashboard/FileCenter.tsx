@@ -758,7 +758,7 @@ const UploadCard = ({ title, fileKey }: { title: string, fileKey: keyof AppState
         if (valResult && valResult.severity !== 'ok') {
            console.warn(`Validation warning for ${fileKey}:`, valResult);
         }
-        setFile(fileKey, selectedFile, results.data, valResult);
+        setFile(fileKey, selectedFile, results.data as string[][], valResult);
       },
       error: (error) => {
         console.error('Error parsing CSV: ' + error.message);

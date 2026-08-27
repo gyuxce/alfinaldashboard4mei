@@ -52,12 +52,12 @@ export interface AppState {
   csidFile: File | null;
   qaFile: File | null;
   
-  productivityData: any[][];
-  csatScData: any[][];
-  slaData: any[][];
-  scheduleData: any[][];
-  csidData: any[][];
-  qaData: any[][];
+  productivityData: string[][];
+  csatScData: string[][];
+  slaData: string[][];
+  scheduleData: string[][];
+  csidData: string[][];
+  qaData: string[][];
   
   startDate: string;
   endDate: string;
@@ -75,7 +75,7 @@ export interface AppState {
   fileValidations: Record<string, ValidationResult | null>;
   fileNames: Record<string, string>;
 
-  setFile: (key: keyof AppState, file: File | null, data: any[], validation?: ValidationResult | null) => void;
+  setFile: (key: keyof AppState, file: File | null, data: string[][], validation?: ValidationResult | null) => void;
   setDateRange: (start: string, end: string) => void;
   setSelectedBpo: (bpo: string) => void;
   setSelectedTL: (tl: string) => void;
@@ -259,10 +259,10 @@ export const useStore = create<AppState>((set, get) => ({
 
               const dummyFile = new File([], `Persisted Data (${k.replace('File', '')}.csv)`, { type: 'text/csv' });
 
-              // @ts-ignore
+              // @ts-ignore — File vs string[][] union key
               fileData[k as keyof AppState] = dummyFile;
-              // @ts-ignore
-              fileData[dataKey] = loadedData;
+              // @ts-ignore — dynamic key, TS can't resolve the specific array type
+              fileData[dataKey] = loadedData as string[][];
 
               if (keys.includes(k + '_validation')) {
                 const valData = await loadData(k + '_validation');
@@ -275,7 +275,7 @@ export const useStore = create<AppState>((set, get) => ({
         }
 
         if (fileData.csidData) {
-          const data = fileData.csidData as any[][];
+          const data = fileData.csidData;
           const dict = buildAgentDictionary(data);
           fileData.agentDictionary = dict;
           fileData.agentDictionaryByMonth = { legacy: dict };
