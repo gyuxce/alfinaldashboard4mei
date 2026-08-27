@@ -1,6 +1,5 @@
 import {
   cell,
-  isCsatScoreCell,
   pickColumn,
   resolveCsatScColumns,
   resolveRowCsId,
@@ -40,21 +39,20 @@ export function processCsatSc(
     const agentId = resolvedId.id;
     const dateIdx = pickColumn(csatColumns.date, idIdx > 0 ? 0 : -1);
     const dateStr = cell(row, dateIdx);
+    let normDate = dateStr ? normalizeDateStr(dateStr) : null;
     const timestampIdx = pickColumn(csatColumns.timestamp, 22);
     const timestampStr = cell(row, timestampIdx);
-    let normDate = dateStr ? normalizeDateStr(dateStr) : null;
-    if (!normDate && timestampStr) {
-      normDate = normalizeDateStr(timestampStr);
-    }
-    const hour = ctx.extractTimestampHour(timestampStr || dateStr);
+    const hour = ctx.extractTimestampHour(timestampStr);
     normDate = ctx.getShiftAdjustedDate(agentId, normDate, hour);
     if (!isWithin(normDate)) continue;
 
     const agent = getAgent(agentId);
     if (!agent) continue;
-    const targetDateLabel = normDate
-      ? ctx.getScheduleDateLabel(agentId, normDate)
-      : (dateStr || timestampStr);
+    const targetDateLabel = dateStr
+      ? normDate
+        ? ctx.getScheduleDateLabel(agentId, normDate)
+        : dateStr
+      : dateStr;
 
     const scoreIdx = pickColumn(csatColumns.score, idIdx >= 0 ? idIdx + 11 : -1);
     const categoryIdx = pickColumn(csatColumns.category, idIdx >= 0 ? idIdx + 8 : -1);
@@ -64,7 +62,7 @@ export function processCsatSc(
     const uidIdx = pickColumn(csatColumns.uid, idIdx >= 0 ? idIdx + 5 : -1);
 
     const scoreStr = cell(row, scoreIdx).replace(",", ".");
-    const score = isCsatScoreCell(scoreStr) ? parseFloat(scoreStr) : NaN;
+    const score = parseFloat(scoreStr);
 
     const category = cell(row, categoryIdx).toLowerCase();
     const response = cell(row, responseIdx);
@@ -117,7 +115,7 @@ export function processCsatSc(
 
     const isTakeoutRecord = isCsatTakeoutCategory(category);
 
-    if (dateStr || normDate) {
+    if (dateStr) {
       agent.csatHistory.push({
         date: targetDateLabel,
         normDate,

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore, normalizeDateStr } from '../../lib/dataProcessor';
+import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore } from '../../lib/dataProcessor';
 import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate, uniqueCalendarDates, weekSeparatorClass, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -90,9 +90,8 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   }, [data, search, filterTL, viewMode]);
 
   const uniqueDates = useMemo(() => {
-    // Date columns come from CSAT survey days only. Mixing in schedule dates
-    // padded empty 6–10 Aug columns while dashboard still showed period totals.
     return uniqueCalendarDates(tableData.flatMap((a) => [
+      a.dailyHistory?.schedule,
       a.dailyHistory?.csatScFull,
       a.dailyHistory?.csatScFair,
     ]));
@@ -171,7 +170,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
         value: formatNum(c.count, 0),
       })),
       bottomDays: daysByScore.slice(0, 3).map(d => ({
-        label: formatCalendarHeader(d.date),
+        label: d.date,
         subLabel: `${formatNum(d.count, 0)} rating`,
         value: `${formatNum(d.pct, 1)}%`,
       })),
@@ -910,12 +909,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 <SortableHeader label="Nama / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                 <SortableHeader label="TL" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
-                <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface md:sticky md:left-[510px] z-40 min-w-[90px] max-w-[90px]" />
-                <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:left-[600px] z-40 min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                <th className="p-2 font-bold text-center text-text-primary bg-surface z-30 relative">
                   Aksi
                 </th>
                 {uniqueDates.map((date, i) => (
-                  <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface min-w-[76px] ${weekSeparatorClass(i)}`}>
+                  <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface `}>
                     {formatCalendarHeader(date)}
                   </th>
                 ))}
@@ -944,7 +943,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   </td>
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
 
-                  <td className={`p-2 text-center font-bold md:sticky md:left-[510px] z-20 bg-card group-hover:bg-surface-muted min-w-[90px] max-w-[90px]`}>
+                  <td className={`p-2 text-center font-bold  z-10  relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]`}>
                     {totalCount > 0 ? (
                       <div className="flex flex-col">
                         <span className={`text-[11px] font-bold ${getKpiColor(
@@ -964,7 +963,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                     ) : '-'}
                   </td>
 
-                  <td className="p-2 text-center md:sticky md:left-[600px] z-20 bg-card group-hover:bg-surface-muted min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                  <td className="p-2 text-center flex items-center justify-center z-10 bg-card group-hover:bg-surface-muted">
                     <button
                       onClick={() => setSelectedAgent({ agent, type: 'csat' })}
                       className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
@@ -1050,15 +1049,15 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 <SortableHeader label="Nama / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                 <SortableHeader label="TL" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
-                <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:left-[510px] z-40 border-b border-border min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                  Aksi
-                </th>
                 <SortableHeader label="Score 1" sortKey="score1" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 2" sortKey="score2" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 3" sortKey="score3" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 4" sortKey="score4" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Score 5" sortKey="score5" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface" />
                 <SortableHeader label="Kategori tersering" sortKey="category" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border bg-surface w-full" />
+                <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-b border-border border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody className="">
@@ -1089,16 +1088,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                     {agent.bpo || '-'}
                   </td>
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
-                  <td className="p-2 text-center md:sticky md:left-[510px] z-20 bg-card group-hover:bg-surface-muted min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                    <button 
-                      onClick={() => setSelectedAgent({ agent, type: 'defects' })}
-                      className="inline-flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
-                      title="View Defect Details"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span className="font-bold">Detail</span>
-                    </button>
-                  </td>
                   
                   <td className="p-2 text-center z-10">
                      <span className={`px-2 py-1 rounded font-bold text-[11px] ${score1Count > 0 ? 'bg-danger/10 text-danger' : 'text-text-disabled'}`}>
@@ -1128,6 +1117,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                   <td className="p-2 font-medium text-text-primary z-10 truncate max-w-[300px]">
                     {topCat}
                   </td>
+                  
+                  <td className="p-2 text-center flex items-center justify-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50">
+                    <button 
+                      onClick={() => setSelectedAgent({ agent, type: 'defects' })}
+                      className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
+                      title="View Defect Details"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="font-bold">Detail</span>
+                    </button>
+                  </td>
                 </tr>
               )})}
               {tableData.filter(agent => (viewMode === 'full' ? agent.csatScBadScoreFullCount : agent.csatScBadScoreFairCount) > 0).length === 0 && (
@@ -1152,12 +1152,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
         <CsatDetailModal
           title={<>Historical Audit Trail: {selectedAgent.agent.name || selectedAgent.agent.csId}</>}
           subtitle={<>CS ID: <span className="font-semibold text-text-primary">{selectedAgent.agent.csId}</span> &nbsp;&bull;&nbsp; TL: <span className="font-semibold text-text-primary">{selectedAgent.agent.teamLeader || '-'}</span></>}
-          surveys={selectedAgent.date
-            ? selectedAgent.agent.csatHistory.filter((h) => {
-                const nd = h.normDate || normalizeDateStr(h.date || '') || h.date;
-                return nd === selectedAgent.date || h.date === selectedAgent.date;
-              })
-            : selectedAgent.agent.csatHistory}
+          surveys={selectedAgent.date ? selectedAgent.agent.csatHistory.filter((h: any) => h.date === selectedAgent.date) : selectedAgent.agent.csatHistory}
           agentType={selectedAgent.type}
           onClose={() => setSelectedAgent(null)}
           expandedDates={expandedDates}
