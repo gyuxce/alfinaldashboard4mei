@@ -550,19 +550,19 @@ export default function App() {
     : undefined;
 
   const navItems = [
-    { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard },
-    { id: 'productivity', label: 'Productivity Detail', icon: Activity },
-    { id: 'qa', label: 'QA Agent 360', icon: UserCircle },
-    { id: 'csat_official', label: 'CSAT Official', icon: Star },
-    { id: 'csat', label: 'CSAT Room (Survey)', icon: Star },
-    { id: 'csat_rca', label: 'CSAT Root Cause', icon: FileText },
-    { id: 'sla', label: 'SLA Monitor', icon: CheckCircle },
-    { id: 'whu', label: 'WHU Monitor', icon: Clock },
-    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
-    { id: 'incentive', label: 'Simulasi Insentif', icon: Calculator },
-    { id: 'schedule', label: 'Schedule Board', icon: Calendar },
-    { id: 'attendance', label: 'Attendance Monitor', icon: Calendar },
-    { id: 'files', label: 'File Center', icon: FolderDown },
+    { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard, section: 'KPI' },
+    { id: 'productivity', label: 'Productivity Detail', icon: Activity, section: 'KPI' },
+    { id: 'qa', label: 'QA Agent 360', icon: UserCircle, section: 'KPI' },
+    { id: 'csat_official', label: 'CSAT Official', icon: Star, section: 'CSAT' },
+    { id: 'csat', label: 'CSAT Room (Survey)', icon: Star, section: 'CSAT' },
+    { id: 'csat_rca', label: 'CSAT Root Cause', icon: FileText, section: 'CSAT' },
+    { id: 'sla', label: 'SLA Monitor', icon: CheckCircle, section: 'Service' },
+    { id: 'whu', label: 'WHU Monitor', icon: Clock, section: 'Service' },
+    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, section: 'Team' },
+    { id: 'incentive', label: 'Simulasi Insentif', icon: Calculator, section: 'Team' },
+    { id: 'schedule', label: 'Schedule Board', icon: Calendar, section: 'Team' },
+    { id: 'attendance', label: 'Attendance Monitor', icon: Calendar, section: 'Team' },
+    { id: 'files', label: 'File Center', icon: FolderDown, section: 'Data' },
   ];
 
   const activeNavLabel = navItems.find((item) => item.id === activeTab)?.label || 'tab';
@@ -705,15 +705,18 @@ export default function App() {
         </div>
       </div>
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto no-scrollbar">
-          {navItems.map(item => {
+          {navItems.map((item, idx) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const prevItem = navItems[idx - 1];
+            const showSectionSep = idx > 0 && prevItem && item.section !== prevItem.section && !isSidebarMinimized;
             return (
               <button
                 key={item.id}
                 onClick={() => { setActiveTab(item.id); setIsSidebarOpen(false); }}
                 className={cn(
                   "group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors duration-150 ease-out overflow-hidden cursor-pointer",
+                  showSectionSep && "mt-2 pt-2 border-t border-sidebar-border",
                   isActive 
                     ? "bg-sidebar-bg-active text-sidebar-text-active" 
                     : "text-sidebar-text hover:bg-sidebar-bg-hover hover:text-sidebar-text-hover",

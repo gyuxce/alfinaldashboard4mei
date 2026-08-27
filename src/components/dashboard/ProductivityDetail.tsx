@@ -616,9 +616,6 @@ export const ProductivityDetail: React.FC<{
                     <span className="text-kpi-neutral-text font-semibold" title={agent.csId}>
                       {displayName}
                     </span>
-                    <div className="text-[9px] text-text-muted font-normal mt-0.5">
-                      {agent.csId}
-                    </div>
                   </td>
                   <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
                     {agent.bpo || "-"}
