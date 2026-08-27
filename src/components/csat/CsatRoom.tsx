@@ -910,14 +910,14 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 <SortableHeader label="BPO" sortKey="bpo" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                 <SortableHeader label="TL" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
                 <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                <th className="p-2 font-bold text-center text-text-primary bg-surface z-30 relative">
+                  Aksi
+                </th>
                 {uniqueDates.map((date, i) => (
                   <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface `}>
                     {formatCalendarHeader(date)}
                   </th>
                 ))}
-                <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                  Aksi
-                </th>
               </tr>
             </thead>
             <tbody className="">
@@ -961,6 +961,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                         <span className="text-[9px] text-text-muted font-medium">({totalCount} valid ratings)</span>
                       </div>
                     ) : '-'}
+                  </td>
+
+                  <td className="p-2 text-center flex items-center justify-center z-10 bg-card group-hover:bg-surface-muted">
+                    <button
+                      onClick={() => setSelectedAgent({ agent, type: 'csat' })}
+                      className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
+                      title="View All Detail"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="font-bold">Detail</span>
+                    </button>
                   </td>
 
                   {uniqueDates.map((date, i) => {
@@ -1008,17 +1019,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                       </td>
                     );
                   })}
-
-                  <td className="p-2 text-center flex items-center justify-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50">
-                    <button 
-                      onClick={() => setSelectedAgent({ agent, type: 'csat' })}
-                      className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
-                      title="View All Detail"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span className="font-bold">Detail</span>
-                    </button>
-                  </td>
                 </tr>
               )})}
               {tableData.length === 0 && (
