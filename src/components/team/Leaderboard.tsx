@@ -232,14 +232,16 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     scheduleData.length > 0 ||
     qaData.length > 0;
 
-  const { agentRows, tlRows } = useMemo(() => {
-    if (!hasData) return { agentRows: [], tlRows: [] };
+  const { agentRows, tlRows, excludedInactive, excludedIncomplete } = useMemo(() => {
+    if (!hasData) return { agentRows: [], tlRows: [], excludedInactive: 0, excludedIncomplete: 0 };
 
     // Reuse App-processed KPI rows (already scoped by global BPO/TL/Agent filters).
+    const inactiveAgents = data.filter((agent) => isAgentInactive(agent, endDate));
     const scopedRawData = data.filter((agent) => !isAgentInactive(agent, endDate));
 
     // Prepare Agent List
     const aList: LeaderboardRow[] = [];
+    let incompleteCount = 0;
 
     // Prepare TL aggregations
     const tlMap: Record<
@@ -296,6 +298,8 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
           quiz_pct: 100,
           quiz_points: 5,
         });
+      } else {
+        incompleteCount++;
       }
 
       // Aggregate for TL
@@ -389,7 +393,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     aList.sort((a, b) => b.score - a.score);
     tList.sort((a, b) => b.score - a.score);
 
-    return { agentRows: aList, tlRows: tList };
+    return { agentRows: aList, tlRows: tList, excludedInactive: inactiveAgents.length, excludedIncomplete: incompleteCount };
   }, [
     data,
     endDate,
@@ -463,6 +467,12 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         <p className="text-[11px] text-text-muted mt-1">
           CSAT di Leaderboard dari <strong>QA CSAT/DSAT tagging</strong> (QC audit), bukan CSAT SC survey. Angka bisa beda dengan Dashboard Summary.
         </p>
+        {(excludedInactive > 0 || excludedIncomplete > 0) && (
+          <p className="text-[11px] text-text-muted mt-1">
+            {excludedInactive > 0 && `${excludedInactive} agent dikecualikan (inactive). `}
+            {excludedIncomplete > 0 && `${excludedIncomplete} agent data belum lengkap (tidak masuk ranking).`}
+          </p>
+        )}
         <div className="mt-2 flex items-center gap-2">
           <button
             onClick={() => downloadCsv(
