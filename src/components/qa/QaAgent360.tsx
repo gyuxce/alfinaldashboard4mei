@@ -381,12 +381,12 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="Nama / CS ID" sortKey="name" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                   <SortableHeader label="BPO" sortKey="bpo" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                   <SortableHeader label="TL" sortKey="teamLeader" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                  <SortableHeader label="Rata-rata QA" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
                   {uniqueDates.map((date, i) => (
                     <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[76px] $\{weekSeparatorClass(i)}">
                       {formatCalendarHeader(date)}
                     </th>
                   ))}
-                  <SortableHeader label="Rata-rata QA" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
                   <th className="p-2 font-bold text-center text-text-muted border-b border-border bg-surface w-24">
                     Aksi
                   </th>
@@ -415,7 +415,13 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                         {agent.bpo || '-'}
                       </td>
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
-                      
+
+                      <td className="p-2 text-center font-bold z-10 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                        <span className={`font-bold text-[11px] ${agent.qaScoreCount > 0 ? getKpiColor(agent.qaScoreSum / agent.qaScoreCount, 'qa') : 'text-text-disabled'}`}>
+                          {agent.qaScoreCount > 0 ? formatNum(agent.qaScoreSum / agent.qaScoreCount, 1) : '-'}
+                        </span>
+                      </td>
+
                       {uniqueDates.map((date, i) => {
                         const dailyQA = getGroupByCalendarDate(qaByDate, date);
                         const validQA = dailyQA.filter(h => h.hasScore);
@@ -439,11 +445,6 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                         );
                       })}
 
-                      <td className="p-2 text-center font-bold z-10 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                        <span className={`font-bold text-[11px] ${agent.qaScoreCount > 0 ? getKpiColor(agent.qaScoreSum / agent.qaScoreCount, 'qa') : 'text-text-disabled'}`}>
-                          {agent.qaScoreCount > 0 ? formatNum(agent.qaScoreSum / agent.qaScoreCount, 1) : '-'}
-                        </span>
-                      </td>
                       <td className="p-2 text-center flex items-center justify-center gap-2 z-10">
                         <button 
                           onClick={() => setSelectedAgent({ agent, type: 'defects' })}

@@ -221,10 +221,10 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                 <SortableHeader label="Nama / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                 <SortableHeader label="TL" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                <SortableHeader label="CSAT Official (Avg)" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
                 {uniqueDates.map((date, i) => (
                   <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface  $\{weekSeparatorClass(i)}">{formatCalendarHeader(date)}</th>
                 ))}
-                <SortableHeader label="CSAT Official (Avg)" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
               </tr>
             </thead>
             <VirtualizedTbody
@@ -251,6 +251,11 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                       {agent.bpo || '-'}
                     </td>
                     <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
+                    <td className="p-2 text-center font-bold border-border z-10 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                      <span className={`font-bold text-[11px] ${getKpiColor(agent.csatAsli, 'csatOfficial')}`}>
+                        {agent.csatAsli !== null ? formatNum(agent.csatAsli) : '-'}
+                      </span>
+                    </td>
                     {uniqueDates.map((date, i) => {
                       const daily = getByCalendarDate(csatByDate, date);
                       const sched = getByCalendarDate(scheduleByDate, date);
@@ -270,11 +275,6 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
                         </td>
                       );
                     })}
-                    <td className="p-2 text-center font-bold border-border z-10 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                      <span className={`font-bold text-[11px] ${getKpiColor(agent.csatAsli, 'csatOfficial')}`}>
-                        {agent.csatAsli !== null ? formatNum(agent.csatAsli) : '-'}
-                      </span>
-                    </td>
                   </tr>
                 );
               })}

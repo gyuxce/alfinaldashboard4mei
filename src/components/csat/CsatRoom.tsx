@@ -909,12 +909,12 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                 <SortableHeader label="Nama / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                 <SortableHeader label="TL" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
                 {uniqueDates.map((date, i) => (
                   <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface `}>
                     {formatCalendarHeader(date)}
                   </th>
                 ))}
-                <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
                 <th className="p-2 font-bold text-center text-text-primary bg-surface md:sticky md:right-0 z-40 border-l border-border/50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                   Aksi
                 </th>
@@ -942,7 +942,27 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                     {agent.bpo || '-'}
                   </td>
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
-                  
+
+                  <td className={`p-2 text-center font-bold  z-10  relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]`}>
+                    {totalCount > 0 ? (
+                      <div className="flex flex-col">
+                        <span className={`text-[11px] font-bold ${getKpiColor(
+                          viewMode === 'full'
+                            ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
+                            : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0),
+                          viewMode === 'full' ? 'csatFull' : 'csatFair'
+                        )}`}>
+                          {formatNum(
+                            viewMode === 'full'
+                              ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
+                              : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0)
+                          )}%
+                        </span>
+                        <span className="text-[9px] text-text-muted font-medium">({totalCount} valid ratings)</span>
+                      </div>
+                    ) : '-'}
+                  </td>
+
                   {uniqueDates.map((date, i) => {
                     const daily = getByCalendarDate(dailyByDate, date);
                     const sched = getByCalendarDate(scheduleByDate, date);
@@ -988,26 +1008,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                       </td>
                     );
                   })}
-                  
-                  <td className={`p-2 text-center font-bold  z-10  relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]`}>
-                    {totalCount > 0 ? (
-                      <div className="flex flex-col">
-                        <span className={`text-[11px] font-bold ${getKpiColor(
-                          viewMode === 'full'
-                            ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
-                            : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0),
-                          viewMode === 'full' ? 'csatFull' : 'csatFair'
-                        )}`}>
-                          {formatNum(
-                            viewMode === 'full'
-                              ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
-                              : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0)
-                          )}%
-                        </span>
-                        <span className="text-[9px] text-text-muted font-medium">({totalCount} valid ratings)</span>
-                      </div>
-                    ) : '-'}
-                  </td>
+
                   <td className="p-2 text-center flex items-center justify-center z-10 md:sticky md:right-0 bg-card group-hover:bg-surface-muted border-l border-border/50">
                     <button 
                       onClick={() => setSelectedAgent({ agent, type: 'csat' })}
