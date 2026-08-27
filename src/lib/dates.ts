@@ -48,8 +48,14 @@ export function normalizeDateStr(raw: string): string | null {
 
   let result: string | null = null;
 
+  // Strip trailing time so "13-Agu-2026 14:30" and ISO datetimes parse.
+  // Keep space-separated month names ("13 Agu 2026") intact.
+  const datePart = rawKey
+    .replace(/[T\s]+\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?.*$/, '')
+    .trim();
+
   // Try to parse DD MMM YYYY or DD-MMM-YYYY
-  const dashMatch = rawKey.match(
+  const dashMatch = datePart.match(
     /^(\d{1,2})[-\s]([A-Za-z]+)(?:[-\s](\d{4}))?$/,
   );
   if (dashMatch) {
@@ -99,7 +105,7 @@ export function normalizeDateStr(raw: string): string | null {
   }
 
   if (!result) {
-    const clean = rawKey.split(" ")[0]; // Take only the date part if there's time
+    const clean = datePart.split(" ")[0]; // Take only the date part if there's time
     const parts = clean.split(/[-/]/);
 
     if (parts.length >= 3) {
@@ -143,7 +149,7 @@ export function normalizeDateStr(raw: string): string | null {
 
   // Final fallback
   if (!result) {
-    const dObj2 = new Date(rawKey);
+    const dObj2 = new Date(datePart || rawKey);
     if (!isNaN(dObj2.getTime())) {
       result = formatDateLocalYmd(dObj2);
     }

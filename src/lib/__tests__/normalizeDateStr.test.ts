@@ -68,10 +68,12 @@ describe('normalizeDateStr', () => {
     expect(normalizeDateStr('13/8/2026 14:30')).toBe('2026-08-13');
   });
 
-  it('does NOT strip time from month-name dates (known limitation)', () => {
-    // Month-name dates with trailing time fail the anchored regex,
-    // and the numeric fallback can't parse "Agu". Documented, not fixed.
-    expect(normalizeDateStr('13-Agu-2026 14:30')).toBeNull();
+  it('strips time from month-name dates and ISO datetimes', () => {
+    expect(normalizeDateStr('13-Agu-2026 14:30')).toBe('2026-08-13');
+    expect(normalizeDateStr('13-Agu-2026 14:30:00')).toBe('2026-08-13');
+    expect(normalizeDateStr('13 Agu 2026 08:00')).toBe('2026-08-13');
+    expect(normalizeDateStr('2026-08-13T14:30:00')).toBe('2026-08-13');
+    expect(normalizeDateStr('2026-08-13T14:30:00.000Z')).toBe('2026-08-13');
   });
 
   it('returns null for unparseable strings', () => {

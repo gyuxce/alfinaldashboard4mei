@@ -225,7 +225,7 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     scrollRef: tableScrollRef,
   });
   const perfTableColSpan = 6 + uniqueDates.length;
-  const defectTableColSpan = 9;
+  const defectTableColSpan = 10;
 
   const highlightStats = useMemo(() => {
     const totalEvaluations = tableData.reduce((sum, agent) => sum + agent.qaScoreCount, 0);
@@ -381,15 +381,15 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="Nama / CS ID" sortKey="name" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                   <SortableHeader label="BPO" sortKey="bpo" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                   <SortableHeader label="TL" sortKey="teamLeader" config={perfSortConfig} onSort={handlePerfSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
-                  <SortableHeader label="Rata-rata QA" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
+                  <SortableHeader label="Rata-rata QA" sortKey="average" config={perfSortConfig} onSort={handlePerfSort} className="text-center text-text-primary border-b border-border md:sticky md:left-[510px] z-40 bg-surface min-w-[90px] max-w-[90px]" />
+                  <th className="p-2 font-bold text-center text-text-primary border-b border-border md:sticky md:left-[600px] z-40 bg-surface min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                    Aksi
+                  </th>
                   {uniqueDates.map((date, i) => (
-                    <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[76px] $\{weekSeparatorClass(i)}">
+                    <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface border-b border-border min-w-[76px] ${weekSeparatorClass(i)}`}>
                       {formatCalendarHeader(date)}
                     </th>
                   ))}
-                  <th className="p-2 font-bold text-center text-text-muted border-b border-border bg-surface w-24">
-                    Aksi
-                  </th>
                 </tr>
               </thead>
               <VirtualizedTbody
@@ -416,13 +416,26 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                       </td>
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
 
-                      <td className="p-2 text-center font-bold z-10 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                      <td className="p-2 text-center font-bold md:sticky md:left-[510px] z-20 bg-card group-hover:bg-surface-muted min-w-[90px] max-w-[90px]">
                         <span className={`font-bold text-[11px] ${agent.qaScoreCount > 0 ? getKpiColor(agent.qaScoreSum / agent.qaScoreCount, 'qa') : 'text-text-disabled'}`}>
                           {agent.qaScoreCount > 0 ? formatNum(agent.qaScoreSum / agent.qaScoreCount, 1) : '-'}
                         </span>
                       </td>
 
-                      {uniqueDates.map((date, i) => {
+                      <td className="p-2 text-center md:sticky md:left-[600px] z-20 bg-card group-hover:bg-surface-muted min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                        <button 
+                          onClick={() => setSelectedAgent({ agent, type: 'defects' })}
+                          className="inline-flex items-center justify-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
+                          title="Lihat detail defect"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          {agent.totalDefect > 0 && (
+                            <span className="text-danger text-[9px] font-bold px-1.5 py-0.5 rounded-full absolute -top-1 -right-2 leading-none shadow-[0_1px_3px_rgba(0,0,0,0.04)]">{agent.totalDefect}</span>
+                          )}
+                        </button>
+                      </td>
+
+                      {uniqueDates.map((date) => {
                         const dailyQA = getGroupByCalendarDate(qaByDate, date);
                         const validQA = dailyQA.filter(h => h.hasScore);
                         if (dailyQA.length === 0 || validQA.length === 0) {
@@ -444,19 +457,6 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                           </td>
                         );
                       })}
-
-                      <td className="p-2 text-center flex items-center justify-center gap-2 z-10">
-                        <button 
-                          onClick={() => setSelectedAgent({ agent, type: 'defects' })}
-                          className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
-                          title="Lihat detail defect"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          {agent.totalDefect > 0 && (
-                            <span className="text-danger text-[9px] font-bold px-1.5 py-0.5 rounded-full absolute -top-1 -right-2 leading-none shadow-[0_1px_3px_rgba(0,0,0,0.04)]">{agent.totalDefect}</span>
-                          )}
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -488,12 +488,12 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <SortableHeader label="Nama / CS ID" sortKey="name" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                   <SortableHeader label="BPO" sortKey="bpo" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                   <SortableHeader label="TL" sortKey="teamLeader" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+                  <th className="p-2 font-bold text-center border-b border-border md:sticky md:left-[510px] z-40 bg-surface min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">Aksi</th>
                   <SortableHeader label="Low" sortKey="low" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
                   <SortableHeader label="Medium" sortKey="medium" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
                   <SortableHeader label="High" sortKey="high" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
                   <SortableHeader label="Very High" sortKey="veryHigh" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border text-center bg-surface text-text-primary" />
                   <SortableHeader label="Temuan tersering" sortKey="category" config={defectSortConfig} onSort={handleDefectSort} className="border-b border-border bg-surface text-text-secondary" />
-                  <th className="p-2 font-bold text-center border-b border-border bg-surface w-24">Aksi</th>
                 </tr>
               </thead>
               <VirtualizedTbody
@@ -518,19 +518,10 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                         {agent.bpo || '-'}
                       </td>
                       <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
-                      
-                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.lowCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.lowCount || '-'}</span></td>
-                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.mediumCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.mediumCount || '-'}</span></td>
-                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.highCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.highCount || '-'}</span></td>
-                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.veryHighCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.veryHighCount || '-'}</span></td>
-                      
-                      <td className="p-2 font-medium text-text-primary z-10 truncate max-w-[200px]">
-                        {agent.mostFrequentMistake === '-' ? <span className="text-text-muted ml-4">-</span> : agent.mostFrequentMistake}
-                      </td>
-                      <td className="p-2 text-center flex items-center justify-center z-10">
+                      <td className="p-2 text-center md:sticky md:left-[510px] z-20 bg-card group-hover:bg-surface-muted min-w-[72px] max-w-[72px] shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                         <button 
                           onClick={() => setSelectedAgent({ agent, type: 'defects' })}
-                          className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
+                          className="inline-flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
                           title="View Defect Details"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -539,6 +530,15 @@ export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                             <span className="text-danger text-[9px] font-bold px-1.5 py-0.5 rounded-full absolute -top-1 -right-2 leading-none shadow-[0_1px_3px_rgba(0,0,0,0.04)]">{agent.totalDefect}</span>
                           )}
                         </button>
+                      </td>
+                      
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.lowCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.lowCount || '-'}</span></td>
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.mediumCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.mediumCount || '-'}</span></td>
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.highCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.highCount || '-'}</span></td>
+                      <td className={`p-2 text-center z-10 `}><span className={`inline-flex font-bold ${agent.veryHighCount > 0 ? 'text-text-primary' : 'text-text-disabled'}`}>{agent.veryHighCount || '-'}</span></td>
+                      
+                      <td className="p-2 font-medium text-text-primary z-10 truncate max-w-[200px]">
+                        {agent.mostFrequentMistake === '-' ? <span className="text-text-muted ml-4">-</span> : agent.mostFrequentMistake}
                       </td>
                     </tr>
                   );
