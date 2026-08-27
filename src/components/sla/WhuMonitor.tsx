@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
+import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, weekSeparatorClass, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 import { Search, Clock } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
@@ -127,8 +127,8 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <SortableHeader label="Name / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
                 <SortableHeader label="BPO" sortKey="bpo" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
                 <SortableHeader label="Team Leader" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
-                {uniqueDates.map(date => (
-                  <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface ">{formatCalendarHeader(date)}</th>
+                {uniqueDates.map((date, i) => (
+                  <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface  $\{weekSeparatorClass(i)}">{formatCalendarHeader(date)}</th>
                 ))}
                 <SortableHeader label="Average WHU" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
               </tr>
@@ -149,16 +149,15 @@ export const WhuMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
                     <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
                     <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                      <span className="text-kpi-neutral-text font-semibold">
+                      <span className="text-kpi-neutral-text font-semibold" title={agent.csId}>
                         {displayName}
                       </span>
-                      <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
                     </td>
                     <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
                       {agent.bpo || '-'}
                     </td>
                     <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
-                    {uniqueDates.map(date => {
+                    {uniqueDates.map((date, i) => {
                       const daily = getByCalendarDate(whuByDate, date);
                       const sched = getByCalendarDate(scheduleByDate, date);
                       const status = sched?.status?.toUpperCase() || '';

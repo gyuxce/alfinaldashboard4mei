@@ -7,7 +7,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { VirtualizedTbody } from '../ui/VirtualizedTbody';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
-import { uniqueCalendarDates, indexByDate, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
+import { uniqueCalendarDates, weekSeparatorClass, indexByDate, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
 
 export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
@@ -67,8 +67,8 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <th className="p-2 font-bold  md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]">Name / CS ID</th>
                 <th className="p-2 font-bold  md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]">BPO</th>
                 <th className="p-2 font-bold  md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]">Team Leader</th>
-                {uniqueDates.map(date => (
-                  <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface ">
+                {uniqueDates.map((date, i) => (
+                  <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface  $\{weekSeparatorClass(i)}">
                     {formatCalendarHeader(date)}
                   </th>
                 ))}
@@ -104,17 +104,16 @@ export const ScheduleBoard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
                   <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{idx + 1}</td>
                   <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                  <span className="text-kpi-neutral-text font-semibold">
+                  <span className="text-kpi-neutral-text font-semibold" title={agent.csId}>
                     {displayName}
                   </span>
-                    <div className="text-[9px] text-text-muted font-normal mt-0.5">{agent.csId}</div>
                   </td>
                   <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
                     {agent.bpo || '-'}
                   </td>
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
                   
-                  {uniqueDates.map(date => {
+                  {uniqueDates.map((date, i) => {
                     const sched = getByCalendarDate(scheduleByDate, date);
                     const status = sched ? sched.status : '-';
                     const bgClass = getBackgroundColor(status);

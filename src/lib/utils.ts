@@ -175,6 +175,10 @@ export function getGroupByCalendarDate<T extends DatedEntry>(
   return [];
 }
 
+export function weekSeparatorClass(index: number): string {
+  return index > 0 && index % 7 === 0 ? 'border-l-2 border-border/30 ' : '';
+}
+
 
 const kpiColorCache = new Map<string, string>();
 
@@ -200,7 +204,12 @@ export function getKpiColor(val: number | null | undefined, type: KpiType): stri
   }
 
   const reached = val >= target;
-  const result = reached ? 'text-success' : 'text-danger';
+  const nearTarget = val >= target * 0.95;
+  const result = reached
+    ? 'text-success'
+    : nearTarget
+      ? 'text-warning'
+      : 'text-danger';
   
   kpiColorCache.set(key, result);
   return result;
