@@ -104,7 +104,7 @@ export function validateCsidFile(parsedData: any[][]): ValidationResult {
       isValid: false,
       errorType: 'MISSING_COLUMN',
       message: `Kolom wajib tidak ditemukan: ${missing.join(', ')}.`,
-      severity: 'warning'
+      severity: 'error'
     };
   }
 
@@ -150,7 +150,7 @@ export function validateProductivityFile(parsedData: any[][]): ValidationResult 
       isValid: false,
       errorType: 'MISSING_COLUMN',
       message: `Kolom wajib Productivity tidak ditemukan: ${missing.join(', ')}.`,
-      severity: 'warning',
+      severity: 'error',
     };
   }
 
@@ -159,7 +159,7 @@ export function validateProductivityFile(parsedData: any[][]): ValidationResult 
       isValid: false,
       errorType: 'MISSING_CSID',
       message: 'Tidak menemukan baris Productivity dengan CS ID.',
-      severity: 'warning',
+      severity: 'error',
     };
   }
 
@@ -170,7 +170,7 @@ export function validateProductivityFile(parsedData: any[][]): ValidationResult 
       message: columns.productivity < 0
         ? 'CS ID ditemukan, tapi kolom Productivity tidak terbaca dari header maupun offset lama.'
         : 'CS ID ditemukan, tapi nilai Productivity kosong/tidak numerik.',
-      severity: 'warning',
+      severity: 'error',
     };
   }
   
@@ -202,7 +202,7 @@ export function validateCsatScFile(parsedData: any[][]): ValidationResult {
       isValid: false,
       errorType: 'MISSING_COLUMN',
       message: 'Kolom CSAT SC tidak lengkap: butuh CS ID, Score, atau Ticket ID.',
-      severity: 'warning'
+      severity: 'error'
     };
   }
 
@@ -259,7 +259,7 @@ export function validateSlaFile(parsedData: any[][]): ValidationResult {
       isValid: false,
       errorType: 'MISSING_CSID',
       message: 'Tidak menemukan baris SLA dengan CS ID.',
-      severity: 'warning'
+      severity: 'error'
     };
   }
 
@@ -270,7 +270,7 @@ export function validateSlaFile(parsedData: any[][]): ValidationResult {
       message: columns.sla1m < 0 && columns.sla3m < 0
         ? 'CS ID ditemukan, tapi header SLA 1m/3m tidak ada dan offset lama +11/+13 kosong.'
         : 'CS ID ditemukan, tapi nilai SLA 1m/3m tidak terbaca.',
-      severity: 'warning'
+      severity: 'error'
     };
   }
   
@@ -302,7 +302,7 @@ export function validateScheduleFile(parsedData: any[][]): ValidationResult {
       isValid: false,
       errorType: 'FEW_COLUMNS',
       message: `File ini terlalu sempit (hanya ${maxCols} kolom) untuk menjadi file Schedule.`,
-      severity: 'warning'
+      severity: 'error'
     };
   }
 
@@ -328,7 +328,7 @@ export function validateScheduleFile(parsedData: any[][]): ValidationResult {
       isValid: false,
       errorType: 'INVALID_FORMAT',
       message: 'Format mencurigakan: tidak ada data shift atau OFF/PULLOUT di beberapa baris pertama.',
-      severity: 'warning'
+      severity: 'error'
     };
   }
 
@@ -367,7 +367,7 @@ export function validateQaFile(parsedData: any[][]): ValidationResult {
       isValid: false,
       errorType: 'MISSING_COLUMN',
       message: 'Kolom indikator QA (CS ID, Checking Date, QC Score, atau keyword QA/Defect) tidak cukup.',
-      severity: 'warning'
+      severity: 'error'
     };
   }
 
@@ -383,7 +383,7 @@ export function validateQaFile(parsedData: any[][]): ValidationResult {
       isValid: false,
       errorType: 'SCHEMA_TOO_NARROW',
       message: `Struktur QA kurang kolom (Punya: ${maxColumns}, butuh header CS ID/Checking Date/QC Score atau minimal 33 sampai kolom AG).`,
-      severity: 'warning',
+      severity: 'error',
     };
   }
   

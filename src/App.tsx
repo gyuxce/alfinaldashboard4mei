@@ -328,11 +328,22 @@ export default function App() {
   }, [isFetchingSheets, sheetsFetchError, lastSyncTime]);
 
   const syncStatusText = isFetchingSheets
-    ? 'Menyinkronkan data...'
-    : lastSyncTime
-      ? ''
-      : 'Menunggu sync';
+    ? (sheetsSyncProgress?.message || 'Menyinkronkan data...')
+    : sheetsFetchError
+      ? 'Sync gagal, mencoba lagi otomatis...'
+      : lastSyncTime
+        ? ''
+        : 'Menunggu sync';
   const syncIsStale = isStaleSync(lastSyncTime);
+  const syncDotColor = isFetchingSheets
+    ? 'bg-primary animate-pulse'
+    : sheetsFetchError
+      ? 'bg-danger animate-pulse'
+      : syncIsStale
+        ? 'bg-warning'
+        : lastSyncTime
+          ? 'bg-success'
+          : 'bg-border';
   const dataQuality = useMemo(() => {
     const sourceRows = [
       { label: 'Master', rows: activeMonthRowCounts?.csidData ?? countDataRows(csidData) },
@@ -894,15 +905,18 @@ export default function App() {
                 ) : null}
                 {import.meta.env.VITE_SHEETS_API_KEY && (
                   <>
-                    {syncStatusText ? (
-                      <span className={cn(
-                        "font-medium",
-                        isFetchingSheets ? "text-primary" : syncIsStale ? "text-warning" : "text-text-secondary"
-                      )}>
-                        {syncStatusText}
-                      </span>
-                    ) : null}
-                    {lastSyncTime && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', syncDotColor)} />
+                      {syncStatusText ? (
+                        <span className={cn(
+                          "font-medium",
+                          isFetchingSheets ? "text-primary" : sheetsFetchError ? "text-danger" : syncIsStale ? "text-warning" : "text-text-secondary"
+                        )}>
+                          {syncStatusText}
+                        </span>
+                      ) : null}
+                    </span>
+                    {lastSyncTime && !isFetchingSheets && !sheetsFetchError && (
                       <span className={cn("text-text-muted", syncIsStale && "text-warning")}>
                         {syncIsStale ? `Data terakhir sync ${formatRelativeTime(lastSyncTime)}, klik Refresh untuk update.` : `Tersinkron ${formatRelativeTime(lastSyncTime)}`}
                       </span>
