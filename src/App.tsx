@@ -2,9 +2,9 @@ import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 're
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
-import { applyAgentRoster, getAgentDictionaryForPeriod, matchesAgentScope, processKPIs, getPreviousMonthPeriod, getPreviousPeriod, getPreviousCalendarMonthRange, normalizeDateStr } from './lib/dataProcessor';
-import { isAgentDictionaryPopulated } from './lib/csid';
-import { cell, pickColumn, resolveProductivityColumns, resolveRowCsId } from './lib/sheetHeaders';
+import { getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
+import { formatRelativeTime, isStaleSync, countDataRows, extractCsIds, getProductivityDuplicateCount } from './lib/dataQuality';
+import { useFilteredKpis } from './hooks/useFilteredKpis';
 
 import { 
   LayoutDashboard, 
@@ -52,24 +52,6 @@ const Leaderboard = React.lazy(() => import('./components/team/Leaderboard').the
 const IncentiveSimulation = React.lazy(() => import('./components/team/IncentiveSimulation').then(module => ({ default: module.IncentiveSimulation })));
 const ScheduleBoard = React.lazy(() => import('./components/team/ScheduleBoard').then(module => ({ default: module.ScheduleBoard })));
 const AttendanceMonitor = React.lazy(() => import('./components/team/AttendanceMonitor').then(module => ({ default: module.AttendanceMonitor })));
-
-function formatRelativeTime(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'baru saja';
-  if (diffMin < 60) return `${diffMin} menit lalu`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} jam lalu`;
-  return date.toLocaleDateString('id-ID');
-}
-
-function isStaleSync(date: Date | null) {
-  if (!date) return false;
-  const now = new Date();
-  const isDifferentDay = date.toDateString() !== now.toDateString();
-  const isOlderThanSixHours = now.getTime() - date.getTime() > 6 * 60 * 60 * 1000;
-  return isDifferentDay || isOlderThanSixHours;
-}
 
 function TabLoading() {
   return <TabSkeleton />;
@@ -143,57 +125,6 @@ function getMonthOptions() {
       label: new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(date),
     };
   });
-}
-
-function countDataRows(data: any[][]) {
-  if (!data || data.length === 0) return 0;
-  return Math.max(0, data.filter((row) => row?.some((cell) => String(cell || '').trim() !== '')).length - 1);
-}
-
-function extractCsIds(data: any[][]) {
-  const ids = new Set<string>();
-  data.forEach((row) => {
-    row?.forEach((cell) => {
-      const value = String(cell || '').trim();
-      if (value.startsWith('3-1-')) ids.add(value);
-    });
-  });
-  return ids;
-}
-
-function getProductivityDuplicateCount(data: any[][]) {
-  const seen = new Map<string, number>();
-  const columns = resolveProductivityColumns(data);
-  const startRow = data.length > 2 ? 2 : 1;
-
-  for (let r = startRow; r < data.length; r++) {
-    const row = data[r];
-    if (!row || row.length < 2) continue;
-
-    const resolved = resolveRowCsId(row, columns.csId);
-    if (!resolved.id) continue;
-
-    const dateIdx = pickColumn(columns.date, resolved.index > 0 ? 0 : -1);
-    const rawDate = cell(row, dateIdx);
-    const normDate = normalizeDateStr(rawDate) || rawDate;
-    const agentId = resolved.id;
-    if (!agentId || !normDate) continue;
-
-    const key = [
-      agentId,
-      normDate,
-      cell(row, pickColumn(columns.productivity, resolved.index >= 0 ? resolved.index + 8 : -1)),
-      cell(row, pickColumn(columns.csatAsli, resolved.index >= 0 ? resolved.index + 1 : -1)),
-      cell(row, pickColumn(columns.whu, resolved.index >= 0 ? resolved.index + 15 : -1)),
-      [columns.star5, columns.star4, columns.star3, columns.star2, columns.star1]
-        .map((idx, i) => cell(row, pickColumn(idx, 3 + i)))
-        .join("/"),
-    ].join("|").toLowerCase();
-
-    seen.set(key, (seen.get(key) || 0) + 1);
-  }
-
-  return Array.from(seen.values()).reduce((sum, count) => sum + Math.max(0, count - 1), 0);
 }
 
 interface MonthPickerProps {
@@ -550,114 +481,28 @@ export default function App() {
     previousRawData3,
   } = kpiRawBundle;
 
-  const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, tlList, agentList } = useMemo(() => {
-    let data = rawData;
-    let prevData = previousRawData;
-    let prevData2 = previousRawData2;
-    let prevData3 = previousRawData3;
-
-    const simulationRange = getPreviousCalendarMonthRange(endDate || startDate || '');
-    // KPI angka = bulan sebelumnya (periode selesai). Nama/BPO/TL harus
-    // mengikuti roster CSID bulan filter yang sama dengan menu lain.
-    const currentRoster = getAgentDictionaryForPeriod(
-      startDate || endDate,
-      agentDictionary,
-      agentDictionaryByMonth,
-    );
-    const selectedMonthRoster = isAgentDictionaryPopulated(agentDictionaryByMonth[selectedSheetMonth])
-      ? agentDictionaryByMonth[selectedSheetMonth]
-      : currentRoster;
-    // Nama / BPO / TL follow the CSID tab of the File Center month, not
-    // Schedule's coarser "TC ID" label or an older history tab.
-    data = applyAgentRoster(data, selectedMonthRoster);
-    const simulationData = activeTab === 'incentive' && simulationRange.start
-      ? applyAgentRoster(
-          processKPIs(
-            productivityData,
-            csatScData,
-            slaData,
-            scheduleData,
-            qaData,
-            simulationRange.start,
-            simulationRange.end,
-            agentDictionary,
-            agentDictionaryByMonth,
-          ),
-          selectedMonthRoster,
-        )
-      : [];
-    const filterOptionData = activeTab === 'incentive' ? simulationData : data;
-
-    const applyFilters = (d: any[]) => {
-      return d.filter(a => matchesAgentScope(a, {
-        bpo: selectedBpo,
-        teamLeader: selectedTL,
-        agent: selectedGlobalAgent,
-      }));
-    };
-
-    const filteredData = applyFilters(data);
-    const filteredPrevData = applyFilters(prevData);
-    const filteredPrevData2 = applyFilters(prevData2);
-    const filteredPrevData3 = applyFilters(prevData3);
-    const filteredIncentiveData = applyFilters(simulationData);
-
-    // Cascading scope options: TL must belong to selected BPO (including
-    // the separate TCID / TCID × TIN rosters), then agent must belong to
-    // the selected BPO + TL pair.
-    const bpoScopedData = filterOptionData.filter(a => matchesAgentScope(a, {
-      bpo: selectedBpo,
-      teamLeader: 'All TL',
-      agent: 'All Agents',
-    }));
-
-    const agents = new Set<string>();
-    bpoScopedData
-      .filter(a => matchesAgentScope(a, {
-        bpo: selectedBpo,
-        teamLeader: selectedTL,
-        agent: 'All Agents',
-      }))
-      .forEach(a => {
-      if (a.name && a.name !== '-') agents.add(a.name);
-      else agents.add(a.csId);
-    });
-
-    const optionTls = new Set<string>();
-    bpoScopedData.forEach(a => {
-      if (a.teamLeader && a.teamLeader.trim() !== '') optionTls.add(a.teamLeader.trim());
-    });
-
-    return { 
-      kpiData: filteredData, 
-      previousKpiData: filteredPrevData,
-      previousKpiData2: filteredPrevData2,
-      previousKpiData3: filteredPrevData3,
-      incentiveKpiData: filteredIncentiveData,
-      incentivePeriod: simulationRange,
-      tlList: Array.from(optionTls).sort((a, b) => a.localeCompare(b)),
-      agentList: Array.from(agents).sort((a,b) => a.localeCompare(b)) 
-    };
-  }, [
-    activeTab,
-    agentDictionary,
-    agentDictionaryByMonth,
-    csatScData,
-    endDate,
+  const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, tlList, agentList } = useFilteredKpis({
+    rawData,
     previousRawData,
     previousRawData2,
     previousRawData3,
-    productivityData,
-    qaData,
-    rawData,
-    scheduleData,
-    selectedBpo,
-    selectedGlobalAgent,
-    selectedTL,
-    slaData,
+    activeTab,
     startDate,
+    endDate,
     selectedSheetMonth,
-  ]);
+    selectedBpo,
+    selectedTL,
+    selectedGlobalAgent,
+    productivityData,
+    csatScData,
+    slaData,
+    scheduleData,
+    qaData,
+    agentDictionary,
+    agentDictionaryByMonth,
+  });
+
+
 
   // Keep persisted/stale scope choices from mixing different BPO rosters.
   useEffect(() => {

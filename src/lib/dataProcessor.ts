@@ -11,6 +11,17 @@ import {
   resolveSlaColumns,
 } from './sheetHeaders';
 import { isAgentDictionaryPopulated } from './csid';
+import { processSchedule } from './processors/schedule';
+import { processProductivity } from './processors/productivity';
+import { processCsatSc } from './processors/csatSc';
+import { processSla } from './processors/sla';
+import { processQa } from './processors/qa';
+import { finalizeAgents } from './processors/finalize';
+import {
+  createAccumulators,
+  createDedupeSets,
+  type ProcessorContext,
+} from './processors/context';
 
 export interface CSATEntry {
   date: string;
@@ -344,7 +355,7 @@ export function getPreviousPeriod(startDate: string, endDate: string) {
   };
 }
 
-function toIsoDate(date: Date) {
+export function toIsoDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
@@ -522,17 +533,17 @@ export function normalizeScheduleStatus(statusRaw: string): string {
   return status;
 }
 
-function readStarCount(row: unknown[] | undefined, index: number) {
+export function readStarCount(row: unknown[] | undefined, index: number) {
   const raw = cell(row, index);
   if (!raw || isLegacyCsId(raw)) return 0;
   return parseFloat(raw.replace(",", ".")) || 0;
 }
 
-function transactionKey(parts: Array<string | number | null | undefined>) {
+export function transactionKey(parts: Array<string | number | null | undefined>) {
   return parts.map((part) => String(part || "").trim().toLowerCase()).join("|");
 }
 
-function ticketOccurrenceKey(
+export function ticketOccurrenceKey(
   agentId: string,
   normDate: string | null | undefined,
   dateStr: string,
@@ -552,13 +563,14 @@ function ticketOccurrenceKey(
   return `${agent}|${day}|${fallback}`;
 }
 
-function productivityDataStartRow(data: any[][]) {
+export function productivityDataStartRow(data: any[][]) {
   if (data.length <= 1) return data.length;
   const probe = data[1] || [];
   const looksLikeData =
     findLegacyCsIdIndex(probe) >= 0 || !!normalizeDateStr(String(probe[0] || ""));
   return looksLikeData ? 1 : 2;
 }
+
 
 export const processKPIs = (
   prodData: any[][] = [],
@@ -587,7 +599,6 @@ export const processKPIs = (
 
   const isWithin = (dStr: string | null) => {
     if (!startDate && !endDate) return true;
-    // Never let a malformed date silently pollute every selected period.
     if (!dStr) return false;
     if (startDate && dStr < startDate) return false;
     if (endDate && dStr > endDate) return false;
@@ -602,9 +613,6 @@ export const processKPIs = (
     return toIsoDate(d);
   };
 
-  // Keep schedule lookup available even when the previous calendar day is
-  // outside the selected KPI range. This matters for overnight shift 22 data
-  // landing after midnight on the first day of a period.
   const scheduleStatusByAgentDate = new Map<string, string>();
   const scheduleDateLabelByAgentDate = new Map<string, string>();
   const getScheduleKey = (agentId: string, normDate: string) =>
@@ -763,742 +771,31 @@ export const processKPIs = (
     });
   }
 
-  const scheduleColumns = resolveScheduleIdentityColumns(schedData[0] || []);
-
-  if (schedData.length > 1) {
-    const scheduleHeaders = schedData[0] || [];
-    for (let c = scheduleColumns.firstDateColumn; c < scheduleHeaders.length; c++) {
-      const dateLabel = String(scheduleHeaders[c] || "").trim();
-      const normDate = dateLabel ? normalizeDateStr(dateLabel) : null;
-      if (!normDate) continue;
-
-      for (let r = 1; r < schedData.length; r++) {
-        const row = schedData[r];
-        const agentId = cell(row, scheduleColumns.csId);
-        if (!agentId) continue;
-
-        const status = String(row?.[c] || "").trim().toUpperCase();
-        if (!status) continue;
-
-        const key = getScheduleKey(agentId, normDate);
-        scheduleStatusByAgentDate.set(key, status);
-        scheduleDateLabelByAgentDate.set(key, dateLabel);
-      }
-    }
-  }
-
-  // 0. Schedule Logic
-  if (schedData.length > 1) {
-    const headers = schedData[0] || [];
-    // Date columns start after identity fields (CS ID / Name / TL / BPO).
-    for (let c = scheduleColumns.firstDateColumn; c < headers.length; c++) {
-      const hd = String(headers[c]).trim();
-      if (!hd) continue;
-
-      const normDate = normalizeDateStr(hd);
-      // Skip non-date headers and out-of-range dates (avoids ±1 man-day drift)
-      if (!normDate || !isWithin(normDate)) continue;
-
-      for (let r = 1; r < schedData.length; r++) {
-        const row = schedData[r];
-        if (!row) continue;
-        const agentId = cell(row, scheduleColumns.csId);
-        const agent = getAgent(agentId);
-        if (!agent) continue;
-
-        const schedName = cell(row, scheduleColumns.name);
-        const schedTL = cell(row, scheduleColumns.teamLeader);
-        const schedBPO = cell(row, scheduleColumns.bpo);
-
-        if (schedName && !agent.name) agent.name = schedName;
-        if (schedTL && !agent.teamLeader) agent.teamLeader = schedTL;
-        // Schedule often stores combined BPOs as "TC ID". Never let that
-        // overwrite a CSID roster value (e.g. Fadli: TCID X TIN).
-        if (schedBPO && !agent.bpo && !periodDictionary?.[agentId]?.bpo) {
-          agent.bpo = schedBPO;
-        }
-
-        const statusRaw = String(row[c] || "").trim();
-        if (!statusRaw) continue;
-
-        const normalizedStatus = normalizeScheduleStatus(statusRaw);
-        const isManDay = isScheduleManDay(statusRaw);
-        // Presence = on-shift number/time (not sick) or pullout
-        const isPresence =
-          normalizedStatus === "PULLOUT" ||
-          (isManDay && normalizedStatus !== "S");
-
-        // Dedupe by calendar day (normDate), not raw header string —
-        // "1/7/2026" vs "01/07/2026" must count as one man-day.
-        const existingSched = agent.dailyHistory.schedule.find(
-          (s) => s.normDate === normDate || s.date === hd,
-        );
-
-        if (!existingSched) {
-          agent.attendanceTotalDays += 1;
-
-          if (isManDay || normalizedStatus === "PULLOUT")
-            agent.attendanceDuty += 1;
-          if (isPresence) agent.attendancePresence += 1;
-
-          if (normalizedStatus === "OFF") agent.attendanceOff += 1;
-          if (normalizedStatus === "S") agent.attendanceS += 1;
-          if (normalizedStatus === "C") agent.attendanceC += 1;
-          if (normalizedStatus === "PULLOUT") agent.attendancePullout += 1;
-
-          agent.dailyHistory.schedule.push({
-            date: hd,
-            status: normalizedStatus,
-            isManDay,
-            normDate,
-          });
-
-          if (isManDay) {
-            agent.manDays += 1;
-          }
-          continue;
-        }
-
-        // Duplicate header for same calendar day: upgrade non-duty → duty
-        if (isManDay && !existingSched.isManDay) {
-          const prev = existingSched.status;
-          const prevWasDuty = prev === "PULLOUT";
-
-          existingSched.status = normalizedStatus;
-          existingSched.isManDay = true;
-          existingSched.date = hd;
-
-          agent.manDays += 1;
-          if (!prevWasDuty) agent.attendanceDuty += 1;
-          if (isPresence) agent.attendancePresence += 1;
-          if (normalizedStatus === "S") agent.attendanceS += 1;
-          if (prev === "OFF") agent.attendanceOff = Math.max(0, agent.attendanceOff - 1);
-          if (prev === "C") agent.attendanceC = Math.max(0, agent.attendanceC - 1);
-        }
-      }
-    }
-  }
-
-  // 1. Productivity, CSAT Asli, WHU
-  let totalProdCsatAsliSum: Record<string, { sum: number; count: number }> = {};
-  let totalWhuSum: Record<string, { sum: number; count: number }> = {};
-  const seenProductivityEntries = new Set<string>();
-  const prodColumns = resolveProductivityColumns(prodData);
-  const prodStartRow = productivityDataStartRow(prodData);
-
-  if (prodData.length > prodStartRow) {
-    for (let i = prodStartRow; i < prodData.length; i++) {
-      const row = prodData[i];
-      if (!row || row.length < 2) continue;
-
-      const resolvedId = resolveRowCsId(row, prodColumns.csId);
-      if (!resolvedId.id) continue;
-      const idIdx = resolvedId.index;
-
-      const dateIdx = pickColumn(prodColumns.date, idIdx > 0 ? 0 : -1);
-      const rawDateStr = cell(row, dateIdx);
-      let normDate = rawDateStr ? normalizeDateStr(rawDateStr) : null;
-      if (!rawDateStr || !normDate) continue;
-
-      let targetDateLabel = rawDateStr;
-      const hour = extractTimestampHour(rawDateStr);
-
-      const agentId = resolvedId.id;
-      const agent = getAgent(agentId);
-      if (!agent) continue;
-
-      normDate = getShiftAdjustedDate(agentId, normDate, hour);
-      targetDateLabel = getScheduleDateLabel(agentId, normDate);
-
-      if (!isWithin(normDate)) continue;
-
-      const prodIdx = pickColumn(prodColumns.productivity, idIdx >= 0 ? idIdx + 8 : -1);
-      const csatIdx = pickColumn(prodColumns.csatAsli, idIdx >= 0 ? idIdx + 1 : -1);
-      const whuIdx = pickColumn(prodColumns.whu, idIdx >= 0 ? idIdx + 15 : -1);
-
-      const prodBase = parseFloat(cell(row, prodIdx).replace(",", ".")) || 0;
-      let csatAsliStr = cell(row, csatIdx);
-      let whuStr = cell(row, whuIdx);
-
-      if (csatAsliStr.includes("%")) csatAsliStr = csatAsliStr.replace("%", "");
-      csatAsliStr = csatAsliStr.replace(",", ".");
-
-      whuStr = whuStr.replace(",", ".");
-      const whuNum = parseFloat(whuStr);
-
-      const dVal = readStarCount(row, pickColumn(prodColumns.star5, 3));
-      const eVal = readStarCount(row, pickColumn(prodColumns.star4, 4));
-      const fVal = readStarCount(row, pickColumn(prodColumns.star3, 5));
-      const gVal = readStarCount(row, pickColumn(prodColumns.star2, 6));
-      const hVal = readStarCount(row, pickColumn(prodColumns.star1, 7));
-      // Consecutive monthly exports commonly overlap at period boundaries.
-      // Ignore exact repeated source facts before they reach any aggregate.
-      const sourceKey = [
-        agentId,
-        normDate,
-        prodBase,
-        csatAsliStr,
-        whuStr,
-        dVal,
-        eVal,
-        fVal,
-        gVal,
-        hVal,
-      ].join("|");
-      if (seenProductivityEntries.has(sourceKey)) continue;
-      seenProductivityEntries.add(sourceKey);
-      const totalRes = dVal + eVal + fVal + gVal + hVal;
-
-      agent.csatRespondents += totalRes;
-      agent.csat5Count += dVal;
-      agent.csat4Count += eVal;
-      agent.csat3Count += fVal;
-      agent.csat2Count += gVal;
-      agent.csat1Count += hVal;
-
-      agent.productivityBase += prodBase;
-      let existingProd = agent.dailyHistory.productivity.find(
-        (h) => h.normDate === normDate || h.date === targetDateLabel,
-      );
-      if (existingProd) {
-        existingProd.value += prodBase;
-        if (!existingProd.normDate) existingProd.normDate = normDate;
-      } else {
-        agent.dailyHistory.productivity.push({
-          date: targetDateLabel,
-          normDate,
-          value: prodBase,
-        });
-      }
-
-      const pointsAsli = (dVal * 5) + (eVal * 4) + (fVal * 3) + (gVal * 2) + (hVal * 1);
-      const totalResAsli = dVal + eVal + fVal + gVal + hVal;
-      
-      const csatDaily = totalResAsli > 0 
-        ? (pointsAsli / totalResAsli)
-        : null;
-
-      if (csatDaily !== null) {
-        if (!totalProdCsatAsliSum[agent.csId])
-          totalProdCsatAsliSum[agent.csId] = { sum: 0, count: 0 };
-        
-        // Store sums of points and respondents for overall agent average
-        totalProdCsatAsliSum[agent.csId].sum += pointsAsli;
-        totalProdCsatAsliSum[agent.csId].count += totalResAsli;
-
-        let existingCsat = agent.dailyHistory.csat.find(
-          (h) => h.normDate === normDate || h.date === targetDateLabel,
-        );
-        if (existingCsat) {
-          const existingCount = existingCsat.count || 0;
-          const existingSum = existingCsat.sum ?? existingCsat.value * existingCount;
-          existingCsat.count = existingCount + totalResAsli;
-          existingCsat.sum = existingSum + pointsAsli;
-          existingCsat.value = existingCsat.sum / existingCsat.count;
-          if (!existingCsat.normDate) existingCsat.normDate = normDate;
-        } else {
-          agent.dailyHistory.csat.push({
-            date: targetDateLabel,
-            normDate,
-            value: csatDaily,
-            count: totalResAsli,
-            sum: pointsAsli,
-          });
-        }
-      }
-
-      if (!isNaN(whuNum)) {
-        let val = whuNum;
-        if (whuStr.includes("%")) {
-          val = parseFloat(whuStr.replace("%", ""));
-        } else {
-          val = whuNum * 100;
-        }
-        if (!totalWhuSum[agent.csId])
-          totalWhuSum[agent.csId] = { sum: 0, count: 0 };
-        totalWhuSum[agent.csId].sum += val;
-        totalWhuSum[agent.csId].count += 1;
-
-        let existingWhu = agent.dailyHistory.whu.find(
-          (h) => h.normDate === normDate || h.date === targetDateLabel,
-        );
-        if (existingWhu) {
-          existingWhu.value = (existingWhu.value + val) / 2;
-          if (!existingWhu.normDate) existingWhu.normDate = normDate;
-        } else {
-          agent.dailyHistory.whu.push({ date: targetDateLabel, normDate, value: val });
-        }
-      }
-    }
-  }
-
-  // 2. CSAT SC
-  if (csatData.length > 1) {
-    const headerRow = csatData[0] || [];
-    const csatColumns = resolveCsatScColumns(headerRow);
-    const seenCsatScEntries = new Set<string>();
-    const seenCsatTickets = new Set<string>();
-
-    for (let i = 1; i < csatData.length; i++) {
-      const row = csatData[i];
-      if (!row || row.length < 2) continue;
-
-      const resolvedId = resolveRowCsId(row, csatColumns.csId);
-      if (!resolvedId.id) continue;
-      const idIdx = resolvedId.index;
-
-      const agentId = resolvedId.id;
-      const dateIdx = pickColumn(csatColumns.date, idIdx > 0 ? 0 : -1);
-      const dateStr = cell(row, dateIdx);
-      let normDate = dateStr ? normalizeDateStr(dateStr) : null;
-      const timestampIdx = pickColumn(csatColumns.timestamp, 22);
-      const timestampStr = cell(row, timestampIdx);
-      const hour = extractTimestampHour(timestampStr);
-      normDate = getShiftAdjustedDate(agentId, normDate, hour);
-      if (!isWithin(normDate)) continue;
-
-      const agent = getAgent(agentId);
-      if (!agent) continue;
-      const targetDateLabel = dateStr
-        ? normDate
-          ? getScheduleDateLabel(agentId, normDate)
-          : dateStr
-        : dateStr;
-
-      const scoreIdx = pickColumn(csatColumns.score, idIdx >= 0 ? idIdx + 11 : -1);
-      const categoryIdx = pickColumn(csatColumns.category, idIdx >= 0 ? idIdx + 8 : -1);
-      const responseIdx = pickColumn(csatColumns.response, idIdx >= 0 ? idIdx + 15 : -1);
-      const ticketIdx = pickColumn(csatColumns.ticketId, idIdx >= 0 ? idIdx + 1 : -1);
-      const chatIdx = pickColumn(csatColumns.chatId, idIdx > 0 ? idIdx - 1 : -1);
-      const uidIdx = pickColumn(csatColumns.uid, idIdx >= 0 ? idIdx + 5 : -1);
-
-      const scoreStr = cell(row, scoreIdx).replace(",", ".");
-      const score = parseFloat(scoreStr);
-
-      const category = cell(row, categoryIdx).toLowerCase();
-      const response = cell(row, responseIdx);
-      const ticketId = cell(row, ticketIdx);
-      const chatId = cell(row, chatIdx);
-      const uid = cell(row, uidIdx);
-
-      // Extract hour from timestamp for hourly productivity
-      if (timestampStr) {
-        if (hour >= 0 && hour < 24) {
-             const hr = hour;
-             agent.hourlyProductivity[hr] += 1;
-             const categoryLabel = category
-               ? category.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-               : "Unknown Case";
-             agent.hourlyCategoryCounts[hr][categoryLabel] = (agent.hourlyCategoryCounts[hr][categoryLabel] || 0) + 1;
-        }
-      }
-
-      const rcaAgent = cell(row, csatColumns.rcaAgent);
-      const rcaCustomer = cell(row, csatColumns.rcaCustomer);
-      const rcaAkulaku = cell(row, csatColumns.rcaAkulaku);
-
-      const csatTicketKey = ticketOccurrenceKey(
-        agentId,
-        normDate,
-        dateStr,
-        ticketId,
-        [chatId, uid],
-      );
-      if (csatTicketKey && seenCsatTickets.has(csatTicketKey)) continue;
-      if (csatTicketKey) seenCsatTickets.add(csatTicketKey);
-
-      const csatScEntryKey = transactionKey([
-        ticketId,
-        agentId,
-        normDate || dateStr.trim(),
-        chatId,
-        uid,
-        scoreStr,
-        category,
-        response,
-        rcaAgent,
-        rcaCustomer,
-        rcaAkulaku,
-        timestampStr,
-      ]);
-
-      if (seenCsatScEntries.has(csatScEntryKey)) continue;
-      seenCsatScEntries.add(csatScEntryKey);
-      
-      const isTakeoutRecord = isCsatTakeoutCategory(category);
-      
-      if (dateStr) {
-         agent.csatHistory.push({
-            date: targetDateLabel,
-            normDate,
-            ticketId,
-            chatId,
-            uid,
-            score: isNaN(score) ? 0 : score,
-            category: category.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
-            response,
-            isTakeout: isTakeoutRecord,
-            rcaAgent,
-            rcaCustomer,
-            rcaAkulaku,
-            agentName: agent.name,
-            csId: agent.csId,
-         });
-      }
-
-      // Aggregate RCA into agent-level counts
-      if (rcaAgent) {
-        if (!agent.rcaAgentAreaCounts[rcaAgent]) agent.rcaAgentAreaCounts[rcaAgent] = 0;
-        agent.rcaAgentAreaCounts[rcaAgent] += 1;
-        agent.rcaTotalCases += 1;
-      }
-      if (rcaCustomer) {
-        if (!agent.rcaCustomerAreaCounts[rcaCustomer]) agent.rcaCustomerAreaCounts[rcaCustomer] = 0;
-        agent.rcaCustomerAreaCounts[rcaCustomer] += 1;
-        if (!rcaAgent) agent.rcaTotalCases += 1;
-      }
-      if (rcaAkulaku) {
-        if (!agent.rcaAkulakuProcessCounts[rcaAkulaku]) agent.rcaAkulakuProcessCounts[rcaAkulaku] = 0;
-        agent.rcaAkulakuProcessCounts[rcaAkulaku] += 1;
-        if (!rcaAgent && !rcaCustomer) agent.rcaTotalCases += 1;
-      }
-
-      // -- Score Distribution Logic --
-      const cleanCatForDist = category
-        ? category
-            .split(" ")
-            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ")
-        : "Unknown Case";
-      let scoreKey = "No Survey";
-      if (!isNaN(score) && score >= 1 && score <= 5) {
-        scoreKey = String(score);
-      }
-      if (!agent.csatScScoreDistribution[scoreKey]) {
-        agent.csatScScoreDistribution[scoreKey] = {};
-      }
-      if (!agent.csatScScoreDistribution[scoreKey][cleanCatForDist]) {
-        agent.csatScScoreDistribution[scoreKey][cleanCatForDist] = 0;
-      }
-      agent.csatScScoreDistribution[scoreKey][cleanCatForDist] += 1;
-      // --------------------------------
-
-      if (isValidCsatScScore(score)) {
-          // Keep old vars for CsatRoom
-          agent.csatScFullScore += score;
-          agent.csatScFullCount += 1;
-
-          // New Official Formula
-          if (score >= 4) {
-            agent.csatScGoodCount += 1;
-          } else {
-            agent.csatScBadCount += 1;
-          }
-          agent.csatScTotalValid += 1;
-
-
-          let fullDay = agent.dailyHistory.csatScFull.find(
-            (h) => (normDate && h.normDate === normDate) || h.date === targetDateLabel,
-          );
-          if (!fullDay) {
-            fullDay = { date: targetDateLabel, normDate, score: 0, count: 0 };
-            agent.dailyHistory.csatScFull.push(fullDay);
-          } else if (!fullDay.normDate && normDate) {
-            fullDay.normDate = normDate;
-          }
-          if (score >= 4) fullDay.score += 1;
-          fullDay.count += 1;
-
-          const isTakeout = isCsatTakeoutCategory(category);
-
-          if (!isTakeout) {
-            // Keep old vars for CsatRoom
-            agent.csatScFairScore += score;
-            agent.csatScFairCount += 1;
-
-            // New Official Formula for Fair
-            if (score >= 4) {
-              agent.csatScFairGoodCount += 1;
-            } else {
-              agent.csatScFairBadCount += 1;
-            }
-            agent.csatScFairTotalValid += 1;
-
-            let fairDay = agent.dailyHistory.csatScFair.find(
-              (h) => (normDate && h.normDate === normDate) || h.date === targetDateLabel,
-            );
-            if (!fairDay) {
-              fairDay = { date: targetDateLabel, normDate, score: 0, count: 0 };
-              agent.dailyHistory.csatScFair.push(fairDay);
-            } else if (!fairDay.normDate && normDate) {
-              fairDay.normDate = normDate;
-            }
-            if (score >= 4) fairDay.score += 1; // good count
-            fairDay.count += 1; // valid count
-          }
-
-          if (score === 1 || score === 2) {
-            agent.csatScBadScoreFullCount += 1;
-            if (!isTakeout) agent.csatScBadScoreFairCount += 1;
-
-            if (category) {
-              const cleanCat = category
-                .split(" ")
-                .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(" ");
-              if (!agent.csatScCategoriesFull[cleanCat])
-                agent.csatScCategoriesFull[cleanCat] = 0;
-              agent.csatScCategoriesFull[cleanCat] += 1;
-
-              if (!isTakeout) {
-                if (!agent.csatScCategoriesFair[cleanCat])
-                  agent.csatScCategoriesFair[cleanCat] = 0;
-                agent.csatScCategoriesFair[cleanCat] += 1;
-              }
-            }
-          }
-      }
-    }
-  }
-
-  // 3. SLA (Index starts at 1)
-  let sla1mSum: Record<string, { sum: number; count: number }> = {};
-  let sla3mSum: Record<string, { sum: number; count: number }> = {};
-
-  if (slaData.length > 1) {
-    const seenSlaEntries = new Set<string>();
-    const slaColumns = resolveSlaColumns(slaData);
-    const seenSlaTickets = new Set<string>();
-
-    for (let i = 1; i < slaData.length; i++) {
-      const row = slaData[i];
-      if (!row || row.length < 2) continue;
-
-      const resolvedId = resolveRowCsId(row, slaColumns.csId);
-      if (!resolvedId.id) continue;
-      const idIdx = resolvedId.index;
-
-      const agentId = resolvedId.id;
-      const dateIdx = pickColumn(slaColumns.date, idIdx > 0 ? 0 : -1);
-      const dateStr = cell(row, dateIdx);
-      let normDate = dateStr ? normalizeDateStr(dateStr) : null;
-      const hour = extractTimestampHour(dateStr);
-      normDate = getShiftAdjustedDate(agentId, normDate, hour);
-      if (!isWithin(normDate)) continue;
-
-      const agent = getAgent(agentId);
-      if (!agent) continue;
-      const targetDateLabel = dateStr
-        ? normDate
-          ? getScheduleDateLabel(agentId, normDate)
-          : dateStr
-        : dateStr;
-
-      const parseSla = (val: string) => {
-        let clean = val.replace(",", ".").trim();
-        if (!clean) return null;
-        if (clean.includes("%")) return parseFloat(clean.replace("%", ""));
-        const n = parseFloat(clean);
-        return isNaN(n) ? null : n * 100;
-      };
-
-      const sla1ValueIdx = pickColumn(slaColumns.sla1m, idIdx >= 0 ? idIdx + 11 : -1);
-      const sla3ValueIdx = pickColumn(slaColumns.sla3m, idIdx >= 0 ? idIdx + 13 : -1);
-      const sla1Raw = cell(row, sla1ValueIdx);
-      const sla3Raw = cell(row, sla3ValueIdx);
-      const sla1 = parseSla(sla1Raw);
-      const sla3 = parseSla(sla3Raw);
-      const ticketId = cell(row, slaColumns.ticketId);
-
-      const slaTicketKey = ticketOccurrenceKey(agentId, normDate, dateStr, ticketId);
-      if (slaTicketKey && seenSlaTickets.has(slaTicketKey)) continue;
-      if (slaTicketKey) seenSlaTickets.add(slaTicketKey);
-
-      const slaEntryKey = transactionKey([
-        ticketId,
-        agentId,
-        normDate || dateStr.trim(),
-        sla1Raw,
-        sla3Raw,
-      ]);
-
-      if (seenSlaEntries.has(slaEntryKey)) continue;
-      seenSlaEntries.add(slaEntryKey);
-
-      if (sla1 !== null && !isNaN(sla1)) {
-        if (!sla1mSum[agent.csId]) sla1mSum[agent.csId] = { sum: 0, count: 0 };
-        sla1mSum[agent.csId].sum += sla1;
-        sla1mSum[agent.csId].count += 1;
-        agent.dailyHistory.sla1m.push({ date: targetDateLabel, normDate, value: sla1 });
-      }
-      if (sla3 !== null && !isNaN(sla3)) {
-        if (!sla3mSum[agent.csId]) sla3mSum[agent.csId] = { sum: 0, count: 0 };
-        sla3mSum[agent.csId].sum += sla3;
-        sla3mSum[agent.csId].count += 1;
-        agent.dailyHistory.sla3m.push({ date: targetDateLabel, normDate, value: sla3 });
-      }
-    }
-  }
-
-  // 4. QA Score (Index starts at 1)
-  if (qaData.length > 1) {
-    const seenQaEntries = new Set<string>();
-    const seenQaTicketScores = new Set<string>();
-    const qaColumns = resolveQaColumns(qaData[0] || []);
-
-    for (let i = 1; i < qaData.length; i++) {
-      const row = qaData[i];
-      if (!row || row.length < 2) continue;
-
-      const resolvedId = resolveRowCsId(row, pickColumn(qaColumns.csId, 0));
-      if (!resolvedId.id) continue;
-      const agentId = resolvedId.id;
-
-      const dateIdx = pickColumn(qaColumns.date, 13);
-      const dateStr = cell(row, dateIdx);
-      const normDate = dateStr ? normalizeDateStr(dateStr) : null;
-      if (dateStr && normDate && !isWithin(normDate)) continue;
-      const targetDateLabel = normDate || dateStr;
-
-      const agent = getAgent(agentId);
-      if (!agent) continue;
-
-      const ticketId = cell(row, pickColumn(qaColumns.ticketId, 4));
-      const uid = cell(row, pickColumn(qaColumns.uid, 5));
-      const chatId = cell(row, pickColumn(qaColumns.chatId, 6));
-      const caseDate = cell(row, pickColumn(qaColumns.caseDate, 8));
-      const systemCheckingType = cell(row, pickColumn(qaColumns.systemCheckingType, 12));
-      const qcName = cell(row, pickColumn(qaColumns.qcName, 14));
-      const mistakeLevel = cell(row, pickColumn(qaColumns.mistakeLevel, 15));
-      const deduction = 0;
-      const category = cell(row, pickColumn(qaColumns.category, 30));
-      const remarks = cell(row, pickColumn(qaColumns.remarks, 32));
-      const feedback = "";
-      const crmKode = cell(row, pickColumn(qaColumns.crmKode, 28));
-
-      const scoreStr = cell(row, pickColumn(qaColumns.score, 17)).replace(",", ".");
-      let score = Number.NaN;
-      if (scoreStr.includes("%")) {
-        score = parseFloat(scoreStr.replace("%", ""));
-      } else if (scoreStr !== "") {
-        score = parseFloat(scoreStr);
-      }
-
-      const qaTicketKey = ticketOccurrenceKey(
-        agentId,
-        normDate,
-        dateStr,
-        ticketId,
-        [chatId, uid],
-      );
-
-      const qaEntryKey = transactionKey([
-        ticketId,
-        agentId,
-        normalizeDateStr(dateStr) || dateStr.trim(),
-        uid,
-        chatId,
-        caseDate,
-        systemCheckingType,
-        qcName,
-        mistakeLevel,
-        category,
-        remarks,
-        crmKode,
-        scoreStr,
-      ]);
-
-      if (seenQaEntries.has(qaEntryKey)) continue;
-      seenQaEntries.add(qaEntryKey);
-
-      // One ticket often has several QC line-items; QC Score is filled on
-      // only one of them. Keep every line for defect analysis, but count
-      // the numeric score once per agent + day + ticket.
-      const rowHasScore = !isNaN(score);
-      const alreadyScored = Boolean(qaTicketKey && seenQaTicketScores.has(qaTicketKey));
-      const countScore = rowHasScore && !alreadyScored;
-      if (countScore) {
-        if (qaTicketKey) seenQaTicketScores.add(qaTicketKey);
-        agent.qaScoreSum += score;
-        agent.qaScoreCount += 1;
-      }
-
-      agent.qaHistory.push({
-        date: targetDateLabel,
-        normDate,
-        systemCheckingType,
-        ticketId,
-        uid,
-        chatId,
-        caseDate,
-        qcName,
-        mistakeLevel,
-        category,
-        remarks,
-        deduction,
-        score: rowHasScore ? score : 0,
-        hasScore: countScore,
-        feedback,
-        crmKode,
-      });
-    }
-  }
-
-  // Final Computations
-  let resultData = Object.values(agents).map((agent) => {
-    agent.productivityTotal = agent.productivityBase;
-    if (agent.manDays > 0) {
-      agent.productivityAverage = agent.productivityTotal / agent.manDays;
-    } else {
-      agent.productivityAverage = 0;
-    }
-
-    agent.targetQuota = agent.manDays * 100;
-    agent.gap = agent.productivityTotal - agent.targetQuota;
-
-    if (agent.attendanceDuty > 0) {
-      agent.attendanceScore = Math.min(
-        100,
-        (agent.attendancePresence / agent.attendanceDuty) * 100,
-      );
-    } else {
-      agent.attendanceScore = 0;
-    }
-
-    agent.csatScFull = agent.csatScTotalValid > 0
-      ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100
-      : null;
-
-    agent.csatScFair = agent.csatScFairTotalValid > 0
-      ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100
-      : null;
-
-    if (
-      totalProdCsatAsliSum[agent.csId] &&
-      totalProdCsatAsliSum[agent.csId].count > 0
-    ) {
-      agent.csatAsli =
-        (totalProdCsatAsliSum[agent.csId].sum /
-        totalProdCsatAsliSum[agent.csId].count);
-    }
-    if (totalWhuSum[agent.csId] && totalWhuSum[agent.csId].count > 0) {
-      agent.whu = totalWhuSum[agent.csId].sum / totalWhuSum[agent.csId].count;
-    }
-    if (sla1mSum[agent.csId] && sla1mSum[agent.csId].count > 0) {
-      agent.sla1m = sla1mSum[agent.csId].sum / sla1mSum[agent.csId].count;
-      agent.sla1mCount = sla1mSum[agent.csId].count;
-    }
-    if (sla3mSum[agent.csId] && sla3mSum[agent.csId].count > 0) {
-      agent.sla3m = sla3mSum[agent.csId].sum / sla3mSum[agent.csId].count;
-      agent.sla3mCount = sla3mSum[agent.csId].count;
-    }
-
-    return agent;
-  });
-
-  if (periodDictionary && Object.keys(periodDictionary).length > 0) {
-    resultData = resultData.filter((a) => !!periodDictionary[a.csId]);
-  }
-
-  return resultData.sort((a, b) => a.csId.localeCompare(b.csId));
+  const acc = createAccumulators();
+  const dedupes = createDedupeSets();
+
+  const ctx: ProcessorContext = {
+    agents,
+    getAgent,
+    isWithin,
+    periodDictionary,
+    scheduleStatusByAgentDate,
+    scheduleDateLabelByAgentDate,
+    getScheduleKey,
+    isShift22Status,
+    extractTimestampHour,
+    getShiftAdjustedDate,
+    getScheduleDateLabel,
+    subtractOneDay,
+    ...acc,
+    ...dedupes,
+  };
+
+  processSchedule(ctx, schedData);
+  processProductivity(ctx, prodData);
+  processCsatSc(ctx, csatData);
+  processSla(ctx, slaData);
+  processQa(ctx, qaData);
+
+  return finalizeAgents(ctx);
 };
