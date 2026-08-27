@@ -15,7 +15,8 @@ import {
   validateQaFile,
   ValidationResult
 } from '../../lib/csvValidator';
-import { normalizeDateStr } from '../../lib/dataProcessor';
+import { normalizeDateStr } from '../../lib/dates';
+import { formatRelativeTime, isStaleSync } from '../../lib/dataQuality';
 import {
   cell,
   pickColumn,
@@ -26,24 +27,6 @@ import {
   resolveScheduleIdentityColumns,
   resolveSlaColumns,
 } from '../../lib/sheetHeaders';
-
-function formatRelativeTime(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'baru saja';
-  if (diffMin < 60) return `${diffMin} menit lalu`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} jam lalu`;
-  return date.toLocaleDateString('id-ID');
-}
-
-function isStaleSync(date: Date | null) {
-  if (!date) return false;
-  const now = new Date();
-  const isDifferentDay = date.toDateString() !== now.toDateString();
-  const isOlderThanSixHours = now.getTime() - date.getTime() > 6 * 60 * 60 * 1000;
-  return isDifferentDay || isOlderThanSixHours;
-}
 
 const validators: Record<string, (data: any[][]) => ValidationResult> = {
   csidFile: validateCsidFile,

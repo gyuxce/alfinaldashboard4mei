@@ -1,4 +1,4 @@
-import { normalizeDateStr } from './dataProcessor';
+import { normalizeDateStr } from './dates';
 import { cell, findHeader, findHeaderIncludes } from './sheetHeaders';
 
 // Config (dari env variables)
@@ -86,8 +86,8 @@ function buildSheetFetchError(sheetName: string, status: number, statusText: str
   );
 }
 
-// Fetch single sheet
-export async function fetchSheet(
+// Fetch single sheet (unused — kept for potential single-tab debugging)
+async function fetchSheet(
   sheetName: string,
   range: string = 'A:AZ',
   spreadsheetId: string = DEFAULT_SPREADSHEET_ID,
@@ -506,9 +506,8 @@ export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsDa
   };
 }
 
-// Convert SheetData ke format CSV string (agar kompatibel 
-// dengan PapaParse yang sudah ada)
-export function sheetDataToCsv(data: SheetData): string {
+// Convert SheetData ke format CSV string (unused — kept for potential export)
+function sheetDataToCsv(data: SheetData): string {
   return data
     .map(row => row.map(cell => {
       const value = String(cell ?? '');

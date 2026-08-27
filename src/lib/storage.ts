@@ -68,14 +68,5 @@ export async function listKeys(): Promise<string[]> {
   }
 }
 
-export async function getStorageSize(): Promise<number> {
-  try {
-    const db = await initDB();
-    const allData = await db.getAll(STORE_NAME);
-    const sizeBytes = new Blob([JSON.stringify(allData)]).size;
-    return Number((sizeBytes / (1024 * 1024)).toFixed(2));
-  } catch (error) {
-    console.warn(`Failed to calculate storage size`, error);
-    return 0;
-  }
-}
+// getStorageSize removed — was unused
+

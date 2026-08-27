@@ -3,6 +3,7 @@ import { saveData, loadData, clearAllData, listKeys, SHEETS_SNAPSHOT_REVISION } 
 import { countDataRows, ValidationResult } from './lib/csvValidator';
 import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError, getDateRangeForSheetMonth } from './lib/sheetsApi';
 import { buildAgentDictionary, isAgentDictionaryPopulated } from './lib/csid';
+import { getCurrentMonthRange } from './lib/dates';
 
 let sheetsSyncGeneration = 0;
 let sheetsAbortController: AbortController | null = null;
@@ -10,21 +11,6 @@ let hydratePromise: Promise<void> | null = null;
 let inFlightSheetsFetch: { month: string; promise: Promise<void> } | null = null;
 let storageEpoch = 0;
 let sheetsPersistChain: Promise<void> = Promise.resolve();
-
-function formatLocalDate(year: number, month: number, day: number) {
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-function getCurrentMonthRange() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const lastDay = new Date(year, month, 0).getDate();
-  return {
-    start: formatLocalDate(year, month, 1),
-    end: formatLocalDate(year, month, lastDay),
-  };
-}
 
 const defaultDateRange = getCurrentMonthRange();
 

@@ -6,7 +6,6 @@ export type ProcessedKpiBundle = {
   previousRawData: AgentKPI[];
   previousRawData2: AgentKPI[];
   previousRawData3: AgentKPI[];
-  baseTlList: string[];
 };
 
 const EMPTY_BUNDLE: ProcessedKpiBundle = {
@@ -14,7 +13,6 @@ const EMPTY_BUNDLE: ProcessedKpiBundle = {
   previousRawData: [],
   previousRawData2: [],
   previousRawData3: [],
-  baseTlList: [],
 };
 
 type PeriodRange = { start: string; end: string } | null;
@@ -183,7 +181,6 @@ export function useProcessedKpis(args: Args): {
           previousRawData,
           previousRawData2,
           previousRawData3,
-          baseTlList: Array.from(tls).sort((a, b) => a.localeCompare(b)),
         });
         setIsProcessing(false);
       });

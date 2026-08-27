@@ -5,6 +5,7 @@ import { useStore } from './store';
 import { getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
 import { formatRelativeTime, isStaleSync, countDataRows, extractCsIds, getProductivityDuplicateCount } from './lib/dataQuality';
 import { useFilteredKpis } from './hooks/useFilteredKpis';
+import { formatLocalDate, getCurrentMonthValue, getMonthValue, getMonthRange, getCurrentMonthRange } from './lib/dates';
 
 import { 
   LayoutDashboard, 
@@ -85,34 +86,6 @@ function formatFilterDate(date: string) {
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return date;
   return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(parsed);
-}
-
-function getMonthValue(date: string) {
-  return date ? date.slice(0, 7) : '';
-}
-
-function formatLocalDate(year: number, month: number, day: number) {
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
-
-function getCurrentMonthValue() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getMonthRange(monthValue: string) {
-  if (!monthValue) return { start: '', end: '' };
-  const [year, month] = monthValue.split('-').map(Number);
-  if (!year || !month) return { start: '', end: '' };
-  const lastDay = new Date(year, month, 0).getDate();
-  return {
-    start: formatLocalDate(year, month, 1),
-    end: formatLocalDate(year, month, lastDay),
-  };
-}
-
-function getCurrentMonthRange() {
-  return getMonthRange(getCurrentMonthValue());
 }
 
 function getMonthOptions() {
