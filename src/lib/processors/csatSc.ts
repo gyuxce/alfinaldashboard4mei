@@ -26,7 +26,7 @@ export function processCsatSc(
   if (csatData.length <= 1) return;
 
   const headerRow = csatData[0] || [];
-  const csatColumns = resolveCsatScColumns(headerRow);
+  const csatColumns = resolveCsatScColumns(headerRow, csatData);
 
   for (let i = 1; i < csatData.length; i++) {
     const row = csatData[i];

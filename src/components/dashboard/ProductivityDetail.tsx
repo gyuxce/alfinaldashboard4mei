@@ -566,6 +566,17 @@ export const ProductivityDetail: React.FC<{
               <SortableHeader label="Name / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
               <SortableHeader label="BPO" sortKey="bpo" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
               <SortableHeader label="Team Leader" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
+              <th className="p-2 font-bold text-center text-text-primary bg-surface z-30 relative">
+                Total Prod
+              </th>
+              <th className="p-2 font-bold text-center text-text-muted bg-surface z-30 relative">
+                Man-Days
+              </th>
+              <SortableHeader label="Average" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface z-30 relative" />
+              <th className="p-2 font-bold text-center text-text-muted bg-surface z-30 relative">
+                Target Quota
+              </th>
+              <SortableHeader label="Gap (+/-)" sortKey="gap" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
               {uniqueDates.map((date, i) => (
                 <th
                   key={date}
@@ -574,17 +585,6 @@ export const ProductivityDetail: React.FC<{
                   {formatCalendarHeader(date)}
                 </th>
               ))}
-              <th className="p-2 font-bold text-center text-text-primary  bg-surface shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] z-30 relative">
-                Total Prod
-              </th>
-              <th className="p-2 font-bold text-center text-text-muted  bg-surface z-30 relative">
-                Man-Days
-              </th>
-              <SortableHeader label="Average" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface z-30 relative" />
-              <th className="p-2 font-bold text-center text-text-muted  bg-surface z-30 relative">
-                Target Quota
-              </th>
-              <SortableHeader label="Gap (+/-)" sortKey="gap" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface z-30 relative" />
             </tr>
           </thead>
           <VirtualizedTbody
@@ -622,6 +622,45 @@ export const ProductivityDetail: React.FC<{
                   </td>
                   <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">
                     {agent.teamLeader || "-"}
+                  </td>
+                  <td className="p-2 text-center z-10 relative">
+                    <span
+                      className={`font-bold text-[11px] ${getKpiColor(agent.productivityTotal, "productivity")}`}
+                    >
+                      {formatNum(agent.productivityTotal, 0)}
+                    </span>
+                  </td>
+                  <td className="p-2 text-center text-text-muted font-medium z-10 relative">
+                    {localManDays}
+                  </td>
+                  <td className="p-2 text-center z-10 relative">
+                    {localManDays > 0 ? (
+                      <span
+                        className={`font-bold text-[11px] ${getKpiColor(localAvg, "productivity")}`}
+                      >
+                        {formatNum(localAvg, 0)}
+                      </span>
+                    ) : (
+                      <span className="text-text-disabled font-bold text-[11px]">
+                        -
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2 text-center text-text-muted font-medium z-10 relative">
+                    {localTargetQuota}
+                  </td>
+                  <td className="p-2 text-center z-10 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                    {localManDays > 0 ? (
+                      <span
+                        className={`font-bold text-[11px] ${localGap >= 0 ? "text-success" : "text-danger"}`}
+                      >
+                        {localGap > 0 ? `+${localGap}` : localGap}
+                      </span>
+                    ) : (
+                      <span className="text-text-disabled font-bold text-[11px]">
+                        -
+                      </span>
+                    )}
                   </td>
                   {uniqueDates.map((date) => {
                     const daily = getByCalendarDate(prodByDate, date);
@@ -672,45 +711,6 @@ export const ProductivityDetail: React.FC<{
                       </td>
                     );
                   })}
-                  <td className="p-2 text-center z-10 relative">
-                    <span
-                      className={`font-bold text-[11px] ${getKpiColor(agent.productivityTotal, "productivity")}`}
-                    >
-                      {formatNum(agent.productivityTotal, 0)}
-                    </span>
-                  </td>
-                  <td className="p-2 text-center text-text-muted font-medium z-10 relative">
-                    {localManDays}
-                  </td>
-                  <td className="p-2 text-center z-10 relative">
-                    {localManDays > 0 ? (
-                      <span
-                        className={`font-bold text-[11px] ${getKpiColor(localAvg, "productivity")}`}
-                      >
-                        {formatNum(localAvg, 0)}
-                      </span>
-                    ) : (
-                      <span className="text-text-disabled font-bold text-[11px]">
-                        -
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-2 text-center text-text-muted font-medium z-10 relative">
-                    {localTargetQuota}
-                  </td>
-                  <td className="p-2 text-center z-10 relative">
-                    {localManDays > 0 ? (
-                      <span
-                        className={`font-bold text-[11px] ${localGap >= 0 ? "text-success" : "text-danger"}`}
-                      >
-                        {localGap > 0 ? `+${localGap}` : localGap}
-                      </span>
-                    ) : (
-                      <span className="text-text-disabled font-bold text-[11px]">
-                        -
-                      </span>
-                    )}
-                  </td>
                 </tr>
               );
             })}

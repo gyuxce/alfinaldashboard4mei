@@ -191,7 +191,7 @@ export function validateCsatScFile(parsedData: any[][]): ValidationResult {
   const base = getBaseIssues(parsedData);
   if (base && base.errorType !== 'FEW_ROWS') return base;
 
-  const columns = resolveCsatScColumns(extractHeaders(parsedData));
+  const columns = resolveCsatScColumns(extractHeaders(parsedData), parsedData);
   let rowsWithCsId = 0;
   for (let i = 1; i < parsedData.length; i++) {
     if (resolveRowCsId(parsedData[i], columns.csId).id) rowsWithCsId++;

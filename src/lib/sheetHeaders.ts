@@ -158,7 +158,42 @@ export function resolveProductivityColumns(data: unknown[][]): ProductivityColum
   };
 }
 
-export function resolveCsatScColumns(headers: unknown[]): CsatScColumns {
+/**
+ * Scan data rows to find the CSAT score column when headers are placeholders
+ * ("Column1", "Column2"...). The score column has values 1-5 (or empty).
+ */
+function findScoreColumnByData(data: unknown[][], maxRows = 100): number {
+  if (!data || data.length < 2) return -1;
+  const sample = data.slice(1, Math.min(data.length, maxRows + 1));
+  let bestCol = -1;
+  let bestScore = 0;
+
+  for (let col = 0; col < (data[0]?.length || 0); col++) {
+    let valid = 0;
+    let total = 0;
+    for (const row of sample) {
+      if (!row || col >= row.length) continue;
+      const val = String(row[col] || '').trim();
+      total++;
+      if (val === '') continue;
+      const num = parseFloat(val);
+      if (!isNaN(num) && num >= 1 && num <= 5) valid++;
+    }
+    // Score column: most values are 1-5 and at least 20% non-empty
+    const score = total > 0 ? valid / total : 0;
+    if (score > 0.2 && score > bestScore) {
+      bestScore = score;
+      bestCol = col;
+    }
+  }
+  return bestCol;
+}
+
+export function resolveCsatScColumns(headers: unknown[], dataRows?: unknown[][]): CsatScColumns {
+  const scoreByHeader = findHeaderIncludes(headers, ['csat score', 'score', 'rating']);
+  const scoreByData = scoreByHeader < 0 && dataRows && dataRows.length > 1
+    ? findScoreColumnByData(dataRows)
+    : -1;
   return {
     date: findHeaderIncludes(headers, ['date', 'tanggal']),
     csId: findHeader(headers, CS_ID_ALIASES),
@@ -166,7 +201,7 @@ export function resolveCsatScColumns(headers: unknown[]): CsatScColumns {
     chatId: findHeaderIncludes(headers, CHAT_ALIASES),
     uid: findHeaderIncludes(headers, UID_ALIASES),
     category: findHeaderIncludes(headers, ['category', 'kategori', 'case category']),
-    score: findHeaderIncludes(headers, ['csat score', 'score', 'rating']),
+    score: scoreByHeader >= 0 ? scoreByHeader : scoreByData,
     response: findHeaderIncludes(headers, ['response', 'respon', 'feedback', 'comment', 'komentar']),
     timestamp: findHeaderIncludes(headers, ['timestamp', 'close time', 'waktu close', 'close']),
     rcaAgent: findHeader(headers, ['RCA Agent Area', 'rca agent']),
