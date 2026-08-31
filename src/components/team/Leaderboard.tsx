@@ -1,14 +1,14 @@
 import React, { useMemo, useState, useRef } from "react";
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from "../../store";
-import { AgentKPI, getCsatBadRatingCount } from "../../lib/dataProcessor";
+import { AgentKPI, getAgentDictionaryForPeriod, getCsatBadRatingCount } from "../../lib/dataProcessor";
 import { ArrowRight, Trophy, Users, User, Download } from "lucide-react";
 import { downloadCsv } from "../../lib/exportCsv";
 import { formatNum, cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
-import { matchTeamLeaderToAgent, normalizeAgentName } from "../../lib/matchTeamLeader";
+import { normalizeAgentName, resolveTeamLeaderAgent } from "../../lib/matchTeamLeader";
 import { VirtualizedTbody } from '../ui/VirtualizedTbody';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 
@@ -187,6 +187,8 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     selectedBpo,
     selectedTL,
     selectedGlobalAgent,
+    agentDictionary,
+    agentDictionaryByMonth,
   } = useStore(useShallow((s) => ({
     productivityData: s.productivityData,
     csatScData: s.csatScData,
@@ -198,6 +200,8 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     selectedBpo: s.selectedBpo,
     selectedTL: s.selectedTL,
     selectedGlobalAgent: s.selectedGlobalAgent,
+    agentDictionary: s.agentDictionary,
+    agentDictionaryByMonth: s.agentDictionaryByMonth,
   })));
   const openTab = useStore((s) => s.openTab);
 
@@ -276,7 +280,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     const buildTlRow = (
       agent: AgentKPI,
       agentCount: number,
-    ): LeaderboardRow | null => {
+    ): LeaderboardRow => {
       const { composite, csatGood, csatBad, csatPct } =
         getLeaderboardComposite(agent);
       const productivity = getProductivityColumns(
@@ -287,12 +291,12 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         productivity.achievement !== null
           ? Math.min(productivity.achievement, 100)
           : null;
-      const score = calculateCompositeScore({
-        qaPct: composite.qaPct,
-        productivityPct: prodPct,
-        csatPct: composite.csatPct,
-      }).score;
-      if (score === null) return null;
+      const score =
+        calculateCompositeScore({
+          qaPct: composite.qaPct,
+          productivityPct: prodPct,
+          csatPct: composite.csatPct,
+        }).score ?? 10;
       return {
         csId: agent.csId,
         name: agent.name || agent.csId,
@@ -343,16 +347,58 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       );
     });
 
+    const roster = getAgentDictionaryForPeriod(
+      startDate || endDate,
+      agentDictionary,
+      agentDictionaryByMonth,
+    );
+
     const tList: LeaderboardRow[] = [];
     const usedTlAgents = new Set<string>();
     uniqueTlNames.forEach((tlName) => {
-      const match = matchTeamLeaderToAgent<AgentKPI>(tlName, scopedRawData);
-      if (!match) return;
-      const key = match.csId || match.name;
-      if (usedTlAgents.has(key)) return;
-      usedTlAgents.add(key);
-      const row = buildTlRow(match, tlAgentCounts.get(tlName) ?? 1);
-      if (row) tList.push(row);
+      const match = resolveTeamLeaderAgent<AgentKPI>(tlName, scopedRawData, roster);
+      if (match) {
+        const key = match.csId || match.name;
+        if (usedTlAgents.has(key)) return;
+        usedTlAgents.add(key);
+        tList.push(buildTlRow(match, tlAgentCounts.get(tlName) ?? 1));
+        return;
+      }
+
+      // Roster nickname didn't map to a personal KPI row — still list the TL
+      // so the tab is never blank when agents have a Team Leader value.
+      if (usedTlAgents.has(tlName)) return;
+      usedTlAgents.add(tlName);
+      tList.push({
+        name: tlName,
+        agent_count: tlAgentCounts.get(tlName) ?? 1,
+        score: 10,
+        qa: null,
+        qa_pct: null,
+        qa_points: null,
+        prod: null,
+        prod_pct: null,
+        prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
+        prod_total_duty: 0,
+        prod_target_chat: 0,
+        prod_total_chat: 0,
+        prod_points: null,
+        prod_final_points: null,
+        prod_difference: null,
+        csat: null,
+        csat_pct: null,
+        csat_good: 0,
+        csat_bad: 0,
+        csat_points: null,
+        training_total: null,
+        training_completion: null,
+        training_pct: 100,
+        training_points: 5,
+        quiz_target: QUIZ_TARGET,
+        quiz_score: 100,
+        quiz_pct: 100,
+        quiz_points: 5,
+      });
     });
 
     aList.sort((a, b) => b.score - a.score);
@@ -360,9 +406,12 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
     return { agentRows: aList, tlRows: tList, excludedInactive: inactiveAgents.length, excludedIncomplete: incompleteCount };
   }, [
+    agentDictionary,
+    agentDictionaryByMonth,
     data,
     endDate,
     hasData,
+    startDate,
   ]);
 
   if (!hasData) {

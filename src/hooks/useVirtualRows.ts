@@ -73,18 +73,21 @@ export function useVirtualRows({
     update();
   }, [count, update]);
 
-  const startIndex = range.start;
-  const endIndex = range.end;
+  const useAll = count <= threshold;
+  const startIndex = useAll ? 0 : Math.min(range.start, count);
+  const endIndex = useAll ? count : Math.min(range.end, count);
+  const windowStart = startIndex >= endIndex ? 0 : startIndex;
+  const windowEnd = startIndex >= endIndex ? count : endIndex;
   const virtualIndexes =
-    endIndex > startIndex
-      ? Array.from({ length: endIndex - startIndex }, (_, i) => startIndex + i)
+    windowEnd > windowStart
+      ? Array.from({ length: windowEnd - windowStart }, (_, i) => windowStart + i)
       : [];
 
   return {
-    startIndex,
-    endIndex,
-    paddingTop: startIndex * rowHeight,
-    paddingBottom: Math.max(0, (count - endIndex) * rowHeight),
+    startIndex: windowStart,
+    endIndex: windowEnd,
+    paddingTop: windowStart * rowHeight,
+    paddingBottom: Math.max(0, (count - windowEnd) * rowHeight),
     virtualIndexes,
   };
 }
