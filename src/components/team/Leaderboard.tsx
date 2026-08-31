@@ -1,14 +1,14 @@
 import React, { useMemo, useState, useRef } from "react";
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from "../../store";
-import { AgentKPI, getAgentDictionaryForPeriod, getCsatBadRatingCount } from "../../lib/dataProcessor";
+import { AgentKPI, getCsatBadRatingCount } from "../../lib/dataProcessor";
 import { ArrowRight, Trophy, Users, User, Download } from "lucide-react";
 import { downloadCsv } from "../../lib/exportCsv";
 import { formatNum, cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
-import { normalizeAgentName, resolveTeamLeaderAgent } from "../../lib/matchTeamLeader";
+import { aggregateTeamLeaderStats, normalizeAgentName } from "../../lib/teamLeaderRows";
 import { VirtualizedTbody } from '../ui/VirtualizedTbody';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 
@@ -273,122 +273,70 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       }
     });
 
-    // TL tab lists the short roster labels (Gagas, Yuge, Fandi) and uses each
-    // TL's personal duty/chat formula — not team sums and not long official names.
-    const buildTlRow = (
-      agent: AgentKPI,
-      agentCount: number,
-      displayName: string,
-    ): LeaderboardRow => {
-      const { composite, csatGood, csatBad, csatPct } =
-        getLeaderboardComposite(agent);
-      const productivity = getProductivityColumns(
-        agent.productivityTotal,
-        agent.manDays,
+    // TL tab keeps the short roster labels (Gagas, Yuge, Fandi). TLs are not
+    // agents themselves, so the official sheet reports their productivity as the
+    // per-agent average of their team, then applies the same personal formula
+    // (duty x 100 target, points, cap 20).
+    const teamsByTl = new Map<string, AgentKPI[]>();
+    scopedRawData.forEach((agent) => {
+      const tlName = (agent.teamLeader || "").trim();
+      if (!tlName) return;
+      const team = teamsByTl.get(tlName);
+      if (team) team.push(agent);
+      else teamsByTl.set(tlName, [agent]);
+    });
+
+    const tList: LeaderboardRow[] = [];
+    teamsByTl.forEach((team, tlName) => {
+      const stats = aggregateTeamLeaderStats(
+        team.map((agent) => {
+          const { csatGood, csatBad } = getLeaderboardComposite(agent);
+          return {
+            manDays: agent.manDays,
+            productivityTotal: agent.productivityTotal,
+            qaScoreSum: agent.qaScoreSum,
+            qaScoreCount: agent.qaScoreCount,
+            csatGood,
+            csatBad,
+          };
+        }),
       );
+      if (!stats) return;
+
+      const productivity = getProductivityColumns(stats.avgChat, stats.avgDuty);
       const prodPct =
         productivity.achievement !== null
           ? Math.min(productivity.achievement, 100)
           : null;
-      const score =
-        calculateCompositeScore({
-          qaPct: composite.qaPct,
-          productivityPct: prodPct,
-          csatPct: composite.csatPct,
-        }).score ?? 10;
-      return {
-        csId: agent.csId,
-        name: displayName,
-        tl: agent.teamLeader || "-",
-        agent_count: agentCount,
+
+      const score = calculateCompositeScore({
+        qaPct: stats.qaPct,
+        productivityPct: prodPct,
+        csatPct: stats.csatPct,
+      }).score;
+      if (score === null) return;
+
+      tList.push({
+        name: tlName,
+        agent_count: stats.agentCount,
         score,
-        qa: composite.qaOriginal,
-        qa_pct: composite.qaPct,
-        qa_points:
-          composite.qaPct !== null ? (composite.qaPct / 100) * 50 : null,
+        qa: stats.qaPct,
+        qa_pct: stats.qaPct,
+        qa_points: stats.qaPct !== null ? (stats.qaPct / 100) * 50 : null,
         prod: productivity.achievement,
         prod_pct: productivity.achievement,
         prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
-        prod_total_duty: agent.manDays,
+        prod_total_duty: stats.avgDuty,
         prod_target_chat: productivity.targetChat,
-        prod_total_chat: agent.productivityTotal,
+        prod_total_chat: stats.avgChat,
         prod_points: productivity.points,
         prod_final_points: productivity.finalPoints,
         prod_difference: productivity.difference,
-        csat: composite.csatOriginal,
-        csat_pct: composite.csatPct,
-        csat_good: csatGood,
-        csat_bad: csatBad,
-        csat_points: csatPct !== null ? (csatPct / 100) * 20 : null,
-        training_total: null,
-        training_completion: null,
-        training_pct: 100,
-        training_points: 5,
-        quiz_target: QUIZ_TARGET,
-        quiz_score: 100,
-        quiz_pct: 100,
-        quiz_points: 5,
-      };
-    };
-
-    const uniqueTlNames: string[] = Array.from(
-      new Set(
-        scopedRawData
-          .map((agent) => (agent.teamLeader || "").trim())
-          .filter((name) => name.length > 0),
-      ),
-    );
-    const tlAgentCounts = new Map<string, number>();
-    uniqueTlNames.forEach((tlName) => {
-      tlAgentCounts.set(
-        tlName,
-        scopedRawData.filter((agent) => (agent.teamLeader || "").trim() === tlName).length,
-      );
-    });
-
-    const roster = getAgentDictionaryForPeriod(
-      startDate || endDate,
-      agentDictionary,
-      agentDictionaryByMonth,
-    );
-
-    const tList: LeaderboardRow[] = [];
-    const usedTlAgents = new Set<string>();
-    uniqueTlNames.forEach((tlName) => {
-      const match = resolveTeamLeaderAgent<AgentKPI>(tlName, scopedRawData, roster);
-      if (match) {
-        const key = match.csId || match.name;
-        if (usedTlAgents.has(key)) return;
-        usedTlAgents.add(key);
-        tList.push(buildTlRow(match, tlAgentCounts.get(tlName) ?? 1, tlName));
-        return;
-      }
-
-      // Roster nickname didn't map to a personal KPI row — still list the TL
-      // so the tab is never blank when agents have a Team Leader value.
-      if (usedTlAgents.has(tlName)) return;
-      usedTlAgents.add(tlName);
-      tList.push({
-        name: tlName,
-        agent_count: tlAgentCounts.get(tlName) ?? 1,
-        score: 10,
-        qa: null,
-        qa_pct: null,
-        qa_points: null,
-        prod: null,
-        prod_pct: null,
-        prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
-        prod_total_duty: 0,
-        prod_target_chat: 0,
-        prod_total_chat: 0,
-        prod_points: null,
-        prod_final_points: null,
-        prod_difference: null,
-        csat: null,
-        csat_pct: null,
-        csat_good: 0,
-        csat_bad: 0,
-        csat_points: null,
+        csat: stats.csatPct,
+        csat_pct: stats.csatPct,
+        csat_good: stats.csatGood,
+        csat_bad: stats.csatBad,
+        csat_points: stats.csatPct !== null ? (stats.csatPct / 100) * 20 : null,
         training_total: null,
         training_completion: null,
         training_pct: 100,
@@ -405,12 +353,9 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
     return { agentRows: aList, tlRows: tList, excludedInactive: inactiveAgents.length, excludedIncomplete: incompleteCount };
   }, [
-    agentDictionary,
-    agentDictionaryByMonth,
     data,
     endDate,
     hasData,
-    startDate,
   ]);
 
   if (!hasData) {
