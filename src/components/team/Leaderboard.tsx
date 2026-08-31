@@ -273,13 +273,12 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       }
     });
 
-    // Official sheet ranks TLs as people (personal duty/chat/points), not team sums.
-    // Build TL rows directly from raw agent data: TLs often lack QA/CSAT, so they may
-    // never enter aList (which gates on composite.score). Productivity is computed
-    // from the personal formula (manDays x 100 target), matching Official Productivity.
+    // TL tab lists the short roster labels (Gagas, Yuge, Fandi) and uses each
+    // TL's personal duty/chat formula — not team sums and not long official names.
     const buildTlRow = (
       agent: AgentKPI,
       agentCount: number,
+      displayName: string,
     ): LeaderboardRow => {
       const { composite, csatGood, csatBad, csatPct } =
         getLeaderboardComposite(agent);
@@ -299,7 +298,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         }).score ?? 10;
       return {
         csId: agent.csId,
-        name: agent.name || agent.csId,
+        name: displayName,
         tl: agent.teamLeader || "-",
         agent_count: agentCount,
         score,
@@ -361,7 +360,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         const key = match.csId || match.name;
         if (usedTlAgents.has(key)) return;
         usedTlAgents.add(key);
-        tList.push(buildTlRow(match, tlAgentCounts.get(tlName) ?? 1));
+        tList.push(buildTlRow(match, tlAgentCounts.get(tlName) ?? 1, tlName));
         return;
       }
 

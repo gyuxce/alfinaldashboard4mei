@@ -1,11 +1,6 @@
 export const normalizeAgentName = (value: string) =>
   value.trim().replace(/\s+/g, " ").toLowerCase();
 
-const stripTlLabel = (value: string) =>
-  normalizeAgentName(value)
-    .replace(/^(tl|team leader)\s*[:.\-]?\s*/, "")
-    .replace(/\s*\(tl\)$/, "");
-
 export type TeamLeaderMatchable = {
   name: string;
   csId?: string;
@@ -13,52 +8,38 @@ export type TeamLeaderMatchable = {
   productivityTotal?: number;
 };
 
-const scoreNameMatch = (tl: string, row: TeamLeaderMatchable): number => {
-  const name = normalizeAgentName(row.name || "");
-  const csId = String(row.csId || "").trim().toLowerCase();
-  if (csId && csId === tl) return 100;
-  if (!name) return 0;
-  if (name === tl) return 90;
-  if (name.startsWith(`${tl} `)) return 80;
+const displayName = (row: TeamLeaderMatchable) =>
+  normalizeAgentName(row.name || row.csId || "");
 
-  const nameParts = name.split(" ").filter(Boolean);
-  const tlParts = tl.split(" ").filter(Boolean);
-  if (tlParts.length > 1 && tlParts.every((part) => nameParts.includes(part))) return 75;
-  if (tlParts.length === 1 && nameParts.includes(tlParts[0])) return 70;
+const pickMostProductive = <T extends TeamLeaderMatchable>(rows: T[]): T =>
+  [...rows].sort(
+    (a, b) =>
+      (b.productivityTotal || 0) - (a.productivityTotal || 0) ||
+      (b.manDays || 0) - (a.manDays || 0),
+  )[0];
 
-  const first = nameParts[0] || "";
-  const tlFirst = tlParts[0] || "";
-  if (first.length >= 3 && tlFirst.length >= 3) {
-    const prefix = Math.min(3, first.length, tlFirst.length);
-    if (
-      first.slice(0, prefix) === tlFirst.slice(0, prefix) &&
-      Math.abs(first.length - tlFirst.length) <= 2
-    ) {
-      return 40;
-    }
-  }
-  return 0;
-};
-
-/** Map roster TL label ("Gagas", "Yuge") to that TL's personal agent row. */
+/**
+ * Find the TL's personal agent row from the short roster label used on the
+ * dashboard ("Gagas", "Yuge"). Exact name match only — do not fuzzy-map
+ * nicknames onto different first names (Yuge is not Yuga).
+ */
 export const matchTeamLeaderToAgent = <T extends TeamLeaderMatchable>(
   tlName: string,
   rows: T[],
 ): T | undefined => {
-  const tl = stripTlLabel(tlName);
+  const tl = normalizeAgentName(tlName);
   if (!tl) return undefined;
 
-  const ranked = rows
-    .map((row) => ({
-      row,
-      rank: scoreNameMatch(tl, { ...row, name: row.name || row.csId || "" }),
-      prod: row.productivityTotal || 0,
-      duty: row.manDays || 0,
-    }))
-    .filter((item) => item.rank > 0)
-    .sort((a, b) => b.rank - a.rank || b.prod - a.prod || b.duty - a.duty);
+  const exact = rows.filter((row) => displayName(row) === tl);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return pickMostProductive(exact);
 
-  return ranked[0]?.row;
+  // Same first word only, e.g. roster "Gagas" and CSID "Gagas Bayu Krisnha".
+  const firstWord = rows.filter((row) => displayName(row).startsWith(`${tl} `));
+  if (firstWord.length === 1) return firstWord[0];
+  if (firstWord.length > 1) return pickMostProductive(firstWord);
+
+  return undefined;
 };
 
 export const resolveTeamLeaderAgent = <T extends TeamLeaderMatchable>(
