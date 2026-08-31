@@ -27,17 +27,13 @@ const productivityColumns = (chat: number, duty: number) => {
 };
 
 describe('getStandardPeriodDuty', () => {
-  it('uses the most common man-days across the roster', () => {
-    // August 2026: most agents work the full 23 days.
-    expect(getStandardPeriodDuty([23, 23, 23, 20, 18, 23, 21])).toBe(23);
+  it('takes the full period duty, not the most common one', () => {
+    // August 2026: plenty of agents log 21 days, but a full roster cycle is 23.
+    expect(getStandardPeriodDuty([21, 21, 21, 23, 20, 18, 21])).toBe(23);
   });
 
   it('ignores agents with no attendance', () => {
-    expect(getStandardPeriodDuty([0, 0, 22, 22, 19])).toBe(22);
-  });
-
-  it('breaks ties toward the longer duty', () => {
-    expect(getStandardPeriodDuty([21, 23])).toBe(23);
+    expect(getStandardPeriodDuty([0, 0, 22, 19])).toBe(22);
   });
 
   it('returns 0 when nobody has attendance', () => {
