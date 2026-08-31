@@ -270,6 +270,64 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     });
 
     // Official sheet ranks TLs as people (personal duty/chat/points), not team sums.
+    // Build TL rows directly from raw agent data: TLs often lack QA/CSAT, so they may
+    // never enter aList (which gates on composite.score). Productivity is computed
+    // from the personal formula (manDays x 100 target), matching Official Productivity.
+    const buildTlRow = (
+      agent: AgentKPI,
+      agentCount: number,
+    ): LeaderboardRow | null => {
+      const { composite, csatGood, csatBad, csatPct } =
+        getLeaderboardComposite(agent);
+      const productivity = getProductivityColumns(
+        agent.productivityTotal,
+        agent.manDays,
+      );
+      const prodPct =
+        productivity.achievement !== null
+          ? Math.min(productivity.achievement, 100)
+          : null;
+      const score = calculateCompositeScore({
+        qaPct: composite.qaPct,
+        productivityPct: prodPct,
+        csatPct: composite.csatPct,
+      }).score;
+      if (score === null) return null;
+      return {
+        csId: agent.csId,
+        name: agent.name || agent.csId,
+        tl: agent.teamLeader || "-",
+        agent_count: agentCount,
+        score,
+        qa: composite.qaOriginal,
+        qa_pct: composite.qaPct,
+        qa_points:
+          composite.qaPct !== null ? (composite.qaPct / 100) * 50 : null,
+        prod: productivity.achievement,
+        prod_pct: productivity.achievement,
+        prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
+        prod_total_duty: agent.manDays,
+        prod_target_chat: productivity.targetChat,
+        prod_total_chat: agent.productivityTotal,
+        prod_points: productivity.points,
+        prod_final_points: productivity.finalPoints,
+        prod_difference: productivity.difference,
+        csat: composite.csatOriginal,
+        csat_pct: composite.csatPct,
+        csat_good: csatGood,
+        csat_bad: csatBad,
+        csat_points: csatPct !== null ? (csatPct / 100) * 20 : null,
+        training_total: null,
+        training_completion: null,
+        training_pct: 100,
+        training_points: 5,
+        quiz_target: QUIZ_TARGET,
+        quiz_score: 100,
+        quiz_pct: 100,
+        quiz_points: 5,
+      };
+    };
+
     const uniqueTlNames: string[] = Array.from(
       new Set(
         scopedRawData
@@ -288,15 +346,13 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     const tList: LeaderboardRow[] = [];
     const usedTlAgents = new Set<string>();
     uniqueTlNames.forEach((tlName) => {
-      const match = matchTeamLeaderToAgent(tlName, aList);
+      const match = matchTeamLeaderToAgent<AgentKPI>(tlName, scopedRawData);
       if (!match) return;
       const key = match.csId || match.name;
       if (usedTlAgents.has(key)) return;
       usedTlAgents.add(key);
-      tList.push({
-        ...match,
-        agent_count: tlAgentCounts.get(tlName) ?? 1,
-      });
+      const row = buildTlRow(match, tlAgentCounts.get(tlName) ?? 1);
+      if (row) tList.push(row);
     });
 
     aList.sort((a, b) => b.score - a.score);
