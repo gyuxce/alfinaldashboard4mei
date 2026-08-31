@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTeamLeaderStats, type TeamMemberStats } from '../teamLeaderRows';
+import {
+  aggregateTeamLeaderStats,
+  getStandardPeriodDuty,
+  type TeamMemberStats,
+} from '../teamLeaderRows';
 
 const member = (
   manDays: number,
@@ -15,39 +19,59 @@ const member = (
   ...extra,
 });
 
-const productivityColumns = (avgChat: number, avgDuty: number) => {
-  const targetChat = avgDuty * 100;
-  const points = targetChat > 0 ? (avgChat / targetChat) * 20 : null;
+const productivityColumns = (chat: number, duty: number) => {
+  const targetChat = duty * 100;
+  const points = targetChat > 0 ? (chat / targetChat) * 20 : null;
   const finalPoints = points !== null ? Math.min(points, 20) : null;
   return { targetChat, points, finalPoints };
 };
 
+describe('getStandardPeriodDuty', () => {
+  it('uses the most common man-days across the roster', () => {
+    // August 2026: most agents work the full 23 days.
+    expect(getStandardPeriodDuty([23, 23, 23, 20, 18, 23, 21])).toBe(23);
+  });
+
+  it('ignores agents with no attendance', () => {
+    expect(getStandardPeriodDuty([0, 0, 22, 22, 19])).toBe(22);
+  });
+
+  it('breaks ties toward the longer duty', () => {
+    expect(getStandardPeriodDuty([21, 23])).toBe(23);
+  });
+
+  it('returns 0 when nobody has attendance', () => {
+    expect(getStandardPeriodDuty([])).toBe(0);
+    expect(getStandardPeriodDuty([0, 0])).toBe(0);
+  });
+});
+
 describe('aggregateTeamLeaderStats', () => {
-  it('reports the per-agent average duty and chat', () => {
-    // Gagas: 5 agents averaging 23 duty and 2291 chats.
+  it('gives every TL the same target call regardless of team attendance', () => {
+    // Gagas: 5 agents averaging 2291 chats, some with partial attendance.
     const team = [
       member(23, 2300),
-      member(23, 2280),
+      member(19, 2280),
       member(23, 2291),
       member(23, 2305),
-      member(23, 2279),
+      member(21, 2279),
     ];
-    const stats = aggregateTeamLeaderStats(team);
+    const stats = aggregateTeamLeaderStats(team, 23);
 
     expect(stats?.agentCount).toBe(5);
-    expect(stats?.avgDuty).toBe(23);
+    expect(stats?.duty).toBe(23);
     expect(stats?.avgChat).toBe(2291);
 
-    const prod = productivityColumns(stats!.avgChat, stats!.avgDuty);
+    const prod = productivityColumns(stats!.avgChat, stats!.duty);
     expect(prod.targetChat).toBe(2300);
     expect(prod.points).toBeCloseTo(19.92, 2);
     expect(prod.finalPoints).toBeCloseTo(19.92, 2);
   });
 
   it('caps final points at 20 while keeping raw points above target', () => {
-    // Yuge: average 2333 chats against a 2300 target.
-    const stats = aggregateTeamLeaderStats([member(23, 2333)]);
-    const prod = productivityColumns(stats!.avgChat, stats!.avgDuty);
+    // Yuge: average 2333 chats against the shared 2300 target.
+    const stats = aggregateTeamLeaderStats([member(23, 2333)], 23);
+    const prod = productivityColumns(stats!.avgChat, stats!.duty);
 
     expect(prod.points).toBeCloseTo(20.29, 2);
     expect(prod.finalPoints).toBe(20);
@@ -55,10 +79,13 @@ describe('aggregateTeamLeaderStats', () => {
   });
 
   it('weights QA by the number of audited chats and sums CSAT counts', () => {
-    const stats = aggregateTeamLeaderStats([
-      member(23, 2000, { qaScoreSum: 190, qaScoreCount: 2, csatGood: 8, csatBad: 2 }),
-      member(23, 2000, { qaScoreSum: 100, qaScoreCount: 1, csatGood: 2, csatBad: 0 }),
-    ]);
+    const stats = aggregateTeamLeaderStats(
+      [
+        member(23, 2000, { qaScoreSum: 190, qaScoreCount: 2, csatGood: 8, csatBad: 2 }),
+        member(23, 2000, { qaScoreSum: 100, qaScoreCount: 1, csatGood: 2, csatBad: 0 }),
+      ],
+      23,
+    );
 
     expect(stats?.qaPct).toBeCloseTo(96.67, 2);
     expect(stats?.csatGood).toBe(10);
@@ -67,12 +94,12 @@ describe('aggregateTeamLeaderStats', () => {
   });
 
   it('returns null KPIs when the team has no QA or CSAT data', () => {
-    const stats = aggregateTeamLeaderStats([member(23, 2000)]);
+    const stats = aggregateTeamLeaderStats([member(23, 2000)], 23);
     expect(stats?.qaPct).toBeNull();
     expect(stats?.csatPct).toBeNull();
   });
 
   it('returns null for an empty team', () => {
-    expect(aggregateTeamLeaderStats([])).toBeNull();
+    expect(aggregateTeamLeaderStats([], 23)).toBeNull();
   });
 });

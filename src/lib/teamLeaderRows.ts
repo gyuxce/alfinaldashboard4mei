@@ -12,9 +12,9 @@ export type TeamMemberStats = {
 
 export type TeamLeaderStats = {
   agentCount: number;
-  /** Per-agent average duty — the TL's Total Duty in the official sheet. */
-  avgDuty: number;
-  /** Per-agent average chats — the TL's Total Chat in the official sheet. */
+  /** Standard period duty — every TL shares one Target Call in the sheet. */
+  duty: number;
+  /** Per-agent average chats — the TL's Total Call in the official sheet. */
   avgChat: number;
   qaPct: number | null;
   csatGood: number;
@@ -23,19 +23,42 @@ export type TeamLeaderStats = {
 };
 
 /**
- * Team Leaders do not handle chats themselves, so the official sheet scores
- * them on the per-agent average of their team against the same personal
- * target (duty x 100).
+ * The official sheet gives every leader the same Target Call (2300 = 23 x 100)
+ * regardless of team size, so a TL is measured against the period's standard
+ * duty rather than their team's average attendance. Use the most common
+ * man-days across the roster, which is that standard working-day count.
+ */
+export const getStandardPeriodDuty = (manDaysPerAgent: number[]): number => {
+  const counts = new Map<number, number>();
+  manDaysPerAgent.forEach((manDays) => {
+    if (manDays > 0) counts.set(manDays, (counts.get(manDays) || 0) + 1);
+  });
+  if (counts.size === 0) return 0;
+
+  let standardDuty = 0;
+  let highestCount = 0;
+  counts.forEach((count, manDays) => {
+    if (count > highestCount || (count === highestCount && manDays > standardDuty)) {
+      standardDuty = manDays;
+      highestCount = count;
+    }
+  });
+  return standardDuty;
+};
+
+/**
+ * Team Leaders are scored on the per-agent average output of their team,
+ * against the standard period target (duty x 100).
  */
 export const aggregateTeamLeaderStats = (
   team: TeamMemberStats[],
+  standardDuty: number,
 ): TeamLeaderStats | null => {
   const agentCount = team.length;
   if (agentCount === 0) return null;
 
   const totals = team.reduce(
     (acc, member) => {
-      acc.duty += member.manDays;
       acc.chat += member.productivityTotal;
       acc.qaSum += member.qaScoreSum;
       acc.qaCount += member.qaScoreCount;
@@ -43,14 +66,14 @@ export const aggregateTeamLeaderStats = (
       acc.csatBad += member.csatBad;
       return acc;
     },
-    { duty: 0, chat: 0, qaSum: 0, qaCount: 0, csatGood: 0, csatBad: 0 },
+    { chat: 0, qaSum: 0, qaCount: 0, csatGood: 0, csatBad: 0 },
   );
 
   const csatTotal = totals.csatGood + totals.csatBad;
 
   return {
     agentCount,
-    avgDuty: totals.duty / agentCount,
+    duty: standardDuty,
     avgChat: totals.chat / agentCount,
     qaPct: totals.qaCount > 0 ? totals.qaSum / totals.qaCount : null,
     csatGood: totals.csatGood,

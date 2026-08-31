@@ -8,7 +8,11 @@ import { formatNum, cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
-import { aggregateTeamLeaderStats, normalizeAgentName } from "../../lib/teamLeaderRows";
+import {
+  aggregateTeamLeaderStats,
+  getStandardPeriodDuty,
+  normalizeAgentName,
+} from "../../lib/teamLeaderRows";
 import { VirtualizedTbody } from '../ui/VirtualizedTbody';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 
@@ -273,10 +277,12 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       }
     });
 
-    // TL tab keeps the short roster labels (Gagas, Yuge, Fandi). TLs are not
-    // agents themselves, so the official sheet reports their productivity as the
-    // per-agent average of their team, then applies the same personal formula
-    // (duty x 100 target, points, cap 20).
+    // TL tab keeps the short roster labels (Gagas, Yuge, Fandi). TLs are scored
+    // on their team's per-agent average output against one shared Target Call
+    // (standard period duty x 100), exactly like the official sheet.
+    const standardDuty = getStandardPeriodDuty(
+      scopedRawData.map((agent) => agent.manDays),
+    );
     const teamsByTl = new Map<string, AgentKPI[]>();
     scopedRawData.forEach((agent) => {
       const tlName = (agent.teamLeader || "").trim();
@@ -300,10 +306,11 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
             csatBad,
           };
         }),
+        standardDuty,
       );
       if (!stats) return;
 
-      const productivity = getProductivityColumns(stats.avgChat, stats.avgDuty);
+      const productivity = getProductivityColumns(stats.avgChat, stats.duty);
       const prodPct =
         productivity.achievement !== null
           ? Math.min(productivity.achievement, 100)
@@ -326,7 +333,7 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         prod: productivity.achievement,
         prod_pct: productivity.achievement,
         prod_daily_target: DAILY_PRODUCTIVITY_TARGET,
-        prod_total_duty: stats.avgDuty,
+        prod_total_duty: stats.duty,
         prod_target_chat: productivity.targetChat,
         prod_total_chat: stats.avgChat,
         prod_points: productivity.points,
