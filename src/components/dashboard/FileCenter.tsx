@@ -2,7 +2,7 @@ import React from 'react';
 import Papa from 'papaparse';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore, AppState } from '../../store';
-import { UploadCloud, CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle2, FileText, DownloadCloud, Loader2, DatabaseBackup, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getSheetConfigForMonth, getSheetMonthOption, getSheetMonthOptions } from '../../lib/sheetsApi';
 import { 

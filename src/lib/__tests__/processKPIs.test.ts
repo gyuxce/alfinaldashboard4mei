@@ -1,14 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { processKPIs, type AgentKPI } from '../dataProcessor';
+import { processKPIs } from '../dataProcessor';
 
 // Minimal sheet fixtures — just enough to verify the pipeline
 // produces agents with correct identity, man-days, and QA scores.
-
-const csidData = [
-  ['CS ID', 'AGENT NAME', 'BPO', 'TEAM LEADER'],
-  ['3-1-1001', 'Agent One', 'TIN', 'Fandi'],
-  ['3-1-1002', 'Agent Two', 'TCID', 'Yuge'],
-];
 
 const scheduleData = [
   ['', 'CSID', 'Name', 'Team Leader', 'BPO', '1-Agu-2026', '2-Agu-2026'],

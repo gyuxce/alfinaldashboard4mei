@@ -1,5 +1,5 @@
 import React from 'react';
-import { AgentKPI, CSATEntry } from '../../lib/dataProcessor';
+import { CSATEntry } from '../../lib/dataProcessor';
 import { parseDateForSort, cn } from '../../lib/utils';
 import { AlertCircle, X, ChevronUp, ChevronDown, Star, Copy } from 'lucide-react';
 import { EmptyState } from '../ui/EmptyState';

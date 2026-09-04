@@ -371,8 +371,6 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     qaData,
     startDate,
     endDate,
-    agentDictionary,
-    agentDictionaryByMonth,
   } = useStore(useShallow((s) => ({
     productivityData: s.productivityData,
     csatScData: s.csatScData,
@@ -381,8 +379,6 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     qaData: s.qaData,
     startDate: s.startDate,
     endDate: s.endDate,
-    agentDictionary: s.agentDictionary,
-    agentDictionaryByMonth: s.agentDictionaryByMonth,
   })));
   const openTab = useStore((s) => s.openTab);
 

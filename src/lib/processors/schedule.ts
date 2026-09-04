@@ -10,7 +10,7 @@ export function processSchedule(
   ctx: ProcessorContext,
   schedData: any[][],
 ): void {
-  const { agents, getAgent, isWithin, periodDictionary } = ctx;
+  const { getAgent, isWithin, periodDictionary } = ctx;
   const scheduleColumns = resolveScheduleIdentityColumns(schedData[0] || []);
 
   if (schedData.length <= 1) return;

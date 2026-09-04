@@ -4,7 +4,7 @@ import { formatNum, getKpiStatus, groupByDate, uniqueCalendarDates, getGroupByCa
 import { KpiValue, KpiCue, KpiLegend } from '../ui/KpiCue';
 import { Sparkline } from '../ui/Sparkline';
 import { DayStrip } from '../ui/DayStrip';
-import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
+import { Search, Eye, X, BarChart2, AlertCircle, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
@@ -21,7 +21,7 @@ const isQaDefect = (entry: QAEntry) => {
 
 export const QaAgent360: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   const [search, setSearch] = useState('');
-  const [filterTL, setFilterTL] = useState<string | null>(null);
+  const [filterTL] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<{agent: AgentKPI, date?: string, type?: 'all' | 'defects' | 'no_mistake'} | null>(null);
   const [viewMode, setViewMode] = useState<'performance' | 'defect'>('performance');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());

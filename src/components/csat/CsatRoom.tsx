@@ -4,7 +4,7 @@ import { formatNum, getKpiStatus, getMonthOffsetLabel, parseDateForSort, cn, ind
 import { KpiValue, KpiCue } from '../ui/KpiCue';
 import { Sparkline } from '../ui/Sparkline';
 import { DayStrip } from '../ui/DayStrip';
-import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
+import { Search, Star, Eye, AlertCircle, ChevronDown, BarChart2, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 
@@ -20,9 +20,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
   const comparisonMode = useStore(state => state.comparisonMode);
-  const selectedBpo = useStore(state => state.selectedBpo);
   const [search, setSearch] = useState('');
-  const [filterTL, setFilterTL] = useState<string | null>(null);
+  const [filterTL] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'full' | 'fair'>('full');
   const [analysisMode, setAnalysisMode] = useState<'category' | 'score' | 'agent' | 'defect'>('agent');
   const [selectedScoreCase, setSelectedScoreCase] = useState<string>('All');
@@ -84,13 +83,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     }
     setDefectSortConfig({ key, direction });
   };
-
-  const dict = useStore(state => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
-    startDate: s.startDate,
-    endDate: s.endDate,
-    setDateRange: s.setDateRange,
-  })));
 
   const tableData = useMemo(() => {
     return data.filter(a => {
@@ -553,12 +545,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
       {isComparisonEnabled && (
         <>
-          <WoWChartPanel 
-            data={data} 
-            previousData={previousData} 
-            previousData2={previousData2} 
-            previousData3={previousData3} 
-            viewMode={viewMode}
+          <WoWChartPanel
+            data={data}
+            previousData={previousData}
+            previousData2={previousData2}
+            previousData3={previousData3}
           />
           <RespondentChartPanel
             data={data} 
@@ -826,8 +817,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                       const prevCount = prevTopCategories[cat.name] || 0;
                       const diff = cat.count - prevCount;
                       const isUp = diff > 0;
-                      const isDown = diff < 0;
-                      
+
                       return (
                         <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group cursor-pointer" onClick={() => handleCategoryClick(cat.name, viewMode === 'full' ? 'From Data penuh' : 'After Takeout', data)}>
                           <td className="p-2 text-center text-text-muted font-medium">{cat.rank}</td>
@@ -1202,7 +1192,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   );
 };
 
-const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
+const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
   const { startDate, endDate, comparisonMode } = useStore(useShallow((s) => ({
     startDate: s.startDate,
     endDate: s.endDate,

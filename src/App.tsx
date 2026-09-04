@@ -19,7 +19,6 @@ import {
   CheckCircle,
   Menu,
   X,
-  Trophy,
   RefreshCw,
   Calendar,
   Sun,
