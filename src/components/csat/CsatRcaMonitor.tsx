@@ -3,7 +3,7 @@ import { AgentKPI } from '../../lib/dataProcessor';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
 } from 'recharts';
 import { AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -11,30 +11,18 @@ import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { chart } from '../../lib/themeColors';
 
+// RCA areas are categories, not good/bad KPIs — a monochrome ramp keeps the
+// screen calm (no red "blame" hue) while still separating the three columns.
 const COLORS = {
-  agent: chart.danger,
-  customer: chart.kpiNeutral,
-  akulaku: chart.warning,
+  agent: chart.secondary,
+  customer: chart.muted,
+  akulaku: chart.disabled,
 };
 
 type IssueCategoryRow = {
   issue: string;
   count: number;
   categories: { name: string; count: number }[];
-};
-
-const CustomPieLabel = ({ cx, cy, midAngle, outerRadius, percent }: any) => {
-  if (percent < 0.04) return null;
-  const RADIAN = Math.PI / 180;
-  const radius = outerRadius + 28;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  return (
-    <text x={x} y={y} textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central"
-      style={{ fontSize: 11, fontWeight: 700, fill: 'var(--color-text-primary)' }}>
-      {`${(percent * 100).toFixed(1)}%`}
-    </text>
-  );
 };
 
 export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
@@ -54,7 +42,6 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   }, [data]);
 
   const {
-    pieData,
     agentDetailBar,
     customerDetailBar,
     akulakuDetailBar,
@@ -115,12 +102,6 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     const tC = Object.values(customerTotal).reduce((a, b) => a + b, 0);
     const tAk = Object.values(akulakuTotal).reduce((a, b) => a + b, 0);
 
-    const pieData = (tA + tC + tAk) > 0 ? [
-      { name: 'Agent Area', value: tA, color: COLORS.agent },
-      { name: 'Customer Area', value: tC, color: COLORS.customer },
-      { name: 'Akulaku Process', value: tAk, color: COLORS.akulaku },
-    ].filter(d => d.value > 0) : [];
-
     const toBar = (rec: Record<string, number>, color: string) =>
       Object.entries(rec).sort((a, b) => b[1] - a[1]).slice(0, 8)
         .map(([name, count]) => ({ name, count, fill: color }));
@@ -147,7 +128,6 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
       .sort((a, b) => b.total - a.total);
 
     return {
-      pieData,
       agentDetailBar: toBar(agentTotal, COLORS.agent),
       customerDetailBar: toBar(customerTotal, COLORS.customer),
       akulakuDetailBar: toBar(akulakuTotal, COLORS.akulaku),
@@ -174,11 +154,55 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
 
   const grandTotal = totalAgent + totalCustomer + totalAkulaku;
 
-  const legendItems = [
-    { key: 'agent', label: 'Agent Area', count: totalAgent, color: COLORS.agent, bg: 'color-mix(in srgb, var(--color-danger) 8%, transparent)', border: 'color-mix(in srgb, var(--color-danger) 25%, transparent)', items: agentDetailBar },
-    { key: 'customer', label: 'Customer Area', count: totalCustomer, color: COLORS.customer, bg: 'color-mix(in srgb, var(--color-kpi-neutral) 8%, transparent)', border: 'color-mix(in srgb, var(--color-kpi-neutral) 25%, transparent)', items: customerDetailBar },
-    { key: 'akulaku', label: 'Akulaku Process', count: totalAkulaku, color: COLORS.akulaku, bg: 'color-mix(in srgb, var(--color-warning) 8%, transparent)', border: 'color-mix(in srgb, var(--color-warning) 25%, transparent)', items: akulakuDetailBar },
+  const areas = [
+    { key: 'agent', label: 'Agent Area', count: totalAgent, issues: agentDetailBar },
+    { key: 'customer', label: 'Customer Area', count: totalCustomer, issues: customerDetailBar },
+    { key: 'akulaku', label: 'Akulaku Process', count: totalAkulaku, issues: akulakuDetailBar },
   ];
+
+  /** One area rolled up into a scannable card: share + top issues. */
+  const AreaCard: React.FC<{
+    label: string;
+    count: number;
+    issues: { name: string; count: number }[];
+  }> = ({ label, count, issues }) => {
+    const share = grandTotal > 0 ? (count / grandTotal) * 100 : 0;
+    const topIssues = issues.slice(0, 4);
+    const maxIssue = topIssues[0]?.count || 1;
+    return (
+      <div className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">{label}</span>
+          <span className="text-[11px] tabular-nums text-text-muted">{share.toFixed(1)}%</span>
+        </div>
+        <div className="mt-1 text-2xl font-bold tabular-nums text-text-primary">{count}</div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-muted">
+          <div className="h-full rounded-full bg-border-strong" style={{ width: `${share}%` }} />
+        </div>
+
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-text-muted">Top isu</div>
+          {topIssues.length === 0 ? (
+            <p className="text-[11px] text-text-muted">Belum ada kasus.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {topIssues.map((issue) => (
+                <li key={issue.name} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-[11px] text-text-secondary" title={issue.name}>{issue.name}</span>
+                    <span className="shrink-0 text-[11px] font-semibold tabular-nums text-text-primary">{issue.count}</span>
+                  </div>
+                  <div className="h-1 overflow-hidden rounded-full bg-surface-muted">
+                    <div className="h-full rounded-full bg-text-muted" style={{ width: `${(issue.count / maxIssue) * 100}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const DetailBarChart = ({
     data: barData,
@@ -291,74 +315,31 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         </div>
       )}
 
-      {/* Tier 1: Pie + Legend Cards */}
-      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-        <h3 className="text-sm font-bold text-text-primary mb-6 text-center tracking-wide">Distribusi Penyebab Bad CSAT</h3>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-center">
-
-          {/* Pie chart */}
-          <div className="md:col-span-3 h-72 flex items-center justify-center">
-            {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={120}
-                    innerRadius={68}
-                    dataKey="value"
-                    paddingAngle={2}
-                    labelLine={false}
-                    label={CustomPieLabel}
-                  >
-                    {pieData.map((entry, idx) => (
-                      <Cell key={idx} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 11 }}
-                    formatter={(value: any) => [`${value} kasus`, '']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState
-                title="Belum ada data RCA"
-                description="Pastikan data CSAT SC memiliki kolom RCA dan kasus bad CSAT."
-                variant="data"
-                className="w-full border-0 bg-transparent py-6"
-                showDataActions
-              />
-            )}
-          </div>
-
-          {/* Legend cards */}
-          <div className="md:col-span-2 flex flex-col gap-3">
-            {legendItems.map(item => (
-              <div
-                key={item.key}
-                className="flex items-center gap-4 p-4 rounded-xl border"
-                style={{ background: item.bg, borderColor: item.border }}
-              >
-                <div className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm" style={{ background: item.color }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-text-primary">{item.label}</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">
-                    {grandTotal > 0 ? `${((item.count / grandTotal) * 100).toFixed(1)}%` : '-'} dari total kasus
-                  </p>
-                </div>
-                <span className="text-2xl font-semibold shrink-0" style={{ color: item.color }}>{item.count}</span>
-              </div>
+      {/* Breakdown cards — one per RCA area */}
+      {grandTotal > 0 ? (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {areas.map((area) => (
+              <AreaCard key={area.key} label={area.label} count={area.count} issues={area.issues} />
             ))}
-            <div className="text-center text-[10px] text-text-muted pt-1">
-              Total kasus dianalisa: <strong className="text-text-primary">{grandTotal}</strong>
-            </div>
           </div>
+          <p className="text-center text-[10px] text-text-muted">
+            Total kasus dianalisa: <strong className="text-text-primary">{grandTotal}</strong>
+          </p>
+        </>
+      ) : (
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <EmptyState
+            title="Belum ada data RCA"
+            description="Pastikan data CSAT SC memiliki kolom RCA dan kasus bad CSAT."
+            variant="data"
+            className="w-full border-0 bg-transparent py-6"
+            showDataActions
+          />
         </div>
-      </div>
+      )}
 
-      {/* Tier 2: detail isu — collapsed by default */}
+      {/* Detail isu per area — collapsed by default */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <button
           type="button"
@@ -368,7 +349,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         >
           <div>
             <h3 className="text-sm font-bold text-text-primary">Detail isu per area</h3>
-            <p className="text-[10px] text-text-muted mt-0.5">Top isu Agent / Customer / Akulaku</p>
+            <p className="text-[10px] text-text-muted mt-0.5">Top isu + kategori per area</p>
           </div>
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-text-muted">
             {showIssueDetail ? 'Sembunyikan' : 'Tampilkan'}
@@ -384,7 +365,7 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         ) : null}
       </div>
 
-      {/* Tier 3: Agent RCA Table */}
+      {/* Agent RCA ranking */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -418,38 +399,33 @@ export const CsatRcaMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                   <th className="px-3 py-2.5 font-bold w-8 text-center">#</th>
                   <th className="px-3 py-2.5 font-bold">Nama agent</th>
                   <th className="px-3 py-2.5 font-bold">TL</th>
-                  <th className="px-3 py-2.5 font-bold text-center" style={{ color: COLORS.agent }}>Agent Area</th>
-                  <th className="px-3 py-2.5 font-bold text-center" style={{ color: COLORS.customer }}>Customer Area</th>
-                  <th className="px-3 py-2.5 font-bold text-center" style={{ color: COLORS.akulaku }}>Akulaku Process</th>
-                  <th className="px-3 py-2.5 font-bold text-center">Total</th>
+                  <th className="px-3 py-2.5 font-bold text-right">Agent Area</th>
+                  <th className="px-3 py-2.5 font-bold text-right">Customer Area</th>
+                  <th className="px-3 py-2.5 font-bold text-right">Akulaku Process</th>
+                  <th className="px-3 py-2.5 font-bold text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredAgentRanking.map((a, i) => (
-                  <tr key={a.name} className="border-b border-border/60 hover:bg-surface/60 transition-colors">
-                    <td className="px-3 py-2.5 text-center text-text-muted font-semibold">{i + 1}</td>
-                    <td className="px-3 py-2.5 font-semibold text-text-primary max-w-[160px] truncate" title={a.name}>{a.name}</td>
-                    <td className="px-3 py-2.5 text-text-muted max-w-[130px] truncate" title={a.tl}>{a.tl || '-'}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      {a.agentCases > 0
-                        ? <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[11px] font-bold shadow-sm" style={{ background: COLORS.agent }}>{a.agentCases}</span>
-                        : <span className="text-text-muted text-xs">-</span>}
+                {filteredAgentRanking.map((a, i) => {
+                  const cell = (n: number) => (
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {n > 0 ? <span className="font-semibold text-text-primary">{n}</span> : <span className="text-text-disabled">–</span>}
                     </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {a.customerCases > 0
-                        ? <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[11px] font-bold shadow-sm" style={{ background: COLORS.customer }}>{a.customerCases}</span>
-                        : <span className="text-text-muted text-xs">-</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {a.akulakuCases > 0
-                        ? <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[11px] font-bold shadow-sm" style={{ background: COLORS.akulaku }}>{a.akulakuCases}</span>
-                        : <span className="text-text-muted text-xs">-</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className="font-semibold text-text-primary text-[13px]">{a.total}</span>
-                    </td>
-                  </tr>
-                ))}
+                  );
+                  return (
+                    <tr key={a.name} className="border-b border-border/60 hover:bg-surface/60 transition-colors">
+                      <td className="px-3 py-2.5 text-center text-text-muted font-semibold tabular-nums">{i + 1}</td>
+                      <td className="px-3 py-2.5 font-semibold text-text-primary max-w-[160px] truncate" title={a.name}>{a.name}</td>
+                      <td className="px-3 py-2.5 text-text-muted max-w-[130px] truncate" title={a.tl}>{a.tl || '-'}</td>
+                      {cell(a.agentCases)}
+                      {cell(a.customerCases)}
+                      {cell(a.akulakuCases)}
+                      <td className="px-3 py-2.5 text-right">
+                        <span className="font-bold text-text-primary text-[13px] tabular-nums">{a.total}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

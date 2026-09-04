@@ -2,9 +2,7 @@ import { useMemo } from 'react';
 import {
   applyAgentRoster,
   getAgentDictionaryForPeriod,
-  getPreviousCalendarMonthRange,
   matchesAgentScope,
-  processKPIs,
   type AgentKPI,
 } from '../lib/dataProcessor';
 import { isAgentDictionaryPopulated } from '../lib/csid';
@@ -18,6 +16,8 @@ export type FilteredKpis = {
   previousKpiData3: AgentKPI[];
   incentiveKpiData: AgentKPI[];
   incentivePeriod: { start: string; end: string };
+  /** Pilot CSAT window (roster-overlaid, NOT scope-filtered — participants are explicit). */
+  pilotKpiData: AgentKPI[];
   tlList: string[];
   agentList: string[];
 };
@@ -27,6 +27,7 @@ type Args = {
   previousRawData: AgentKPI[];
   previousRawData2: AgentKPI[];
   previousRawData3: AgentKPI[];
+  pilotRawData: AgentKPI[];
   activeTab: string;
   startDate: string;
   endDate: string;
@@ -34,35 +35,24 @@ type Args = {
   selectedBpo: string;
   selectedTL: string;
   selectedGlobalAgent: string;
-  productivityData: any[][];
-  csatScData: any[][];
-  slaData: any[][];
-  scheduleData: any[][];
-  qaData: any[][];
   agentDictionary: AgentDict;
   agentDictionaryByMonth: Record<string, AgentDict>;
 };
 
 /**
- * Roster overlay + scope filter + incentive simulation.
- * Extracted verbatim from the useMemo in App.tsx.
+ * Roster overlay + scope filter. Simulasi Insentif now runs on the same live
+ * period as every other tab (per 1 Sep 2026 the dashboard is live) — no more
+ * previous-calendar-month special case.
  */
 export function useFilteredKpis(args: Args): FilteredKpis {
   const {
-    rawData, previousRawData, previousRawData2, previousRawData3,
-    activeTab, startDate, endDate, selectedSheetMonth,
+    rawData, previousRawData, previousRawData2, previousRawData3, pilotRawData,
+    startDate, endDate, selectedSheetMonth,
     selectedBpo, selectedTL, selectedGlobalAgent,
-    productivityData, csatScData, slaData, scheduleData, qaData,
     agentDictionary, agentDictionaryByMonth,
   } = args;
 
   return useMemo(() => {
-    let data = rawData;
-    let prevData = previousRawData;
-    let prevData2 = previousRawData2;
-    let prevData3 = previousRawData3;
-
-    const simulationRange = getPreviousCalendarMonthRange(endDate || startDate || '');
     const currentRoster = getAgentDictionaryForPeriod(
       startDate || endDate,
       agentDictionary,
@@ -71,24 +61,7 @@ export function useFilteredKpis(args: Args): FilteredKpis {
     const selectedMonthRoster = isAgentDictionaryPopulated(agentDictionaryByMonth[selectedSheetMonth])
       ? agentDictionaryByMonth[selectedSheetMonth]
       : currentRoster;
-    data = applyAgentRoster(data, selectedMonthRoster);
-    const simulationData = activeTab === 'incentive' && simulationRange.start
-      ? applyAgentRoster(
-          processKPIs(
-            productivityData,
-            csatScData,
-            slaData,
-            scheduleData,
-            qaData,
-            simulationRange.start,
-            simulationRange.end,
-            agentDictionary,
-            agentDictionaryByMonth,
-          ),
-          selectedMonthRoster,
-        )
-      : [];
-    const filterOptionData = activeTab === 'incentive' ? simulationData : data;
+    const data = applyAgentRoster(rawData, selectedMonthRoster);
 
     const applyFilters = (d: AgentKPI[]) => {
       return d.filter(a => matchesAgentScope(a, {
@@ -99,12 +72,11 @@ export function useFilteredKpis(args: Args): FilteredKpis {
     };
 
     const filteredData = applyFilters(data);
-    const filteredPrevData = applyFilters(prevData);
-    const filteredPrevData2 = applyFilters(prevData2);
-    const filteredPrevData3 = applyFilters(prevData3);
-    const filteredIncentiveData = applyFilters(simulationData);
+    const filteredPrevData = applyFilters(previousRawData);
+    const filteredPrevData2 = applyFilters(previousRawData2);
+    const filteredPrevData3 = applyFilters(previousRawData3);
 
-    const bpoScopedData = filterOptionData.filter(a => matchesAgentScope(a, {
+    const bpoScopedData = data.filter(a => matchesAgentScope(a, {
       bpo: selectedBpo,
       teamLeader: 'All TL',
       agent: 'All Agents',
@@ -132,28 +104,25 @@ export function useFilteredKpis(args: Args): FilteredKpis {
       previousKpiData: filteredPrevData,
       previousKpiData2: filteredPrevData2,
       previousKpiData3: filteredPrevData3,
-      incentiveKpiData: filteredIncentiveData,
-      incentivePeriod: simulationRange,
+      incentiveKpiData: filteredData,
+      incentivePeriod: { start: startDate || '', end: endDate || '' },
+      // Roster overlay only — pilot participants are picked explicitly, not scope-filtered.
+      pilotKpiData: applyAgentRoster(pilotRawData, selectedMonthRoster),
       tlList: Array.from(optionTls).sort((a, b) => a.localeCompare(b)),
       agentList: Array.from(agents).sort((a, b) => a.localeCompare(b)),
     };
   }, [
-    activeTab,
     agentDictionary,
     agentDictionaryByMonth,
-    csatScData,
     endDate,
     previousRawData,
     previousRawData2,
     previousRawData3,
-    productivityData,
-    qaData,
+    pilotRawData,
     rawData,
-    scheduleData,
     selectedBpo,
     selectedGlobalAgent,
     selectedTL,
-    slaData,
     startDate,
     selectedSheetMonth,
   ]);

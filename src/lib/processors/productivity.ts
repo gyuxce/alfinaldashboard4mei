@@ -160,10 +160,22 @@ export function processProductivity(
         (h) => h.normDate === normDate || h.date === targetDateLabel,
       );
       if (existingWhu) {
-        existingWhu.value = (existingWhu.value + val) / 2;
+        // True running mean (sum/count) — the old `(prev + val) / 2` skewed
+        // toward the last entry once a day had 3+ WHU rows.
+        const prevCount = existingWhu.count ?? 1;
+        const prevSum = existingWhu.sum ?? existingWhu.value * prevCount;
+        existingWhu.count = prevCount + 1;
+        existingWhu.sum = prevSum + val;
+        existingWhu.value = existingWhu.sum / existingWhu.count;
         if (!existingWhu.normDate) existingWhu.normDate = normDate;
       } else {
-        agent.dailyHistory.whu.push({ date: targetDateLabel, normDate, value: val });
+        agent.dailyHistory.whu.push({
+          date: targetDateLabel,
+          normDate,
+          value: val,
+          count: 1,
+          sum: val,
+        });
       }
     }
   }

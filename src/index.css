@@ -91,80 +91,80 @@
 }
 
 .dark {
-  /* Base Surfaces — charcoal (not navy slate) */
-  --background: 18 18 18;             /* #121212 */
-  --surface: 26 26 26;                /* #1A1A1A */
-  --surface-muted: 36 36 36;          /* #242424 */
-  --card: 26 26 26;                   /* #1A1A1A */
-  --border: 48 48 48;                 /* #303030 */
-  --border-strong: 64 64 64;          /* #404040 */
+  /* Base Surfaces — 4-step elevation so regions don't blur into one flat black */
+  --background: 12 12 14;             /* #0C0C0E — canvas */
+  --surface: 20 20 23;               /* #141417 — sidebar, filter bar */
+  --surface-muted: 35 35 41;         /* #232329 — row hover, popovers */
+  --card: 28 28 33;                  /* #1C1C21 — cards, tables */
+  --border: 42 42 49;               /* #2A2A31 */
+  --border-strong: 58 58 67;        /* #3A3A43 */
 
-  /* Text */
-  --text-primary: 245 245 244;        /* #F5F5F4 */
-  --text-secondary: 168 162 158;      /* #A8A29E */
-  --text-muted: 115 115 115;          /* #737373 */
-  --text-disabled: 64 64 64;          /* #404040 */
+  /* Text — brighter secondary/muted (muted ~3.1:1 → ~4.6:1 on card) */
+  --text-primary: 244 244 245;       /* #F4F4F5 */
+  --text-secondary: 180 180 189;     /* #B4B4BD */
+  --text-muted: 138 138 148;         /* #8A8A94 */
+  --text-disabled: 90 90 99;         /* #5A5A63 */
 
-  /* Brand */
-  --primary: 239 68 68;               /* #EF4444 */
-  --primary-hover: 248 113 113;       /* #F87171 */
-  --primary-soft: 69 26 26;           /* #451A1A */
-  --primary-soft-hover: 90 30 30;
-  --primary-text: 252 165 165;        /* #FCA5A5 */
+  /* Brand — one job: active nav, primary action, focus ring */
+  --primary: 240 69 75;              /* #F0454B */
+  --primary-hover: 245 103 109;      /* #F5676D */
+  --primary-soft: 56 22 26;          /* #38161A */
+  --primary-soft-hover: 74 30 34;    /* #4A1E22 */
+  --primary-text: 255 154 160;       /* #FF9AA0 */
 
-  /* Semantic */
-  --success: 34 197 94;               /* #22C55E */
-  --success-soft: 20 53 34;
-  --success-text: 74 222 128;
-  --danger: 248 113 113;              /* #F87171 */
-  --danger-soft: 69 26 26;
-  --danger-text: 252 165 165;
-  --warning: 251 191 36;              /* #FBBF24 */
-  --warning-soft: 66 40 10;
-  --warning-text: 252 211 77;
+  /* Semantic — disciplined trio (green sparingly, amber = watch, red = miss) */
+  --success: 61 214 140;             /* #3DD68C */
+  --success-soft: 18 48 39;          /* #123027 */
+  --success-text: 111 227 176;       /* #6FE3B0 */
+  --danger: 242 106 106;             /* #F26A6A */
+  --danger-soft: 56 25 26;           /* #38191A */
+  --danger-text: 245 142 142;        /* #F58E8E */
+  --warning: 245 184 75;             /* #F5B84B */
+  --warning-soft: 56 41 15;          /* #38290F */
+  --warning-text: 247 201 121;       /* #F7C979 */
 
-  /* Sidebar */
-  --sidebar-bg: 18 18 18;             /* #121212 */
-  --sidebar-bg-hover: 36 36 36;
-  --sidebar-bg-active: 36 36 36;
-  --sidebar-text: 163 163 163;
-  --sidebar-text-hover: 245 245 244;
-  --sidebar-text-active: 245 245 244;
-  --sidebar-border: 48 48 48;
-  --sidebar-accent: 239 68 68;
+  /* Sidebar — aligned with new surfaces */
+  --sidebar-bg: 20 20 23;
+  --sidebar-bg-hover: 28 28 33;
+  --sidebar-bg-active: 35 35 41;
+  --sidebar-text: 138 138 148;
+  --sidebar-text-hover: 244 244 245;
+  --sidebar-text-active: 244 244 245;
+  --sidebar-border: 42 42 49;
+  --sidebar-accent: 240 69 75;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px -4px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.35);
 
-  /* KPI Color Identity */
-  --kpi-productivity: 239 68 68;
-  --kpi-productivity-soft: 69 26 26;
-  --kpi-productivity-text: 248 113 113;
+  /* KPI Color Identity — quieted: metrics read neutral, status carries meaning */
+  --kpi-productivity: 138 138 148;
+  --kpi-productivity-soft: 35 35 41;
+  --kpi-productivity-text: 180 180 189;
 
-  --kpi-productivity-avg: 239 68 68;
-  --kpi-productivity-avg-soft: 69 26 26;
-  --kpi-productivity-avg-text: 248 113 113;
+  --kpi-productivity-avg: 138 138 148;
+  --kpi-productivity-avg-soft: 35 35 41;
+  --kpi-productivity-avg-text: 180 180 189;
 
-  --kpi-csat: 251 191 36;
-  --kpi-csat-soft: 66 40 10;
-  --kpi-csat-text: 252 211 77;
+  --kpi-csat: 245 184 75;
+  --kpi-csat-soft: 56 41 15;
+  --kpi-csat-text: 247 201 121;
 
-  --kpi-qa: 251 191 36;
-  --kpi-qa-soft: 66 40 10;
-  --kpi-qa-text: 252 211 77;
+  --kpi-qa: 245 184 75;
+  --kpi-qa-soft: 56 41 15;
+  --kpi-qa-text: 247 201 121;
 
-  --kpi-sla: 34 197 94;
-  --kpi-sla-soft: 20 53 34;
-  --kpi-sla-text: 74 222 128;
+  --kpi-sla: 61 214 140;
+  --kpi-sla-soft: 18 48 39;
+  --kpi-sla-text: 111 227 176;
 
-  --kpi-whu: 34 197 94;
-  --kpi-whu-soft: 20 53 34;
-  --kpi-whu-text: 74 222 128;
+  --kpi-whu: 61 214 140;
+  --kpi-whu-soft: 18 48 39;
+  --kpi-whu-text: 111 227 176;
 
-  --kpi-neutral: 163 163 163;
-  --kpi-neutral-soft: 38 38 38;
-  --kpi-neutral-text: 212 212 212;
-  --chart-primary: 163 163 163;
+  --kpi-neutral: 138 138 148;
+  --kpi-neutral-soft: 35 35 41;
+  --kpi-neutral-text: 180 180 189;
+  --chart-primary: 138 138 148;
 }
 
 @theme {

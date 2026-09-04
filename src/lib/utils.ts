@@ -180,37 +180,53 @@ export function weekSeparatorClass(index: number): string {
 }
 
 
+export const KPI_TARGETS: Record<KpiType, number> = {
+  productivity: 100,
+  qa: 92,
+  sla1m: 92,
+  sla3m: 96,
+  whu: 96,
+  csatFull: 75,
+  csatFair: 92,
+  csatOfficial: 3.75,
+  attendance: 95,
+};
+
+export type KpiStatus = 'on' | 'watch' | 'miss' | 'none';
+
+/**
+ * Colour discipline: a value that meets its target reads plainly (neutral) —
+ * only "watch" (within 5% below) and "miss" (further below) get colour, so the
+ * misses actually stand out. `getKpiStatus` gives the same call sites a shape
+ * cue (▼ / dot) for colour-blind viewers and dark screens.
+ */
+export function getKpiStatus(val: number | null | undefined, type: KpiType): KpiStatus {
+  if (val === null || val === undefined || isNaN(val)) return 'none';
+  const target = KPI_TARGETS[type] ?? 0;
+  if (val >= target) return 'on';
+  if (val >= target * 0.95) return 'watch';
+  return 'miss';
+}
+
 const kpiColorCache = new Map<string, string>();
+const KPI_COLOR_CACHE_MAX = 4000;
+
+const KPI_STATUS_CLASS: Record<KpiStatus, string> = {
+  none: 'text-text-disabled',
+  on: 'text-text-primary',
+  watch: 'text-warning',
+  miss: 'text-danger',
+};
 
 export function getKpiColor(val: number | null | undefined, type: KpiType): string {
-  if (val === null || val === undefined || isNaN(val)) return 'text-text-disabled';
-  
-  const key = `${type}_${val}`;
-  let cached = kpiColorCache.get(key);
+  // Round the key so a stream of distinct floats can't grow the cache without
+  // bound; the status thresholds are far coarser than 0.01 anyway.
+  const key = `${type}_${val === null || val === undefined || isNaN(val as number) ? 'x' : (val as number).toFixed(2)}`;
+  const cached = kpiColorCache.get(key);
   if (cached) return cached;
-  
-  let target = 0;
+  if (kpiColorCache.size >= KPI_COLOR_CACHE_MAX) kpiColorCache.clear();
 
-  switch (type) {
-    case 'productivity': target = 100; break;
-    case 'qa': target = 92.00; break;
-    case 'sla1m': target = 92.00; break;
-    case 'sla3m': target = 96.00; break;
-    case 'whu': target = 96.00; break;
-    case 'csatFull': target = 75.00; break;
-    case 'csatFair': target = 92.00; break;
-    case 'csatOfficial': target = 3.75; break;
-    case 'attendance': target = 95.00; break;
-  }
-
-  const reached = val >= target;
-  const nearTarget = val >= target * 0.95;
-  const result = reached
-    ? 'text-success'
-    : nearTarget
-      ? 'text-warning'
-      : 'text-danger';
-  
+  const result = KPI_STATUS_CLASS[getKpiStatus(val, type)];
   kpiColorCache.set(key, result);
   return result;
 }

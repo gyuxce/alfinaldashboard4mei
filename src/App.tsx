@@ -3,22 +3,22 @@ import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
 import { getPreviousMonthPeriod, getPreviousPeriod } from './lib/dataProcessor';
+import { parsePilotRows, pilotProcessingRange } from './lib/pilot';
 import { formatRelativeTime, isStaleSync, countDataRows, extractCsIds, getProductivityDuplicateCount } from './lib/dataQuality';
+import { laggingSources } from './lib/sourceFreshness';
 import { useFilteredKpis } from './hooks/useFilteredKpis';
 import { formatLocalDate, getCurrentMonthValue, getMonthValue, getMonthRange, getCurrentMonthRange } from './lib/dates';
-import { getSheetMonthKeyFromDate } from './lib/sheetsApi';
+import { getSheetMonthKeyFromDate, getSheetMonthHistoryKeys, getSheetMonthOption } from './lib/sheetsApi';
 
 import { 
-  LayoutDashboard, 
-  Activity, 
-  Star, 
-  Clock, 
-  UserCircle, 
+  LayoutDashboard,
+  Activity,
+  Star,
+  UserCircle,
   FolderDown,
   CheckCircle,
   Menu,
   X,
-  Trophy,
   RefreshCw,
   Calendar,
   Sun,
@@ -30,7 +30,8 @@ import {
   FileText,
   Calculator,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Rocket
 } from 'lucide-react';
 
 import { cn } from './lib/utils';
@@ -47,8 +48,8 @@ const ProductivityDetail = React.lazy(() => import('./components/dashboard/Produ
 const CsatOfficialMonitor = React.lazy(() => import('./components/csat/CsatOfficialMonitor').then(module => ({ default: module.CsatOfficialMonitor })));
 const CsatRoom = React.lazy(() => import('./components/csat/CsatRoom').then(module => ({ default: module.CsatRoom })));
 const CsatRcaMonitor = React.lazy(() => import('./components/csat/CsatRcaMonitor').then(module => ({ default: module.CsatRcaMonitor })));
+const PilotCsat = React.lazy(() => import('./components/csat/PilotCsat').then(module => ({ default: module.PilotCsat })));
 const SlaWhuMonitor = React.lazy(() => import('./components/sla/SlaWhuMonitor').then(module => ({ default: module.SlaWhuMonitor })));
-const WhuMonitor = React.lazy(() => import('./components/sla/WhuMonitor').then(module => ({ default: module.WhuMonitor })));
 const QaAgent360 = React.lazy(() => import('./components/qa/QaAgent360').then(module => ({ default: module.QaAgent360 })));
 const Leaderboard = React.lazy(() => import('./components/team/Leaderboard').then(module => ({ default: module.Leaderboard })));
 const IncentiveSimulation = React.lazy(() => import('./components/team/IncentiveSimulation').then(module => ({ default: module.IncentiveSimulation })));
@@ -67,13 +68,13 @@ interface ActiveFilterChipProps {
 
 function ActiveFilterChip({ label, value, onClear }: ActiveFilterChipProps) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-2.5 py-1 text-[11px] font-semibold text-primary">
-      <span className="shrink-0 text-primary/70">{label}:</span>
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border-strong bg-surface-muted px-2.5 py-1 text-[11px] font-semibold text-text-primary">
+      <span className="shrink-0 text-text-muted">{label}:</span>
       <span className="min-w-0 truncate">{value}</span>
       <button
         type="button"
         onClick={onClear}
-        className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-border-strong hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         aria-label={`Clear ${label} filter`}
       >
         <X size={11} />
@@ -222,9 +223,13 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const hasAutoFetchedSheetsRef = useRef(false);
   const autoRetryCountRef = useRef(0);
   const autoRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // One continuous boot loader: stays up from hydrate through the first sync so
+  // the panel never flashes off in the gap between "hydrate done" and "sync started".
+  const [initialSyncSettled, setInitialSyncSettled] = useState(!import.meta.env.VITE_SHEETS_API_KEY);
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const stored = localStorage.getItem('theme');
@@ -241,11 +246,11 @@ export default function App() {
   }, [theme]);
 
   const {
-    csidData, productivityData, csatScData, slaData, scheduleData, qaData,
+    csidData, productivityData, csatScData, slaData, scheduleData, qaData, pilotData,
     startDate, endDate, selectedBpo, selectedTL, selectedGlobalAgent, agentDictionary, agentDictionaryByMonth, selectedSheetMonth,
     setDateRange, setSelectedBpo, setSelectedTL, setSelectedGlobalAgent, setSelectedSheetMonth,
     isHydrating, hydrateFromStorage,
-    isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, sheetsSyncProgress, activeMonthRowCounts,
+    isFetchingSheets, fetchFromSheets, lastSyncTime, sheetsFetchError, sheetsSyncProgress, activeMonthRowCounts, activeMonthLastDates, missingHistoryMonths,
     isComparisonEnabled, setIsComparisonEnabled, comparisonMode, setComparisonMode,
     pendingTab, clearPendingTab,
   } = useStore(useShallow((s) => ({
@@ -255,6 +260,7 @@ export default function App() {
     slaData: s.slaData,
     scheduleData: s.scheduleData,
     qaData: s.qaData,
+    pilotData: s.pilotData,
     startDate: s.startDate,
     endDate: s.endDate,
     selectedBpo: s.selectedBpo,
@@ -276,6 +282,8 @@ export default function App() {
     sheetsFetchError: s.sheetsFetchError,
     sheetsSyncProgress: s.sheetsSyncProgress,
     activeMonthRowCounts: s.activeMonthRowCounts,
+    activeMonthLastDates: s.activeMonthLastDates,
+    missingHistoryMonths: s.missingHistoryMonths,
     isComparisonEnabled: s.isComparisonEnabled,
     setIsComparisonEnabled: s.setIsComparisonEnabled,
     comparisonMode: s.comparisonMode,
@@ -347,6 +355,16 @@ export default function App() {
           ? 'bg-success'
           : 'bg-border';
   const dataQuality = useMemo(() => {
+    // First-ever sync in progress: nothing to review yet — stay neutral.
+    if (isFetchingSheets && !lastSyncTime) {
+      return {
+        status: 'ok' as const,
+        label: 'Memuat…',
+        detail: 'Sinkronisasi pertama sedang berjalan',
+        count: 0,
+      };
+    }
+
     const sourceRows = [
       { label: 'Master', rows: activeMonthRowCounts?.csidData ?? countDataRows(csidData) },
       { label: 'Productivity', rows: activeMonthRowCounts?.productivityData ?? countDataRows(productivityData) },
@@ -362,12 +380,14 @@ export default function App() {
     const missingProductivity = Array.from(masterIds).filter((id) => !productivityIds.has(id)).length;
     const missingSchedule = Array.from(masterIds).filter((id) => !scheduleIds.has(id)).length;
     const duplicateProductivityRows = getProductivityDuplicateCount(productivityData);
+    const lags = laggingSources(activeMonthLastDates || {});
 
     let warningCount = 0;
     if (syncIsStale) warningCount += 1;
     if (missingProductivity > 0) warningCount += 1;
     if (missingSchedule > 0) warningCount += 1;
     if (duplicateProductivityRows > 0) warningCount += 1;
+    if (lags.length > 0) warningCount += 1;
 
     const errorCount = (sheetsFetchError ? 1 : 0) + missingSources.length;
     const detailParts = [
@@ -376,6 +396,7 @@ export default function App() {
       missingProductivity ? `${missingProductivity} missing productivity` : '',
       missingSchedule ? `${missingSchedule} missing schedule` : '',
       duplicateProductivityRows ? `${duplicateProductivityRows} duplicate suspect` : '',
+      lags.length ? `${lags[0].label} tertinggal ${lags[0].lagDays} hari` : '',
       syncIsStale ? 'stale sync' : '',
     ].filter(Boolean);
 
@@ -404,8 +425,10 @@ export default function App() {
       count: 0,
     };
   }, [
+    isFetchingSheets,
     agentDictionary,
     activeMonthRowCounts,
+    activeMonthLastDates,
     csidData,
     productivityData,
     csatScData,
@@ -430,6 +453,11 @@ export default function App() {
     }
   }, [comparisonTabs, isComparisonEnabled, setIsComparisonEnabled]);
 
+  // Leaderboard is hidden — bounce any persisted/stale nav state to Summary.
+  useEffect(() => {
+    if (activeTab === 'leaderboard') setActiveTab('summary');
+  }, [activeTab]);
+
   const comparisonRanges = useMemo(() => {
     if (!needsComparisonData || !startDate || !endDate) {
       return { prev1: null, prev2: null, prev3: null } as const;
@@ -449,6 +477,13 @@ export default function App() {
     || qaData.length > 0
     || csidData.length > 0;
 
+  const pilotEntries = useMemo(() => parsePilotRows(pilotData), [pilotData]);
+  // Wide processKPIs window the Pilot CSAT tab needs (batch window + baseline).
+  const pilotPeriodRange = useMemo(
+    () => (activeTab === 'pilot' ? pilotProcessingRange(pilotEntries, endDate) : null),
+    [activeTab, pilotEntries, endDate],
+  );
+
   // Yield between KPI passes so boot UI does not freeze/"patah".
   const { bundle: kpiRawBundle, isProcessing: isProcessingKpis } = useProcessedKpis({
     productivityData,
@@ -464,6 +499,8 @@ export default function App() {
     prev1: comparisonRanges.prev1,
     prev2: comparisonRanges.prev2,
     prev3: comparisonRanges.prev3,
+    // Simulasi Insentif runs on the live active period; only Pilot CSAT needs a wider pass.
+    pilotPeriod: pilotPeriodRange,
     enabled: !isHydrating && hasSourceData,
   });
 
@@ -472,13 +509,15 @@ export default function App() {
     previousRawData,
     previousRawData2,
     previousRawData3,
+    pilotRawData,
   } = kpiRawBundle;
 
-  const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, tlList, agentList } = useFilteredKpis({
+  const { kpiData, previousKpiData, previousKpiData2, previousKpiData3, incentiveKpiData, incentivePeriod, pilotKpiData, tlList, agentList } = useFilteredKpis({
     rawData,
     previousRawData,
     previousRawData2,
     previousRawData3,
+    pilotRawData,
     activeTab,
     startDate,
     endDate,
@@ -486,11 +525,6 @@ export default function App() {
     selectedBpo,
     selectedTL,
     selectedGlobalAgent,
-    productivityData,
-    csatScData,
-    slaData,
-    scheduleData,
-    qaData,
     agentDictionary,
     agentDictionaryByMonth,
   });
@@ -528,26 +562,29 @@ export default function App() {
     setSelectedGlobalAgent('All Agents');
   };
 
+  // Boot loader shows once, continuously, then never comes back. It clears the
+  // moment there's data (cached or freshly synced) so a background sync doesn't
+  // keep the whole screen blocked; later manual refreshes use the status strip.
+  useEffect(() => {
+    if (initialSyncSettled) return;
+    if (isHydrating) return;                       // still reading IndexedDB cache
+    if (hasSourceData) { setInitialSyncSettled(true); return; }
+    if (isFetchingSheets) return;                  // no data yet, first sync running — keep panel up
+    if (sheetsFetchError || !import.meta.env.VITE_SHEETS_API_KEY) setInitialSyncSettled(true);
+  }, [initialSyncSettled, isHydrating, isFetchingSheets, hasSourceData, sheetsFetchError]);
+
+  // Once the KPI pipeline has produced real rows a single time, never blank
+  // the whole app for it again — a later recompute (switching to a tab that
+  // needs a wider period, changing the date range, a background re-sync)
+  // keeps showing what's already on screen (useProcessedKpis is
+  // stale-while-revalidate) instead of re-triggering the full boot screen.
+  const hasRenderedKpiOnceRef = useRef(false);
+  if (rawData.length > 0) hasRenderedKpiOnceRef.current = true;
+
   const showBootLoading =
-    isHydrating
-    || (isFetchingSheets && !hasSourceData)
-    || (isProcessingKpis && rawData.length === 0);
-
-  const bootTitle = isHydrating
-    ? 'Mohon menunggu...'
-    : isFetchingSheets && !hasSourceData
-      ? 'Menyinkronkan data...'
-      : 'Menyiapkan KPI...';
-
-  const bootSubtitle = isHydrating
-    ? 'Sedang menyiapkan dashboard'
-    : isFetchingSheets && !hasSourceData
-      ? (sheetsSyncProgress?.message || 'Sedang mengambil data terbaru')
-      : 'Menghitung metrik tanpa membekukan layar';
-
-  const bootSteps = isFetchingSheets && !hasSourceData && sheetsSyncProgress?.steps
-    ? sheetsSyncProgress.steps
-    : undefined;
+    !initialSyncSettled
+    || isHydrating
+    || (isProcessingKpis && rawData.length === 0 && !hasRenderedKpiOnceRef.current);
 
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard, section: 'KPI' },
@@ -556,9 +593,10 @@ export default function App() {
     { id: 'csat_official', label: 'CSAT Official', icon: Star, section: 'CSAT' },
     { id: 'csat', label: 'CSAT Room (Survey)', icon: Star, section: 'CSAT' },
     { id: 'csat_rca', label: 'CSAT Root Cause', icon: FileText, section: 'CSAT' },
-    { id: 'sla', label: 'SLA Monitor', icon: CheckCircle, section: 'Service' },
-    { id: 'whu', label: 'WHU Monitor', icon: Clock, section: 'Service' },
-    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, section: 'Team' },
+    { id: 'pilot', label: 'Pilot CSAT', icon: Rocket, section: 'CSAT' },
+    { id: 'sla', label: 'SLA / WHU Monitor', icon: CheckCircle, section: 'Service' },
+    // Leaderboard hidden per 1 Sep 2026 — Simulasi Insentif (live period) is the primary Team view.
+    // { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, section: 'Team' },
     { id: 'incentive', label: 'Simulasi Insentif', icon: Calculator, section: 'Team' },
     { id: 'schedule', label: 'Schedule Board', icon: Calendar, section: 'Team' },
     { id: 'attendance', label: 'Attendance Monitor', icon: Calendar, section: 'Team' },
@@ -652,6 +690,13 @@ export default function App() {
     return comparisonMode === 'mom'
       ? `MoM: ${currentLabel} vs ${prevLabel}`
       : `WoW: ${currentLabel} vs ${prevLabel}`;
+  })();
+
+  const historyGapHint = (() => {
+    if (!isComparisonEnabled || !missingHistoryMonths?.length) return null;
+    const expected = Math.max(0, getSheetMonthHistoryKeys(selectedSheetMonth).length - 1);
+    const labels = missingHistoryMonths.map((k) => getSheetMonthOption(k).label).join(', ');
+    return `Perbandingan: ${missingHistoryMonths.length} dari ${expected} bulan riwayat tidak tersedia (${labels}).`;
   })();
 
   return (
@@ -830,35 +875,22 @@ export default function App() {
                   options={monthOptions}
                   onChange={applyMonthFilter}
                 />
-                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
-                <span className="text-text-muted text-[10px] shrink-0">–</span>
-                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
-              </div>
-              
-              {/* Quick nav */}
-              <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 md:border-r md:border-border md:pr-2.5 shrink-0">
-                <button onClick={resetPeriodToCurrentMonth} className="h-8 rounded-lg px-2 text-[10px] font-semibold text-text-muted transition-colors hover:bg-primary-soft hover:text-primary whitespace-nowrap">Bulan Ini</button>
-                
-                <div className="flex h-8 items-center bg-card rounded-lg border border-border p-0.5 gap-0.5">
-                  <button 
-                    onClick={() => navigateWeek('prev')} 
-                    className="text-[10px] hover:bg-surface-muted text-text-secondary px-1.5 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    &laquo;
-                  </button>
-                  <button 
-                    onClick={() => navigateWeek('current')} 
-                    className="text-[10px] bg-primary-soft text-primary px-2 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    Minggu Ini
-                  </button>
-                  <button 
-                    onClick={() => navigateWeek('next')} 
-                    className="text-[10px] hover:bg-surface-muted text-text-secondary px-1.5 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    &raquo;
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedFilter(v => !v)}
+                  className={cn(
+                    "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-medium transition-colors whitespace-nowrap",
+                    showAdvancedFilter || hasCustomDateFilter
+                      ? "border-border-strong bg-surface-muted text-text-primary"
+                      : "border-border bg-surface text-text-secondary hover:bg-surface-muted"
+                  )}
+                  aria-expanded={showAdvancedFilter}
+                >
+                  <Calendar size={12} />
+                  Rentang &amp; minggu
+                  {hasCustomDateFilter && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                  {showAdvancedFilter ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
               </div>
 
               {/* Compare — only on tabs that support comparison */}
@@ -880,7 +912,7 @@ export default function App() {
 
                 <div className={cn(
                   "flex h-8 items-center rounded-md border p-0.5 gap-0.5 transition-opacity",
-                  isComparisonEnabled ? "border-primary/30 bg-primary-soft opacity-100" : "border-border bg-surface opacity-80"
+                  isComparisonEnabled ? "border-border-strong bg-surface-muted opacity-100" : "border-border bg-surface opacity-80"
                 )}>
                   <button
                     type="button"
@@ -889,8 +921,8 @@ export default function App() {
                       setIsComparisonEnabled(true);
                     }}
                     className={cn(
-                      "text-[10px] px-2 py-1 rounded font-medium transition-colors cursor-pointer",
-                      comparisonMode === 'wow' && isComparisonEnabled ? "bg-primary text-white" : "text-primary hover:bg-primary/10"
+                      "text-[10px] px-2 py-1 rounded font-semibold transition-colors cursor-pointer",
+                      comparisonMode === 'wow' && isComparisonEnabled ? "bg-card text-text-primary shadow-sm" : "text-text-muted hover:text-text-primary"
                     )}
                     title="WoW membandingkan dengan periode sebelumnya dengan durasi yang sama"
                   >
@@ -903,8 +935,8 @@ export default function App() {
                       setIsComparisonEnabled(true);
                     }}
                     className={cn(
-                      "text-[10px] px-2 py-1 rounded font-medium transition-colors cursor-pointer",
-                      comparisonMode === 'mom' && isComparisonEnabled ? "bg-primary text-white" : "text-primary hover:bg-primary/10"
+                      "text-[10px] px-2 py-1 rounded font-semibold transition-colors cursor-pointer",
+                      comparisonMode === 'mom' && isComparisonEnabled ? "bg-card text-text-primary shadow-sm" : "text-text-muted hover:text-text-primary"
                     )}
                     title="MoM membandingkan dengan bulan sebelumnya"
                   >
@@ -922,6 +954,22 @@ export default function App() {
               )}
             </div>
 
+            {/* Advanced: custom date range + week nav — hidden by default */}
+            {showAdvancedFilter && (
+              <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-2">
+                <span className="text-[10px] font-medium text-text-muted tracking-wide">Rentang</span>
+                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30" value={startDate || ''} onChange={e => setDateRange(e.target.value, endDate)} />
+                <span className="text-text-muted text-[10px] shrink-0">–</span>
+                <input type="date" className="h-8 w-[128px] shrink-0 rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text-primary transition-colors focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30" value={endDate || ''} onChange={e => setDateRange(startDate, e.target.value)} />
+                <button onClick={resetPeriodToCurrentMonth} className="h-8 rounded-lg px-2 text-[10px] font-semibold text-text-muted transition-colors hover:bg-primary-soft hover:text-primary whitespace-nowrap">Bulan Ini</button>
+                <div className="flex h-8 items-center bg-card rounded-lg border border-border p-0.5 gap-0.5">
+                  <button onClick={() => navigateWeek('prev')} className="text-[10px] hover:bg-surface-muted text-text-secondary px-1.5 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap">&laquo;</button>
+                  <button onClick={() => navigateWeek('current')} className="text-[10px] bg-primary-soft text-primary px-2 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap">Minggu Ini</button>
+                  <button onClick={() => navigateWeek('next')} className="text-[10px] hover:bg-surface-muted text-text-secondary px-1.5 py-1 rounded font-medium transition-colors cursor-pointer whitespace-nowrap">&raquo;</button>
+                </div>
+              </div>
+            )}
+
             {/* Status strip — selalu satu baris tipis di bawah */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-1.5">
               <div className="flex min-w-0 flex-col gap-0.5 text-[10px] leading-tight">
@@ -930,7 +978,13 @@ export default function App() {
                     Bandingkan · {comparisonHint}
                   </span>
                 ) : null}
-                {import.meta.env.VITE_SHEETS_API_KEY && (
+                {historyGapHint ? (
+                  <span className="inline-flex items-center gap-1.5 font-medium text-warning">
+                    <AlertTriangle size={11} className="shrink-0" />
+                    {historyGapHint}
+                  </span>
+                ) : null}
+                {import.meta.env.VITE_SHEETS_API_KEY && !showBootLoading && (
                   <>
                     <span className="inline-flex items-center gap-1.5">
                       <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', syncDotColor)} />
@@ -1022,11 +1076,7 @@ export default function App() {
 
         <div className="w-full pb-8">
           {showBootLoading ? (
-            <BootLoadingPanel
-              title={bootTitle}
-              subtitle={bootSubtitle}
-              steps={bootSteps}
-            />
+            <BootLoadingPanel />
           ) : (
             <div key={activeTab}>
               <TabErrorBoundary label={activeNavLabel}>
@@ -1040,8 +1090,8 @@ export default function App() {
                   {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
                   {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
                   {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
-                  {activeTab === 'sla' && <SlaWhuMonitor data={kpiData} />}
-                  {activeTab === 'whu' && <WhuMonitor data={kpiData} />}
+                  {activeTab === 'pilot' && <PilotCsat data={pilotKpiData} pilotEntries={pilotEntries} periodEnd={endDate} isProcessing={isProcessingKpis} />}
+                  {(activeTab === 'sla' || activeTab === 'whu') && <SlaWhuMonitor data={kpiData} />}
                   {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
                   {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
                   {activeTab === 'attendance' && <AttendanceMonitor data={kpiData} />}

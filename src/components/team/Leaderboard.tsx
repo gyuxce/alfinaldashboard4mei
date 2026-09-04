@@ -2,18 +2,16 @@ import React, { useMemo, useState, useRef } from "react";
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from "../../store";
 import { AgentKPI, getCsatBadRatingCount } from "../../lib/dataProcessor";
-import { ArrowRight, Trophy, Users, User, Download } from "lucide-react";
-import { downloadCsv } from "../../lib/exportCsv";
+import { ArrowRight, Trophy, Users, User, X } from "lucide-react";
 import { formatNum, cn } from "../../lib/utils";
 import { EmptyState } from '../ui/EmptyState';
-import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { calculateAgentCompositeScore, calculateCompositeScore } from "../../lib/kpiScoring";
 import {
   aggregateTeamLeaderStats,
   getStandardPeriodDuty,
-  normalizeAgentName,
 } from "../../lib/teamLeaderRows";
-import { VirtualizedTbody } from '../ui/VirtualizedTbody';
+import { isInactiveAgent } from "../../lib/inactiveAgents";
+import { IncompleteDataNotice } from '../ui/IncompleteDataNotice';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 const DAILY_PRODUCTIVITY_TARGET = 100;
@@ -52,22 +50,6 @@ interface LeaderboardRow {
   quiz_points: number;
 }
 
-const INACTIVE_AGENT_RULES = [
-  {
-    name: "edgar gasita adhigama",
-    inactiveFrom: "2026-06",
-  },
-] as const;
-
-const isAgentInactive = (agent: Pick<AgentKPI, "name">, periodEnd: string) => {
-  const periodMonth = periodEnd.slice(0, 7);
-  const agentName = normalizeAgentName(agent.name || "");
-  return INACTIVE_AGENT_RULES.some(
-    (rule) =>
-      agentName === rule.name && periodMonth >= rule.inactiveFrom,
-  );
-};
-
 const getProductivityColumns = (totalChat: number, totalDuty: number) => {
   const targetChat = totalDuty * DAILY_PRODUCTIVITY_TARGET;
   const achievement = targetChat > 0 ? (totalChat / targetChat) * 100 : null;
@@ -79,10 +61,9 @@ const getProductivityColumns = (totalChat: number, totalDuty: number) => {
     targetChat,
     points,
     finalPoints,
-    difference:
-      points !== null && finalPoints !== null
-        ? Math.round(points - finalPoints)
-        : null,
+    // Chats above (or below) the period target — the number people actually
+    // care about. The old "wasted points past the 20 cap" was ~always 0.
+    difference: achievement !== null ? Math.round(totalChat - targetChat) : null,
   };
 };
 
@@ -126,7 +107,7 @@ const AgentKpiRow = ({
 }: AgentKpiRowProps) => {
   const fmt = formatFn || ((v: number) => v.toFixed(1) + (suffix || '%'));
   const safeValue = value !== null ? value : 0;
-  
+
   const percentage = Math.min((safeValue / maxValue) * 100, 100);
 
   let colorClass = "bg-danger";
@@ -151,9 +132,9 @@ const AgentKpiRow = ({
           )}
         </div>
       </div>
-      
+
       <div className="relative h-2 bg-border rounded-full overflow-hidden">
-        <div 
+        <div
           className={`absolute top-0 h-full rounded-full transition-all ${colorClass}`}
           style={{ width: `${percentage}%` }}
         />
@@ -162,10 +143,212 @@ const AgentKpiRow = ({
   );
 };
 
-const getScoreColor = (score: number | null): string => {
-  if (score === null) return 'text-text-disabled';
-  if (score >= 95) return 'text-success font-bold text-[11px]';
-  return 'text-danger font-bold text-[11px]';
+/** Score + climb-the-rank breakdown for one agent/TL — used in the side drawer. */
+const AgentDetail = ({
+  agent,
+  rank,
+  isBottom,
+  isRank1,
+  scoreGap,
+  safeScore,
+  targetDesc,
+  onClose,
+}: {
+  agent: LeaderboardRow;
+  rank: number;
+  isBottom: boolean;
+  isRank1: boolean;
+  scoreGap: number;
+  safeScore: number;
+  targetDesc: string;
+  onClose: () => void;
+}) => {
+  return (
+    <>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h2 className="text-base font-bold text-text-primary">Analisis KPI</h2>
+          <p className="text-text-secondary text-xs mt-0.5">
+            {agent.name}{agent.csId ? ` · ${agent.csId}` : ''}{agent.tl ? ` · TL ${agent.tl}` : ''}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span className="text-xs text-text-muted bg-surface-muted px-2 py-0.5 rounded-full border border-border">
+              Rank #{rank}
+            </span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${agent.score >= 95 ? 'bg-success-soft text-success-text' : 'bg-surface-muted text-text-secondary'}`}>
+              Skor {agent.score.toFixed(1)}
+            </span>
+            {isBottom && (
+              <span className="text-[10px] bg-warning-soft text-warning-text px-2 py-0.5 rounded-full font-semibold">
+                3 terbawah
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-text-muted hover:text-text-primary transition-colors p-1 rounded hover:bg-surface-muted"
+          aria-label="Tutup"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-[11px] font-medium text-text-muted tracking-wide uppercase">Skor KPI</h3>
+
+        <AgentKpiRow label="QA Score" weight="50%" value={agent.qa_pct} maxValue={100} isMaxCapped={false} />
+        <AgentKpiRow
+          label="Produktivitas"
+          weight="20%"
+          value={agent.prod !== null ? Math.min(agent.prod, 100) : null}
+          maxValue={100}
+          isMaxCapped={agent.prod !== null && agent.prod >= 100}
+        />
+        <AgentKpiRow
+          label="CSAT Rating"
+          weight="20%"
+          value={agent.csat_pct}
+          maxValue={100}
+          isMaxCapped={false}
+          formatFn={(v) => v.toFixed(2)}
+          suffix="%"
+        />
+
+        <div className="space-y-1.5 mt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-text-muted">Training (5%)</span>
+            <span className="text-sm font-semibold text-success-text">100%</span>
+          </div>
+          <div className="relative w-full bg-border-strong rounded-full h-1.5 overflow-hidden">
+            <div className="absolute top-0 h-full rounded-full bg-success" style={{ width: '100%' }} />
+          </div>
+          <p className="text-[10px] text-text-muted">Auto 100% — pastikan modul training selesai tepat waktu</p>
+        </div>
+        <div className="space-y-1.5 mt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-text-muted">Quiz (5%)</span>
+            <span className="text-sm font-semibold text-success-text">100%</span>
+          </div>
+          <div className="relative w-full bg-border-strong rounded-full h-1.5 overflow-hidden">
+            <div className="absolute top-0 h-full rounded-full bg-success" style={{ width: '100%' }} />
+          </div>
+          <p className="text-[10px] text-text-muted">Auto 100% — pastikan kuis dikerjakan sebelum deadline</p>
+        </div>
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-border space-y-3">
+        <h3 className="text-[11px] font-semibold text-text-secondary tracking-wide uppercase">Prioritas Peningkatan</h3>
+
+        {isRank1 ? (
+          <div className="p-3 bg-primary-soft/20 border border-primary-soft/50 rounded-lg text-center">
+            <p className="text-sm font-bold text-primary">Sudah #1 pada periode ini.</p>
+            <p className="text-xs text-text-secondary mt-1">Pertahankan performa ini.</p>
+          </div>
+        ) : (() => {
+          const qaNeeded = scoreGap / 0.5;
+          const prodNeeded = scoreGap / 0.2;
+          const csatNeeded = scoreGap / 0.2;
+
+          const currQa = agent.qa_pct || 0;
+          const currProd = agent.prod || 0;
+          const currCsat = agent.csat_pct || 0;
+
+          const canQa = (currQa + qaNeeded) <= 100;
+          const canProd = currProd < 100 && (currProd + prodNeeded) <= 100;
+          const canCsat = (currCsat + csatNeeded) <= 100;
+
+          if (currQa >= 100 && currProd >= 100 && currCsat >= 100) {
+            return (
+              <div className="p-3 bg-success-soft/20 border border-success-soft/50 rounded-lg text-center">
+                <p className="text-sm font-bold text-success-text">Semua KPI sudah maksimal (100%).</p>
+                <p className="text-xs text-text-secondary mt-1">Tidak ada yang perlu ditingkatkan lagi.</p>
+              </div>
+            );
+          }
+
+          const options = [
+            { type: 'qa', needed: qaNeeded, can: canQa },
+            { type: 'prod', needed: prodNeeded, can: canProd },
+            { type: 'csat', needed: csatNeeded, can: canCsat },
+          ].filter((o) => o.can).sort((a, b) => a.needed - b.needed);
+          const easiest = options.length > 0 ? options[0].type : 'none';
+
+          return (
+            <>
+              <div className="mb-1">
+                <p className="text-xs font-bold text-text-primary">{targetDesc}</p>
+                {scoreGap < 0.2 ? (
+                  <p className="text-xs text-text-secondary mt-0.5">Hampir! Sedikit lagi naik rank.</p>
+                ) : (
+                  <p className="text-xs text-text-secondary mt-0.5">Butuh skor &ge; {safeScore.toFixed(1)} · gap {scoreGap.toFixed(1)} poin</p>
+                )}
+              </div>
+
+              <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'qa' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
+                <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canQa ? (easiest === 'qa' ? 'bg-primary' : 'bg-warning') : 'bg-text-muted'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-text-primary">QA Score</span>
+                    {easiest === 'qa' && <span className="text-[9px] text-primary bg-primary-soft px-1 rounded font-medium">prioritas</span>}
+                  </div>
+                  <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
+                    {canQa
+                      ? <>Naik <span className="font-bold">+{qaNeeded.toFixed(1)}%</span> ({currQa.toFixed(1)}% → {(currQa + qaNeeded).toFixed(1)}%) — cukup untuk target</>
+                      : <>Butuh +{qaNeeded.toFixed(1)}% (melebihi 100%, sangat sulit)</>}
+                  </div>
+                </div>
+              </div>
+
+              <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'prod' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
+                <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canProd ? (easiest === 'prod' ? 'bg-primary' : 'bg-warning') : 'bg-text-muted'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-text-primary">Produktivitas</span>
+                    {easiest === 'prod' && <span className="text-[9px] text-primary bg-primary-soft px-1 rounded font-medium">prioritas</span>}
+                  </div>
+                  <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
+                    {currProd >= 100
+                      ? <>Sudah maksimal (100%, di-cap)</>
+                      : canProd
+                        ? <>Naik <span className="font-bold">+{prodNeeded.toFixed(1)}%</span> ({currProd.toFixed(1)}% → {(currProd + prodNeeded).toFixed(1)}%) — cukup untuk target</>
+                        : <>Butuh effort besar / akan kena cap 100%</>}
+                  </div>
+                </div>
+              </div>
+
+              <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'csat' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
+                <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canCsat ? (easiest === 'csat' ? 'bg-primary' : 'bg-warning') : 'bg-text-muted'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-text-primary">CSAT Rating</span>
+                    {easiest === 'csat' && <span className="text-[9px] text-primary bg-primary-soft px-1 rounded font-medium">prioritas</span>}
+                  </div>
+                  <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
+                    {canCsat
+                      ? <>Naik <span className="font-bold">+{csatNeeded.toFixed(2)}%</span> ({currCsat.toFixed(2)}% → {(currCsat + csatNeeded).toFixed(2)}%) — cukup untuk target</>
+                      : <>Butuh +{csatNeeded.toFixed(2)}% (melebihi 100%, sangat sulit)</>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-2 p-2.5 bg-primary-soft/20 rounded-lg border border-primary-soft/50">
+                <p className="text-[11px] font-semibold text-primary">Cara paling mudah:</p>
+                {easiest === 'none' ? (
+                  <p className="text-[11px] font-medium text-primary mt-1">Sulit dengan satu KPI saja — tingkatkan semua KPI bertahap.</p>
+                ) : (
+                  <p className="text-[11px] font-medium text-primary mt-1">
+                    Naikkan {easiest === 'qa' ? 'QA' : easiest === 'prod' ? 'Prod' : 'CSAT'}{' '}
+                    <span className="font-bold">+{easiest === 'qa' ? qaNeeded.toFixed(1) : easiest === 'prod' ? prodNeeded.toFixed(1) : csatNeeded.toFixed(2)}%</span> saja sudah cukup.
+                  </p>
+                )}
+              </div>
+            </>
+          );
+        })()}
+      </div>
+    </>
+  );
 };
 
 export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
@@ -188,11 +371,6 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     qaData,
     startDate,
     endDate,
-    selectedBpo,
-    selectedTL,
-    selectedGlobalAgent,
-    agentDictionary,
-    agentDictionaryByMonth,
   } = useStore(useShallow((s) => ({
     productivityData: s.productivityData,
     csatScData: s.csatScData,
@@ -201,11 +379,6 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     qaData: s.qaData,
     startDate: s.startDate,
     endDate: s.endDate,
-    selectedBpo: s.selectedBpo,
-    selectedTL: s.selectedTL,
-    selectedGlobalAgent: s.selectedGlobalAgent,
-    agentDictionary: s.agentDictionary,
-    agentDictionaryByMonth: s.agentDictionaryByMonth,
   })));
   const openTab = useStore((s) => s.openTab);
 
@@ -224,8 +397,8 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     if (!hasData) return { agentRows: [], tlRows: [], excludedInactive: 0, excludedIncomplete: 0 };
 
     // Reuse App-processed KPI rows (already scoped by global BPO/TL/Agent filters).
-    const inactiveAgents = data.filter((agent) => isAgentInactive(agent, endDate));
-    const scopedRawData = data.filter((agent) => !isAgentInactive(agent, endDate));
+    const inactiveAgents = data.filter((agent) => isInactiveAgent(agent, endDate));
+    const scopedRawData = data.filter((agent) => !isInactiveAgent(agent, endDate));
 
     // Prepare Agent List
     const aList: LeaderboardRow[] = [];
@@ -365,6 +538,16 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     hasData,
   ]);
 
+  // Hooks must run on every render — keep them above the early return so the
+  // no-data → data transition does not change the hook count (Rules of Hooks).
+  const activeData = toggleMode === "tl" ? tlRows : agentRows;
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  const listVirtual = useVirtualRows({
+    count: activeData.length,
+    rowHeight: 60,
+    scrollRef: listScrollRef,
+  });
+
   if (!hasData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full mt-10">
@@ -385,14 +568,6 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     );
   }
 
-  const activeData = toggleMode === "tl" ? tlRows : agentRows;
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const tableVirtual = useVirtualRows({
-    count: activeData.length,
-    rowHeight: 44,
-    scrollRef: tableScrollRef,
-  });
-
   const bottomThreeIds = activeData.slice(-3).map(a => a.csId || a.name);
   const isBottomThree = (id: string) => toggleMode === "agent" && bottomThreeIds.includes(id);
 
@@ -403,11 +578,11 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
   let scoreGap = 0;
   let targetDesc = "";
   let isRank1 = false;
-  
+
   if (selectedAgent) {
     if (isSelectedBottomThree) {
       scoreGap = safeScore - selectedAgent.score + 0.1;
-      targetDesc = "TARGET KELUAR BOTTOM 3:";
+      targetDesc = "TARGET KELUAR 3 TERBAWAH:";
     } else if (selectedRank > 1) {
       const nextRankAgent = activeData[selectedRank - 2];
       safeScore = nextRankAgent.score;
@@ -418,96 +593,49 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
     }
   }
 
+  const dataIssues: string[] = [];
+  if (qaData.length <= 1) dataIssues.push('Sheet QA kosong — skor QA & CSAT tidak terhitung untuk semua agent.');
+  if (productivityData.length <= 1) dataIssues.push('Sheet Productivity kosong — poin produktivitas tidak terhitung.');
+  if (scheduleData.length <= 1) dataIssues.push('Sheet Schedule kosong — man-days & target chat tidak terhitung.');
+  if (excludedIncomplete > 0) dataIssues.push(`${excludedIncomplete} agent tidak masuk ranking karena QA / produktivitas / CSAT-nya belum ada.`);
+
+  const gridCols = "grid-cols-[40px_minmax(0,1fr)_170px_150px_60px]";
+
   return (
-    <div className="flex flex-col gap-6 p-2">
-      <div>
-        <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+    <div className="flex flex-col gap-5 p-2">
+      <IncompleteDataNotice
+        title="Ranking di bawah ini belum final — data tidak lengkap."
+        issues={dataIssues}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
           <Trophy className="w-5 h-5 text-warning" />
           Leaderboard
         </h2>
-        <p className="text-[13px] text-text-secondary mt-1">
-          Bobot skor: QA 50% · Prod 20% · CSAT 20% · Training 5% · Quiz 5% · periode & filter global aktif
-        </p>
-        <p className="text-[11px] text-text-muted mt-1">
-          CSAT di Leaderboard dari <strong>QA CSAT/DSAT tagging</strong> (QC audit), bukan CSAT SC survey. Angka bisa beda dengan Dashboard Summary.
-        </p>
-        {(excludedInactive > 0 || excludedIncomplete > 0) && (
-          <p className="text-[11px] text-text-muted mt-1">
-            {excludedInactive > 0 && `${excludedInactive} agent dikecualikan (inactive). `}
-            {excludedIncomplete > 0 && `${excludedIncomplete} agent data belum lengkap (tidak masuk ranking).`}
-          </p>
-        )}
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            onClick={() => downloadCsv(
-              `leaderboard_${startDate || 'all'}_${endDate || ''}.csv`,
-              activeData,
-              [
-                { key: 'rank', label: 'Rank' },
-                { key: 'name', label: 'Nama' },
-                { key: 'csId', label: 'CS ID' },
-                { key: 'tl', label: 'Team Leader' },
-                { key: 'qa_pct', label: 'QA %' },
-                { key: 'qa_points', label: 'QA Points' },
-                { key: 'prod_achievement', label: 'Prod % Ach' },
-                { key: 'prod_total_chat', label: 'Total Chat' },
-                { key: 'prod_final_points', label: 'Prod Points' },
-                { key: 'csat_good', label: 'CSAT Good' },
-                { key: 'csat_bad', label: 'CSAT Bad' },
-                { key: 'csat_pct', label: 'CSAT %' },
-                { key: 'csat_points', label: 'CSAT Points' },
-                { key: 'score', label: 'Skor Akhir' },
-              ],
-            )}
-            className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-[10px] font-medium text-text-secondary hover:bg-primary-soft hover:text-primary transition-colors"
-          >
-            <Download size={12} />
-            Export CSV
-          </button>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] not-italic">
-            <span className="rounded-full border border-border bg-surface px-2 py-1 font-semibold text-text-secondary">
-              Periode: {startDate || "-"} s/d {endDate || "-"}
-            </span>
-            {(selectedBpo !== "All BPO" || selectedTL !== "All TL" || selectedGlobalAgent !== "All Agents") && (
-              <span className="font-medium tracking-wide text-text-muted">Filter aktif:</span>
-            )}
-            {selectedBpo !== "All BPO" && (
-              <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 font-semibold text-primary">BPO: {selectedBpo}</span>
-            )}
-            {selectedTL !== "All TL" && selectedTL !== "All Team Leaders" && (
-              <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 font-semibold text-primary">TL: {selectedTL}</span>
-            )}
-            {selectedGlobalAgent !== "All Agents" && (
-              <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 font-semibold text-primary">Agent: {selectedGlobalAgent}</span>
-            )}
-        </div>
+        <span className="text-[11px] tabular-nums text-text-muted">
+          {startDate || "-"} &ndash; {endDate || "-"}
+          {excludedInactive > 0 && ` · ${excludedInactive} inactive dikecualikan`}
+        </span>
       </div>
 
       <div className="inline-flex bg-surface-muted p-1 rounded-lg w-max gap-1">
         <button
-          onClick={() => {
-            setToggleMode("agent");
-            setSelectedAgent(null);
-          }}
+          onClick={() => { setToggleMode("agent"); setSelectedAgent(null); }}
           className={cn(
             "px-4 py-2 rounded-md text-[13px] flex items-center gap-2",
             toggleMode === "agent"
-              ? "bg-card text-primary font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border"
+              ? "bg-card text-text-primary font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border"
               : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50",
           )}
         >
           <User className="w-4 h-4" /> Agent
         </button>
         <button
-          onClick={() => {
-            setToggleMode("tl");
-            setSelectedAgent(null);
-          }}
+          onClick={() => { setToggleMode("tl"); setSelectedAgent(null); }}
           className={cn(
             "px-4 py-2 rounded-md text-[13px] flex items-center gap-2",
             toggleMode === "tl"
-              ? "bg-card text-primary font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border"
+              ? "bg-card text-text-primary font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-border"
               : "bg-transparent text-text-muted font-medium hover:text-text-primary hover:bg-card/50",
           )}
         >
@@ -515,505 +643,136 @@ export const Leaderboard: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
         </button>
       </div>
 
-      <div className="flex flex-col gap-4">
-      <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div ref={tableScrollRef} className="isolate relative w-full overflow-auto bg-card border border-border-strong rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex-1 max-h-[calc(100vh-200px)]">
-      {toggleMode === "agent" ? (
-        <table className="kpi-data-table w-full min-w-[2644px] table-fixed border-collapse whitespace-nowrap text-left">
-          <colgroup>
-            <col className="w-[52px]" />
-            <col className="w-[190px]" />
-            <col className="w-[130px]" />
-            <col className="w-[160px]" />
-            {Array.from({ length: 21 }).map((_, index) => (
-              <col key={`metric-column-${index}`} className="w-[96px]" />
-            ))}
-          </colgroup>
-          <thead className="sticky top-0 z-40 text-white">
-            <tr className="bg-primary">
-              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 text-center font-bold md:sticky md:left-0 z-50 bg-primary">#</th>
-              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 font-bold md:sticky md:left-[52px] z-50 bg-primary">Nama</th>
-              <th rowSpan={2} className="overflow-hidden border-r border-white/40 p-2 font-bold md:sticky md:left-[242px] z-50 bg-primary">Email / CS ID</th>
-              <th rowSpan={2} className="overflow-hidden border-r-2 border-white/60 p-2 font-bold md:sticky md:left-[372px] z-50 bg-primary shadow-[8px_0_12px_-8px_rgba(0,0,0,0.45)]">Nama leader</th>
-              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 poin)</th>
-              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 poin)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 poin)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training (5 poin)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz (5 poin)</th>
-              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Skor akhir</th>
-            </tr>
-            <tr className="bg-primary border-t border-white/30">
-              {[
-                "% Ach", "Total Points",
-                "Daily Target", "Total Duty", "Target Chat", "Total Chat", "Total Points", "Final Points", "Difference",
-                "Total Good Rating", "Total Bad Rating", "Total CSAT", "Total Points",
-                "Total Training", "Agent Completion", "% Ach", "Total Points",
-                "Target", "Agent Score", "% Ach", "Total Points",
-              ].map((label, index) => (
-                <th
-                  key={`${label}-${index}`}
-                  className={cn(
-                    "overflow-hidden border-r border-white/40 px-2 py-1.5 text-center font-bold",
-                    [0, 2, 9, 13, 17].includes(index) && "border-l-2 border-l-white/60",
-                  )}
-                >
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <VirtualizedTbody
-            colSpan={26}
-            paddingTop={tableVirtual.paddingTop}
-            paddingBottom={tableVirtual.paddingBottom}
-          >
-            {tableVirtual.virtualIndexes.map((idx) => {
-              const item = activeData[idx];
-              if (!item) return null;
-              const rank = idx + 1;
-              const isBottom = isBottomThree(item.csId || item.name);
-              const stickyClass = isBottom
-                ? "bg-danger-soft group-hover:bg-danger-soft"
-                : "bg-card group-hover:bg-surface-muted";
-              const metricCell = "overflow-hidden border-r border-border-strong/70 px-2 py-2 text-center font-semibold text-text-secondary";
-              const metricGroupStart = `${metricCell} border-l-2 border-l-border-strong`;
-
-              return (
-                <tr
-                  key={item.csId || item.name}
-                  className={cn(
-                    "group border-b border-border-strong/70 transition-colors",
-                    isBottom ? "bg-danger-soft/30 hover:bg-danger-soft/50" : "hover:bg-surface-muted",
-                  )}
-                >
-                  <td className={`overflow-hidden border-r border-border-strong px-2 py-2 text-center font-bold text-text-muted md:sticky md:left-0 z-30 ${stickyClass}`}>#{rank}</td>
-                  <td className={`overflow-hidden border-r border-border-strong px-2 py-2 md:sticky md:left-[52px] z-30 ${stickyClass}`}>
-                    <button onClick={() => setSelectedAgent(item)} className="block max-w-full truncate text-left font-bold text-kpi-neutral-text hover:underline" title={item.name}>
-                      {item.name}
-                    </button>
-                  </td>
-                  <td className={`overflow-hidden truncate border-r border-border-strong px-2 py-2 font-medium text-text-secondary md:sticky md:left-[242px] z-30 ${stickyClass}`} title={item.csId || "-"}>
-                    {item.csId || "-"}
-                  </td>
-                  <td className={`overflow-hidden truncate border-r-2 border-border-strong px-2 py-2 font-medium text-text-secondary md:sticky md:left-[372px] z-30 shadow-[8px_0_12px_-8px_rgba(0,0,0,0.35)] ${stickyClass}`} title={item.tl || "-"}>
-                    {item.tl || "-"}
-                  </td>
-
-                  <td className={metricGroupStart}>{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
-                  <td className={metricCell}>{item.qa_points !== null ? formatNum(item.qa_points, 2) : "-"}</td>
-
-                  <td className={metricGroupStart}>{item.prod_daily_target}</td>
-                  <td className={metricCell}>{formatNum(item.prod_total_duty, 0)}</td>
-                  <td className={metricCell}>{formatNum(item.prod_target_chat, 0)}</td>
-                  <td className={metricCell}>{formatNum(item.prod_total_chat, 0)}</td>
-                  <td className={metricCell}>{item.prod_points !== null ? formatNum(item.prod_points, 2) : "-"}</td>
-                  <td className={metricCell}>{item.prod_final_points !== null ? formatNum(item.prod_final_points, 2) : "-"}</td>
-                  <td className={`${metricCell} font-bold ${item.prod_difference !== null && item.prod_difference > 0 ? "text-success-text" : ""}`}>
-                    {item.prod_difference !== null ? item.prod_difference : "-"}
-                  </td>
-
-                  <td className={metricGroupStart}>{formatNum(item.csat_good, 0)}</td>
-                  <td className={metricCell}>{formatNum(item.csat_bad, 0)}</td>
-                  <td className={metricCell}>{item.csat_pct !== null ? `${formatNum(item.csat_pct, 2)}%` : "-"}</td>
-                  <td className={metricCell}>{item.csat_points !== null ? formatNum(item.csat_points, 2) : "-"}</td>
-
-                  <td className={metricGroupStart}>{item.training_total ?? "-"}</td>
-                  <td className={metricCell}>{item.training_completion ?? "-"}</td>
-                  <td className={metricCell}>{formatNum(item.training_pct, 2)}%</td>
-                  <td className={metricCell}>{formatNum(item.training_points, 2)}</td>
-
-                  <td className={metricGroupStart}>{item.quiz_target}%</td>
-                  <td className={metricCell}>{formatNum(item.quiz_score, 2)}%</td>
-                  <td className={metricCell}>{formatNum(item.quiz_pct, 2)}%</td>
-                  <td className={metricCell}>{formatNum(item.quiz_points, 2)}</td>
-
-                  <td className="border-l-2 border-border-strong px-2 py-2 text-center">
-                    <span className={`text-[11px] ${getScoreColor(item.score)}`}>{formatNum(item.score, 2)}</span>
-                  </td>
-                </tr>
-              );
-            })}
-
-            {activeData.length === 0 && (
-              <tr>
-                <td colSpan={26} className="p-4">
-                  <EmptyState
-                    title="Tidak ada data leaderboard"
-                    description="Pastikan periode aktif memiliki data agent."
-                    variant="filter"
-                    className="border-0 bg-transparent py-6"
-                    showDataActions
-                  />
-                </td>
-              </tr>
-            )}
-          </VirtualizedTbody>
-        </table>
-      ) : (
-        <table className="kpi-data-table w-full min-w-[2580px] table-fixed border-collapse whitespace-nowrap text-left">
-          <colgroup>
-            <col className="w-[52px]" />
-            <col className="w-[220px]" />
-            <col className="w-[80px]" />
-            {Array.from({ length: 22 }).map((_, index) => (
-              <col key={`tl-metric-column-${index}`} className="w-[105px]" />
-            ))}
-            <col className="w-[105px]" />
-          </colgroup>
-          <thead className="sticky top-0 z-40 text-white">
-            <tr className="bg-primary">
-              <th rowSpan={2} className="border-r border-white/40 p-2 text-center font-bold">#</th>
-              <th rowSpan={2} className="border-r border-white/40 p-2 text-left font-bold">Team Leader</th>
-              <th rowSpan={2} className="border-r border-white/40 p-2 text-center font-bold">Agent</th>
-              <th colSpan={2} className="border-r-2 border-white/60 p-2 text-center font-bold">QC Score (50 poin)</th>
-              <th colSpan={7} className="border-r-2 border-white/60 p-2 text-center font-bold">Productivity (20 poin)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">CSAT Score (20 poin)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Training (5 poin)</th>
-              <th colSpan={4} className="border-r-2 border-white/60 p-2 text-center font-bold">Quiz (5 poin)</th>
-              <th rowSpan={2} className="border-l-2 border-white/60 p-2 text-center font-bold">Skor akhir</th>
-            </tr>
-            <tr className="border-t border-white/30 bg-primary">
-              {[
-                "% Ach", "Total Points",
-                "Daily Target", "Total Duty", "Target Chat", "Total Chat", "Total Points", "Final Points", "Difference",
-                "Total Good Rating", "Total Bad Rating", "Total CSAT", "Total Points",
-                "Total Training", "Agent Completion", "% Ach", "Total Points",
-                "Target", "Agent Score", "% Ach", "Total Points",
-              ].map((label, index) => (
-                <th
-                  key={`${label}-${index}`}
-                  className={cn(
-                    "overflow-hidden border-r border-white/40 px-2 py-1.5 text-center font-bold",
-                    [0, 2, 9, 13, 17].includes(index) && "border-l-2 border-l-white/60",
-                  )}
-                >
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <VirtualizedTbody
-            colSpan={25}
-            paddingTop={tableVirtual.paddingTop}
-            paddingBottom={tableVirtual.paddingBottom}
-          >
-            {tableVirtual.virtualIndexes.map((idx) => {
-              const item = tlRows[idx];
-              if (!item) return null;
-              return (
-              <tr key={item.name} className="border-b border-border-strong/70 hover:bg-surface-muted">
-                <td className="border-r border-border-strong px-2 py-2 text-center font-bold text-text-muted">#{idx + 1}</td>
-                <td className="border-r border-border-strong px-2 py-2 font-bold text-text-primary">{item.name}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center text-text-secondary">{item.agent_count ?? "-"}</td>
-
-                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.qa_pct !== null ? `${formatNum(item.qa_pct, 2)}%` : "-"}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.qa_points !== null ? formatNum(item.qa_points, 2) : "-"}</td>
-
-                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_daily_target}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.prod_total_duty, 0)}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.prod_target_chat, 0)}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.prod_total_chat, 0)}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_points !== null ? formatNum(item.prod_points, 2) : "-"}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_final_points !== null ? formatNum(item.prod_final_points, 2) : "-"}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.prod_difference !== null ? item.prod_difference : "-"}</td>
-
-                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.csat_good, 0)}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.csat_bad, 0)}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.csat_pct !== null ? `${formatNum(item.csat_pct, 2)}%` : "-"}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.csat_points !== null ? formatNum(item.csat_points, 2) : "-"}</td>
-
-                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.training_total ?? "-"}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.training_completion ?? "-"}</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-success-text">{formatNum(item.training_pct, 2)}%</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.training_points, 2)}</td>
-
-                <td className="border-l-2 border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{item.quiz_target}%</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.quiz_score, 2)}%</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-success-text">{formatNum(item.quiz_pct, 2)}%</td>
-                <td className="border-r border-border-strong px-2 py-2 text-center font-semibold text-text-secondary">{formatNum(item.quiz_points, 2)}</td>
-
-                <td className="border-l-2 border-border-strong px-2 py-2 text-center">
-                  <span className={`text-[12px] ${getScoreColor(item.score)}`}>{formatNum(item.score, 2)}</span>
-                </td>
-              </tr>
-              );
-            })}
-            {tlRows.length === 0 && (
-              <tr>
-                <td colSpan={25} className="p-4">
-                  <EmptyState
-                    title="Tidak ada data Team Leader"
-                    description="Pastikan data agent memiliki nama Team Leader pada periode aktif."
-                    variant="filter"
-                    className="border-0 bg-transparent py-6"
-                  />
-                </td>
-              </tr>
-            )}
-          </VirtualizedTbody>
-        </table>
-      )}
-      </div>
-
-      </div>
-
-      {selectedAgent && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 transition-opacity"
-          onClick={() => setSelectedAgent(null)}
+      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+        {/* rank list */}
+        <div
+          ref={listScrollRef}
+          className="rounded-xl border border-border bg-card overflow-y-auto max-h-[calc(100vh-230px)]"
         >
-          <div 
-            className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto p-5 animate-in fade-in zoom-in-95 duration-200"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* HEADER */}
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-                  Analisis KPI
-                </h2>
-                <p className="text-text-secondary text-xs mt-0.5">
-                  {selectedAgent.name} {selectedAgent.csId && `- ${selectedAgent.csId}`}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs text-text-muted bg-surface-muted px-2 py-0.5 rounded-full border border-border">
-                    Rank #{selectedRank}
-                  </span>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${selectedAgent.score >= 95 ? 'bg-success-soft text-success-text' : 'bg-danger-soft text-danger-text'}`}>
-                    Score {selectedAgent.score.toFixed(1)}
-                  </span>
-                  {isSelectedBottomThree && (
-                    <span className="text-[10px] bg-danger-soft text-danger-text px-2 py-0.5 rounded-full font-semibold border border-danger-soft">
-                      Bottom 3
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedAgent(null)}
-                className="text-text-muted hover:text-text-primary transition-colors p-1 rounded hover:bg-surface-muted"
-                aria-label="Tutup"
-              >
-                X
-              </button>
-            </div>
+          <div className={cn("sticky top-0 z-10 grid gap-3 px-4 py-2.5 bg-surface border-b border-border text-[10px] font-medium uppercase tracking-wide text-text-muted", gridCols)}>
+            <span className="text-center">#</span>
+            <span>{toggleMode === "agent" ? "Agent" : "Team Leader"}</span>
+            <span>Kontribusi skor</span>
+            <span>QA · Prod · CSAT</span>
+            <span className="text-right">Skor</span>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* LEFT COLUMN: KPI BREAKDOWN */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-text-secondary tracking-wide mb-2">
-                    SKOR KPI KAMU
-                  </h3>
-
-              <AgentKpiRow
-                label="QA Score"
-                weight="50%"
-                value={selectedAgent.qa_pct}
-                maxValue={100}
-                isMaxCapped={false}
-              />
-
-              <AgentKpiRow
-                label="Produktivitas"
-                weight="20%"
-                value={selectedAgent.prod !== null ? Math.min(selectedAgent.prod, 100) : null}
-                maxValue={100}
-                isMaxCapped={selectedAgent.prod !== null && selectedAgent.prod >= 100}
-              />
-
-              <AgentKpiRow
-                label="CSAT Rating"
-                weight="20%"
-                value={selectedAgent.csat_pct}
-                maxValue={100}
-                isMaxCapped={false}
-                formatFn={(v) => v.toFixed(2)}
-                suffix="%"
-              />
-
-              <div className="space-y-1.5 mt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-text-muted">
-                    Training (5%)
-                  </span>
-                  <div className="text-sm font-semibold text-success-text">
-                    100%
-                  </div>
-                </div>
-                <div className="relative w-full bg-border-strong rounded-full h-1.5 overflow-hidden">
-                  <div 
-                    className="absolute top-0 h-full rounded-full transition-all bg-success"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <p className="text-[10px] text-text-muted italic">
-                  Auto 100% - pastikan selesaikan modul training tepat waktu
-                </p>
-              </div>
-
-              <div className="space-y-1.5 mt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-text-muted">
-                    Quiz (5%)
-                  </span>
-                  <div className="text-sm font-semibold text-success-text">
-                    100%
-                  </div>
-                </div>
-                <div className="relative w-full bg-border-strong rounded-full h-1.5 overflow-hidden">
-                  <div 
-                    className="absolute top-0 h-full rounded-full transition-all bg-success"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <p className="text-[10px] text-text-muted italic">
-                  Auto 100% - pastikan kerjakan kuis sebelum deadline
-                </p>
-              </div>
-            </div>
-            </div>
-            
-            {/* RIGHT COLUMN: REKOMENDASI */}
-            <div className="space-y-4 md:border-l md:border-border md:pl-6 md:pt-0 pt-6 border-t border-border md:border-t-0">
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-text-secondary tracking-wide mb-2">
-                  Prioritas Peningkatan
-                </h3>
-
-              {isRank1 ? (
-                <div className="p-3 bg-primary-soft/20 border border-primary-soft/50 rounded-lg text-center">
-                  <span className="text-2xl block mb-2">🏆</span>
-                  <p className="text-sm font-bold text-primary">Kamu sudah #1!</p>
-                  <p className="text-xs text-text-secondary mt-1">Pertahankan performa luar biasa ini.</p>
-                </div>
-              ) : (() => {
-                const qaNeeded = scoreGap / 0.5;
-                const prodNeeded = scoreGap / 0.2;
-                const csatNeeded = scoreGap / 0.2;
-
-                const currQa = selectedAgent.qa_pct || 0;
-                const currProd = selectedAgent.prod || 0;
-                const currCsat = selectedAgent.csat_pct || 0;
-
-                const canQa = (currQa + qaNeeded) <= 100;
-                const canProd = currProd < 100 && (currProd + prodNeeded) <= 100;
-                const canCsat = (currCsat + csatNeeded) <= 100;
-
-                const isAllCapped = currQa >= 100 && currProd >= 100 && currCsat >= 100;
-
-                if (isAllCapped) {
-                  return (
-                    <div className="p-3 bg-success-soft/20 border border-success-soft/50 rounded-lg text-center mt-2">
-                      <p className="text-sm font-bold text-success-text">Semua KPI sudah maksimal (100%).</p>
-                      <p className="text-xs text-text-secondary mt-1">Pertahankan! Tidak ada yang perlu ditingkatkan lagi.</p>
-                    </div>
-                  );
-                }
-
-                const options = [
-                  { type: 'qa', needed: qaNeeded, can: canQa, current: currQa },
-                  { type: 'prod', needed: prodNeeded, can: canProd, current: currProd },
-                  { type: 'csat', needed: csatNeeded, can: canCsat, current: currCsat }
-                ].filter(opt => opt.can).sort((a, b) => a.needed - b.needed);
-
-                const easiest = options.length > 0 ? options[0].type : "none";
+          {activeData.length === 0 ? (
+            <EmptyState
+              title="Tidak ada data leaderboard"
+              description="Pastikan periode aktif memiliki data agent."
+              variant="filter"
+              className="border-0 bg-transparent py-8"
+              showDataActions
+            />
+          ) : (
+            <>
+              <div style={{ height: listVirtual.paddingTop }} aria-hidden />
+              {listVirtual.virtualIndexes.map((idx) => {
+                const item = activeData[idx];
+                if (!item) return null;
+                const rank = idx + 1;
+                const isBottom = isBottomThree(item.csId || item.name);
+                const isSel = !!selectedAgent && (selectedAgent.csId || selectedAgent.name) === (item.csId || item.name);
+                const qp = item.qa_points ?? 0;
+                const pp = item.prod_final_points ?? 0;
+                const cp = item.csat_points ?? 0;
+                const tot = qp + pp + cp + 10 || 1;
+                const meta = toggleMode === "agent" ? (item.csId || item.name) : `${item.agent_count ?? 0} agent`;
 
                 return (
-                  <>
-                    <div className="mb-3 px-2">
-                      <p className="text-xs font-bold text-text-primary">{targetDesc}</p>
-                      {scoreGap < 0.2 ? (
-                        <p className="text-xs text-text-secondary mt-0.5">Hampir! Sedikit lagi naik rank.</p>
-                      ) : (
-                        <p className="text-xs text-text-secondary mt-0.5">Butuh score &gt;= {safeScore.toFixed(1)} | Gap: {scoreGap.toFixed(1)} poin</p>
-                      )}
-                    </div>
-
-                    <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'qa' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
-                      <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canQa ? (easiest === 'qa' ? 'bg-danger' : 'bg-warning') : 'bg-success'}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-text-primary">QA Score</span>
-                          {easiest === 'qa' && <span className="text-[9px] text-primary bg-primary-soft px-1 rounded font-medium">prioritas utama</span>}
-                        </div>
-                        {canQa ? (
-                          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Naik <span className="font-bold">+{qaNeeded.toFixed(1)}%</span> dari {currQa.toFixed(1)}% ke {(currQa + qaNeeded).toFixed(1)}%<br/>
-                            <span className="text-success-text">Cukup untuk mencapai target</span>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Butuh naik +{qaNeeded.toFixed(1)}% (melebihi 100%, sangat sulit)
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'prod' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
-                      <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canProd ? (easiest === 'prod' ? 'bg-danger' : 'bg-warning') : 'bg-success'}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-text-primary">Produktivitas</span>
-                          {easiest === 'prod' && <span className="text-[9px] text-primary bg-primary-soft px-1 rounded font-medium">prioritas utama</span>}
-                        </div>
-                        {currProd >= 100 ? (
-                          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Sudah maksimal (100%, di-cap)
-                          </div>
-                        ) : canProd ? (
-                          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Naik <span className="font-bold">+{prodNeeded.toFixed(1)}%</span> dari {currProd.toFixed(1)}% ke {(currProd + prodNeeded).toFixed(1)}%<br/>
-                            <span className="text-success-text">Cukup untuk mencapai target</span>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Butuh effort besar / akan terkena cap 100%
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className={`flex items-start gap-3 p-2.5 rounded-lg border ${easiest === 'csat' ? 'bg-primary-soft/10 border-primary/20' : 'bg-surface-muted border-border'}`}>
-                      <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${canCsat ? (easiest === 'csat' ? 'bg-danger' : 'bg-warning') : 'bg-success'}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-text-primary">CSAT Rating</span>
-                          {easiest === 'csat' && <span className="text-[9px] text-primary bg-primary-soft px-1 rounded font-medium">prioritas utama</span>}
-                        </div>
-                        {canCsat ? (
-                          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Naik <span className="font-bold">+{csatNeeded.toFixed(2)}%</span> dari {currCsat.toFixed(2)}% ke {(currCsat + csatNeeded).toFixed(2)}%<br/>
-                            <span className="text-success-text">Cukup untuk mencapai target</span>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                            Butuh naik +{csatNeeded.toFixed(2)}% (melebihi 100%, sangat sulit)
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 p-2.5 bg-primary-soft/20 rounded-lg border border-primary-soft/50">
-                      <p className="text-[11px] font-semibold text-primary">
-                        Cara paling mudah:
-                      </p>
-                      {easiest === 'none' ? (
-                        <p className="text-[11px] font-medium text-primary mt-1">
-                          Sulit untuk mencapai target ini dengan satu KPI saja. Coba tingkatkan semua KPI secara bertahap.
-                        </p>
-                      ) : (
-                        <p className="text-[11px] font-medium text-primary mt-1 flex items-center gap-1">
-                          Naikkan {easiest === 'qa' ? 'QA' : easiest === 'prod' ? 'Prod' : 'CSAT'} <span className="font-bold">+{easiest === 'qa' ? qaNeeded.toFixed(1) : easiest === 'prod' ? prodNeeded.toFixed(1) : csatNeeded.toFixed(2)}%</span> saja sudah cukup!
-                        </p>
-                      )}
-                    </div>
-                  </>
+                  <button
+                    key={item.csId || item.name}
+                    onClick={() => setSelectedAgent(item)}
+                    className={cn(
+                      "w-full grid gap-3 px-4 py-3 items-center text-left border-b border-border/60 transition-colors",
+                      gridCols,
+                      isSel ? "bg-surface-muted" : "hover:bg-surface-muted/60",
+                      isBottom && "border-l-2 border-l-warning",
+                    )}
+                  >
+                    <span className={cn("text-center text-[12px] font-bold tabular-nums", rank <= 3 ? "text-text-primary" : "text-text-muted")}>{rank}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-semibold text-text-primary" title={item.name}>{item.name}</span>
+                      <span className="block truncate text-[10px] text-text-muted">{meta}</span>
+                    </span>
+                    <span
+                      className="flex h-2 rounded-full overflow-hidden bg-surface-muted"
+                      title={`QA ${qp.toFixed(1)} · Prod ${pp.toFixed(1)} · CSAT ${cp.toFixed(1)} · T+Q 10`}
+                    >
+                      <span className="bg-text-secondary" style={{ width: `${(qp / tot) * 100}%` }} />
+                      <span className="bg-text-muted" style={{ width: `${(pp / tot) * 100}%` }} />
+                      <span className="bg-border-strong" style={{ width: `${(cp / tot) * 100}%` }} />
+                      <span className="bg-border" style={{ width: `${(10 / tot) * 100}%` }} />
+                    </span>
+                    <span className="text-[11px] tabular-nums text-text-secondary truncate">
+                      {item.qa_pct !== null ? formatNum(item.qa_pct, 1) : "–"}
+                      <span className="text-text-disabled"> · </span>
+                      {item.prod_pct !== null ? formatNum(Math.min(item.prod_pct, 999), 0) + "%" : "–"}
+                      <span className="text-text-disabled"> · </span>
+                      {item.csat_pct !== null ? formatNum(item.csat_pct, 1) : "–"}
+                    </span>
+                    <span className="text-right text-[15px] font-bold tabular-nums text-text-primary">{formatNum(item.score, 1)}</span>
+                  </button>
                 );
-              })()}
+              })}
+              <div style={{ height: listVirtual.paddingBottom }} aria-hidden />
+            </>
+          )}
+
+          <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 border-t border-border text-[10px] text-text-muted">
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2 rounded-sm bg-text-secondary" />QA (50)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2 rounded-sm bg-text-muted" />Prod (20)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2 rounded-sm bg-border-strong" />CSAT (20)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2 rounded-sm bg-border" />Training + Quiz (10)</span>
+            {toggleMode === "agent" && <span className="ml-auto">3 terbawah ditandai garis kuning</span>}
+          </div>
+        </div>
+
+        {/* detail — inline on large screens */}
+        <div className="hidden lg:block">
+          <div className="sticky top-4 rounded-xl border border-border bg-card p-4 max-h-[calc(100vh-230px)] overflow-y-auto">
+            {selectedAgent ? (
+              <AgentDetail
+                agent={selectedAgent}
+                rank={selectedRank}
+                isBottom={isSelectedBottomThree}
+                isRank1={isRank1}
+                scoreGap={scoreGap}
+                safeScore={safeScore}
+                targetDesc={targetDesc}
+                onClose={() => setSelectedAgent(null)}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center py-16 text-text-muted">
+                <User className="w-8 h-8 mb-3 stroke-1" />
+                <p className="text-xs">Pilih baris untuk lihat rincian skor &amp; saran naik rank.</p>
               </div>
-            </div>
-            </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* detail — slide-in drawer on small screens */}
+      {selectedAgent && (
+        <div
+          className="lg:hidden fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm"
+          onClick={() => setSelectedAgent(null)}
+        >
+          <div
+            className="h-full w-full max-w-[380px] bg-card border-l border-border overflow-y-auto p-4 animate-in slide-in-from-right duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <AgentDetail
+              agent={selectedAgent}
+              rank={selectedRank}
+              isBottom={isSelectedBottomThree}
+              isRank1={isRank1}
+              scoreGap={scoreGap}
+              safeScore={safeScore}
+              targetDesc={targetDesc}
+              onClose={() => setSelectedAgent(null)}
+            />
           </div>
         </div>
       )}

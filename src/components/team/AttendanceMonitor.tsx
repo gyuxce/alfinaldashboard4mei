@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI } from '../../lib/dataProcessor';
 import { formatNum } from '../../lib/utils';
+import { KpiValue, KpiLegend } from '../ui/KpiCue';
 import { Search, Users, HeartPulse, UserMinus, AlertTriangle } from 'lucide-react';
 import { EmptyState } from '../ui/EmptyState';
 import { MobileScrollHint } from '../ui/ChartScrollArea';
@@ -118,7 +119,10 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
          </div>
       </div>
 
-      <MobileScrollHint label="Geser → untuk lihat semua kolom" />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <MobileScrollHint label="Geser → untuk lihat semua kolom" />
+        <KpiLegend />
+      </div>
       <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-200px)]">
           <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
             <thead className="bg-surface text-text-secondary sticky top-0 z-30">
@@ -133,7 +137,7 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                 <th className="p-2 font-bold text-center  bg-surface">S</th>
                 <th className="p-2 font-bold text-center  bg-surface">PULL OUT</th>
                 <th className="p-2 font-bold text-center  bg-surface">Total Days</th>
-                <th className="p-2 font-bold text-center bg-surface">Attendance %</th>
+                <th className="p-2 font-bold text-center bg-surface">Attendance % <span className="font-normal text-text-muted">· t 95%</span></th>
               </tr>
             </thead>
             <VirtualizedTbody
@@ -144,10 +148,6 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
               {tableVirtual.virtualIndexes.map((index) => {
                 const agent = tableData[index];
                 if (!agent) return null;
-                 let colorScore = 'text-text-primary';
-                 if (agent.attendanceScore >= 100) colorScore = 'text-success';
-                 else if (agent.attendanceScore < 100) colorScore = 'text-danger';
-                 
                  const totalDays = agent.attendanceTotalDays;
                  const displayName = agent.name || agent.csId;
 
@@ -167,8 +167,10 @@ export const AttendanceMonitor: React.FC<{ data: AgentKPI[] }> = ({ data }) => {
                     <td className="p-2 text-center text-text-muted z-10 relative">{agent.attendanceS || '-'}</td>
                     <td className="p-2 text-center font-bold text-[11px] text-success z-10 relative">{agent.attendancePullout || '-'}</td>
                     <td className="p-2 text-center font-bold text-[11px] text-text-primary z-10 relative">{totalDays}</td>
-                    <td className={`p-2 text-center font-bold text-[11px] z-10 relative ${colorScore}`}>
-                      {formatNum(agent.attendanceScore, 1)}%
+                    <td className="p-2 text-center text-[11px] z-10 relative">
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <KpiValue value={agent.attendanceScore} type="attendance" text={`${formatNum(agent.attendanceScore, 1)}%`} />
+                      </span>
                     </td>
                   </tr>
                 );

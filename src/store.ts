@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { saveData, loadData, clearAllData, listKeys, SHEETS_SNAPSHOT_REVISION } from './lib/storage';
 import { countDataRows, ValidationResult } from './lib/csvValidator';
-import { fetchAllSheets, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError, getDateRangeForSheetMonth } from './lib/sheetsApi';
+import { fetchAllSheets, fetchPilotRows, getCurrentSheetMonthKey, getSheetMonthHistoryKeys, getSheetConfigForMonth, getSheetMonthOption, getSpreadsheetIdForMonth, getSpreadsheetIdCandidatesForMonth, mergeAllSheetsData, sheetDataToParseResult, emptyAllSheetsData, isAbortError, isTransientNetworkError, getDateRangeForSheetMonth } from './lib/sheetsApi';
 import { buildAgentDictionary, isAgentDictionaryPopulated } from './lib/csid';
 import { getCurrentMonthRange } from './lib/dates';
+import { lastDataDate, lastDatesForAllSources, type SourceLastDates } from './lib/sourceFreshness';
 
 let sheetsSyncGeneration = 0;
 let sheetsAbortController: AbortController | null = null;
@@ -29,6 +30,10 @@ export interface AppState {
   lastSyncTime: Date | null;
   selectedSheetMonth: string;
   activeMonthRowCounts: Record<string, number> | null;
+  /** Newest calendar date present per source sheet — surfaces a stale/frozen sheet. */
+  activeMonthLastDates: SourceLastDates | null;
+  /** History month keys (e.g. `JUN_2026`) whose tabs could not be fetched this sync. */
+  missingHistoryMonths: string[];
   sheetsSnapshotRevision: number | null;
   
   // Sheet configuration
@@ -58,7 +63,9 @@ export interface AppState {
   scheduleData: string[][];
   csidData: string[][];
   qaData: string[][];
-  
+  /** Raw rows of the optional PILOT tab (Pilot CSAT roster). */
+  pilotData: string[][];
+
   startDate: string;
   endDate: string;
   selectedBpo: string;
@@ -104,6 +111,8 @@ export const useStore = create<AppState>((set, get) => ({
   lastSyncTime: null,
   selectedSheetMonth: getCurrentSheetMonthKey(),
   activeMonthRowCounts: null,
+  activeMonthLastDates: null,
+  missingHistoryMonths: [],
   sheetsSnapshotRevision: null,
   sheetsConfig: null,
 
@@ -120,7 +129,8 @@ export const useStore = create<AppState>((set, get) => ({
   scheduleData: [],
   csidData: [],
   qaData: [],
-  
+  pilotData: [],
+
   startDate: defaultDateRange.start,
   endDate: defaultDateRange.end,
   selectedBpo: 'All BPO',
@@ -149,13 +159,19 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     const dataKey = key.replace('File', 'Data');
-    
+
+    // Track the newest date this uploaded source carries, so a stale sheet shows up.
+    const lastDate = key === 'csidFile' ? null : lastDataDate(dataKey, data);
+
     // Update Zustand state synchronously
     set((state) => ({
       [key]: file,
       [dataKey]: data,
       ...dictUpdates,
       fileValidations: { ...state.fileValidations, [key]: validation },
+      ...(key !== 'csidFile'
+        ? { activeMonthLastDates: { ...(state.activeMonthLastDates || {}), [dataKey]: lastDate } }
+        : {}),
       ...(file && file.name ? { fileNames: { ...state.fileNames, [key]: file.name } } : {})
     }));
 
@@ -204,11 +220,14 @@ export const useStore = create<AppState>((set, get) => ({
       scheduleData: [],
       csidData: [],
       qaData: [],
+      pilotData: [],
       agentDictionary: {},
       agentDictionaryByMonth: {},
       fileValidations: {},
       fileNames: {},
       activeMonthRowCounts: null,
+      activeMonthLastDates: null,
+      missingHistoryMonths: [],
       selectedBpo: 'All BPO',
       selectedTL: 'All TL',
       persistedKeys: [],
@@ -274,6 +293,11 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
 
+        if (keys.includes('pilotData')) {
+          const loadedPilot = await loadData('pilotData');
+          if (Array.isArray(loadedPilot)) fileData.pilotData = loadedPilot as string[][];
+        }
+
         if (fileData.csidData) {
           const data = fileData.csidData;
           const dict = buildAgentDictionary(data);
@@ -290,6 +314,8 @@ export const useStore = create<AppState>((set, get) => ({
             if (meta.selectedSheetMonth) fileData.selectedSheetMonth = meta.selectedSheetMonth;
             if (meta.lastSyncTime) fileData.lastSyncTime = new Date(meta.lastSyncTime);
             if (meta.activeMonthRowCounts) fileData.activeMonthRowCounts = meta.activeMonthRowCounts;
+            if (meta.activeMonthLastDates) fileData.activeMonthLastDates = meta.activeMonthLastDates;
+            if (Array.isArray(meta.missingHistoryMonths)) fileData.missingHistoryMonths = meta.missingHistoryMonths;
             if (meta.agentDictionaryByMonth) fileData.agentDictionaryByMonth = meta.agentDictionaryByMonth;
             if (meta.agentDictionary) fileData.agentDictionary = meta.agentDictionary;
             if (meta.fileNames) {
@@ -429,34 +455,53 @@ export const useStore = create<AppState>((set, get) => ({
           scheduleData: countDataRows(sheetDataToParseResult(currentMonthData.schedule).data),
           qaData: countDataRows(sheetDataToParseResult(currentMonthData.qa).data),
         };
+        const currentMonthLastDates = lastDatesForAllSources({
+          productivityData: sheetDataToParseResult(currentMonthData.productivity).data,
+          csatScData: sheetDataToParseResult(currentMonthData.csatSc).data,
+          slaData: sheetDataToParseResult(currentMonthData.sla).data,
+          scheduleData: sheetDataToParseResult(currentMonthData.schedule).data,
+          qaData: sheetDataToParseResult(currentMonthData.qa).data,
+        });
         const historyMonthKeys = getSheetMonthHistoryKeys(selectedMonth);
 
         patchProgress('Mengambil riwayat bulan sebelumnya...', { history: 'active' });
         // History tabs are optional. A missing JUN/legacy sheet must not fail the
         // first boot of the selected month.
         const historicalSheets = [];
+        const missingHistoryMonths: string[] = [];
         for (const monthKey of historyMonthKeys) {
           if (gen !== sheetsSyncGeneration) return;
           if (monthKey === selectedMonth) {
             historicalSheets.push(currentMonthData);
             continue;
           }
-          try {
-            historicalSheets.push(
-              await fetchAllSheets(
-                getSheetConfigForMonth(monthKey),
-                getSpreadsheetIdForMonth(monthKey),
-                signal,
-              ),
-            );
-          } catch (error) {
-            if (isAbortError(error) || signal.aborted || gen !== sheetsSyncGeneration) throw error;
-            console.warn(`Riwayat ${monthKey} dilewati`, error);
+          const monthConfig = getSheetConfigForMonth(monthKey);
+          const candidateIds = getSpreadsheetIdCandidatesForMonth(monthKey, selectedMonth);
+          let monthSheets: typeof currentMonthData | null = null;
+          let lastError: unknown = null;
+          for (const spreadsheetId of candidateIds) {
+            try {
+              monthSheets = await fetchAllSheets(monthConfig, spreadsheetId, signal);
+              break;
+            } catch (error) {
+              if (isAbortError(error) || signal.aborted || gen !== sheetsSyncGeneration) throw error;
+              lastError = error;
+            }
+          }
+          if (monthSheets) {
+            historicalSheets.push(monthSheets);
+          } else {
+            console.warn(`Riwayat ${monthKey} dilewati`, lastError);
+            missingHistoryMonths.push(monthKey);
             historicalSheets.push(emptyAllSheetsData());
           }
         }
         if (gen !== sheetsSyncGeneration) return;
         patchProgress('Riwayat siap', { history: 'done', assemble: 'active' });
+
+        // Optional Pilot CSAT roster — never fails the sync (helper swallows non-abort errors).
+        const pilotRows = await fetchPilotRows(signal);
+        if (gen !== sheetsSyncGeneration) return;
 
         const allData = historicalSheets.reduce(
           (merged, monthData) =>
@@ -512,10 +557,13 @@ export const useStore = create<AppState>((set, get) => ({
           slaData: csvSla.data,
           scheduleData: csvSchedule.data,
           qaData: csvQa.data,
+          pilotData: pilotRows,
 
           agentDictionary,
           agentDictionaryByMonth,
           activeMonthRowCounts: currentMonthRows,
+          activeMonthLastDates: currentMonthLastDates,
+          missingHistoryMonths,
           lastSyncTime: syncedAt,
           isFetchingSheets: false,
           sheetsSyncProgress: null,
@@ -536,11 +584,14 @@ export const useStore = create<AppState>((set, get) => ({
               saveData('slaFile', csvSla.data),
               saveData('scheduleFile', csvSchedule.data),
               saveData('qaFile', csvQa.data),
+              saveData('pilotData', pilotRows),
               saveData('sheetsMeta', {
                 dataSource: 'sheets',
                 selectedSheetMonth: selectedMonth,
                 lastSyncTime: syncedAt.toISOString(),
                 activeMonthRowCounts: currentMonthRows,
+                activeMonthLastDates: currentMonthLastDates,
+                missingHistoryMonths,
                 agentDictionary,
                 agentDictionaryByMonth,
                 fileNames,

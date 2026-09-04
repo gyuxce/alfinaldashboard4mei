@@ -1,7 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { AgentKPI, CSATEntry, isCsatTakeoutCategory, isValidCsatScScore, normalizeDateStr } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate, uniqueCalendarDates, weekSeparatorClass, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
-import { Search, Star, Eye, X, AlertCircle, ChevronDown, ChevronUp, BarChart2, ArrowUpDown, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
+import { formatNum, getKpiStatus, getMonthOffsetLabel, parseDateForSort, cn, indexByDate, uniqueCalendarDates, getByCalendarDate } from '../../lib/utils';
+import { KpiValue, KpiCue } from '../ui/KpiCue';
+import { Sparkline } from '../ui/Sparkline';
+import { DayStrip } from '../ui/DayStrip';
+import { Search, Star, Eye, AlertCircle, ChevronDown, BarChart2, CheckCircle, Filter, Layers, TrendingUp } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 
@@ -17,9 +20,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
   const comparisonMode = useStore(state => state.comparisonMode);
-  const selectedBpo = useStore(state => state.selectedBpo);
   const [search, setSearch] = useState('');
-  const [filterTL, setFilterTL] = useState<string | null>(null);
+  const [filterTL] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'full' | 'fair'>('full');
   const [analysisMode, setAnalysisMode] = useState<'category' | 'score' | 'agent' | 'defect'>('agent');
   const [selectedScoreCase, setSelectedScoreCase] = useState<string>('All');
@@ -27,7 +29,16 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   const [selectedAgent, setSelectedAgent] = useState<{agent: AgentKPI, date?: string, type?: 'csat' | 'defects'} | null>(null);
   const [wowModalData, setWowModalData] = useState<{ title: React.ReactNode, subtitle?: React.ReactNode, surveys: CSATEntry[] } | null>(null);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
-  
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (csId: string) =>
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(csId)) next.delete(csId);
+      else next.add(csId);
+      return next;
+    });
+
   const handleCategoryClick = (categoryName: string, weekLabel: string, dataset: AgentKPI[]) => {
     const surveys: CSATEntry[] = [];
     dataset.forEach(a => {
@@ -73,13 +84,6 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
     setDefectSortConfig({ key, direction });
   };
 
-  const dict = useStore(state => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
-    startDate: s.startDate,
-    endDate: s.endDate,
-    setDateRange: s.setDateRange,
-  })));
-
   const tableData = useMemo(() => {
     return data.filter(a => {
       const matchSearch = a.csId.toLowerCase().includes(search.toLowerCase()) || (a.name || '').toLowerCase().includes(search.toLowerCase());
@@ -96,6 +100,17 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
       a.dailyHistory?.csatScFair,
     ]));
   }, [tableData]);
+  // Sparkline + day-strip read oldest→newest; uniqueDates is newest-first.
+  const chronoDates = useMemo(() => [...uniqueDates].reverse(), [uniqueDates]);
+
+  const csatTarget = viewMode === 'full' ? 75 : 92;
+  const csatKpiType = viewMode === 'full' ? 'csatFull' as const : 'csatFair' as const;
+  const agentCsatPct = (a: AgentKPI): number | null => {
+    if (viewMode === 'full') {
+      return a.csatScTotalValid > 0 ? (a.csatScGoodCount / a.csatScTotalValid) * 100 : null;
+    }
+    return a.csatScFairTotalValid > 0 ? (a.csatScFairGoodCount / a.csatScFairTotalValid) * 100 : null;
+  };
 
   const topCategories = useMemo(() => {
     const agg: Record<string, number> = {};
@@ -530,12 +545,11 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
 
       {isComparisonEnabled && (
         <>
-          <WoWChartPanel 
-            data={data} 
-            previousData={previousData} 
-            previousData2={previousData2} 
-            previousData3={previousData3} 
-            viewMode={viewMode}
+          <WoWChartPanel
+            data={data}
+            previousData={previousData}
+            previousData2={previousData2}
+            previousData3={previousData3}
           />
           <RespondentChartPanel
             data={data} 
@@ -803,8 +817,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
                       const prevCount = prevTopCategories[cat.name] || 0;
                       const diff = cat.count - prevCount;
                       const isUp = diff > 0;
-                      const isDown = diff < 0;
-                      
+
                       return (
                         <tr key={cat.name} className="border-b border-border hover:bg-surface-muted transition-colors group cursor-pointer" onClick={() => handleCategoryClick(cat.name, viewMode === 'full' ? 'From Data penuh' : 'After Takeout', data)}>
                           <td className="p-2 text-center text-text-muted font-medium">{cat.rank}</td>
@@ -900,130 +913,117 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
         </div>
       ) : analysisMode === 'agent' ? (
         <>
-        <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-200px)]">
-            <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[11px] text-text-muted">
+            Klik baris untuk rincian harian · {viewMode === 'full' ? 'skor penuh' : 'setelah takeout'}, target {csatTarget}%
+          </span>
+        </div>
+        <div className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl flex-1 max-h-[calc(100vh-200px)]">
+          <table className="kpi-data-table w-full text-left border-collapse">
             <thead className="bg-surface text-text-secondary sticky top-0 z-30">
               <tr>
-                <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
-                <SortableHeader label="Nama / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
-                <SortableHeader label="BPO" sortKey="bpo" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
-                <SortableHeader label="TL" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
-                <SortableHeader label="Rata-rata" sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
-                <th className="p-2 font-bold text-center text-text-primary bg-surface z-30 relative">
-                  Aksi
-                </th>
-                {uniqueDates.map((date, i) => (
-                  <th key={date} className={`p-2 font-bold text-center text-text-muted bg-surface `}>
-                    {formatCalendarHeader(date)}
-                  </th>
-                ))}
+                <th className="p-2 font-bold text-center border-b border-border bg-surface w-[48px]">No</th>
+                <SortableHeader label="Nama / CS ID" sortKey="name" config={agentSortConfig} onSort={handleAgentSort} className="border-b border-border bg-surface min-w-[200px]" />
+                <SortableHeader label="BPO · TL" sortKey="teamLeader" config={agentSortConfig} onSort={handleAgentSort} className="border-b border-border bg-surface min-w-[130px]" />
+                <th className="p-2 font-bold text-text-muted border-b border-border bg-surface min-w-[150px]">Tren 20 hari</th>
+                <SortableHeader label={`Rata-rata · t ${csatTarget}%`} sortKey="average" config={agentSortConfig} onSort={handleAgentSort} className="text-right text-text-primary border-b border-border bg-surface w-[130px]" />
+                <th className="p-2 font-bold text-right text-text-muted border-b border-border bg-surface w-[72px]">vs&nbsp;{csatTarget}</th>
+                <th className="p-2 border-b border-border bg-surface w-[40px]" aria-hidden />
               </tr>
             </thead>
-            <tbody className="">
+            <tbody>
               {sortedAgentData.map((agent, index) => {
-                const totalCount = viewMode === 'full' ? agent.csatScFullCount : agent.csatScFairCount;
-                
                 const displayName = agent.name || agent.csId;
+                const totalCount = viewMode === 'full' ? agent.csatScFullCount : agent.csatScFairCount;
                 const dailyByDate = indexByDate(
                   viewMode === 'full' ? agent.dailyHistory?.csatScFull : agent.dailyHistory?.csatScFair,
                 );
                 const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
+                // Official formula: good_count / total_valid × 100 (score 3 excluded;
+                // stored per day as score=good, count=total_valid).
+                const dailyVals = chronoDates.map((date) => {
+                  const d = getByCalendarDate(dailyByDate, date);
+                  return d && d.count > 0 ? (d.score / d.count) * 100 : null;
+                });
+                const pct = agentCsatPct(agent);
+                const status = getKpiStatus(pct, csatKpiType);
+                const vsTarget = pct !== null ? pct - csatTarget : null;
+                const isOpen = expandedRows.has(agent.csId);
 
                 return (
-                <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
-                  <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
-                  <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                    <span className="text-kpi-neutral-text font-semibold" title={agent.csId}>
-                      {displayName}
-                    </span>
-                  </td>
-                  <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
-                    {agent.bpo || '-'}
-                  </td>
-                  <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
-
-                  <td className={`p-2 text-center font-bold  z-10  relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]`}>
-                    {totalCount > 0 ? (
-                      <div className="flex flex-col">
-                        <span className={`text-[11px] font-bold ${getKpiColor(
-                          viewMode === 'full'
-                            ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
-                            : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0),
-                          viewMode === 'full' ? 'csatFull' : 'csatFair'
-                        )}`}>
-                          {formatNum(
-                            viewMode === 'full'
-                              ? (agent.csatScTotalValid > 0 ? (agent.csatScGoodCount / agent.csatScTotalValid) * 100 : 0)
-                              : (agent.csatScFairTotalValid > 0 ? (agent.csatScFairGoodCount / agent.csatScFairTotalValid) * 100 : 0)
-                          )}%
-                        </span>
-                        <span className="text-[9px] text-text-muted font-medium">({totalCount} valid ratings)</span>
-                      </div>
-                    ) : '-'}
-                  </td>
-
-                  <td className="p-2 text-center flex items-center justify-center z-10 bg-card group-hover:bg-surface-muted">
-                    <button
-                      onClick={() => setSelectedAgent({ agent, type: 'csat' })}
-                      className="flex items-center gap-1 text-[10px] text-text-muted hover:text-primary transition-colors px-2 py-1 rounded hover:bg-surface-muted relative cursor-pointer"
-                      title="View All Detail"
+                  <React.Fragment key={agent.csId}>
+                    <tr
+                      className="border-b border-border transition-colors group hover:bg-surface-muted cursor-pointer"
+                      onClick={() => toggleRow(agent.csId)}
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span className="font-bold">Detail</span>
-                    </button>
-                  </td>
-
-                  {uniqueDates.map((date, i) => {
-                    const daily = getByCalendarDate(dailyByDate, date);
-                    const sched = getByCalendarDate(scheduleByDate, date);
-                    const status = sched?.status?.toUpperCase() || '';
-                      
-                    const isOff = status === 'OFF' || status === 'C';
-                    const isPullout = status === 'PULLOUT';
-                    const bgClass = isOff ? 'text-text-muted' : '';
-                    
-                    if (!daily || daily.count === 0 || isOff) {
-                      return (
-                        <td key={date} className={`p-0 text-center text-text-disabled z-10 ${bgClass}`}>
-                           <button 
-                             onClick={() => isOff ? null : setSelectedAgent({ agent, date, type: 'csat' })} 
-                             className={`w-full h-full min-h-[36px] flex flex-col items-center justify-center transition-colors group/btn relative ${isOff ? 'cursor-default' : 'hover:bg-surface-muted cursor-pointer'}`}
-                             title={isOff && daily && daily.count > 0 ? `Agent OFF — ${daily.count} survey(s) tetap dihitung di total` : ''}
-                           >
-                             <span className="text-[11px]">
-                               {isOff ? <span className="text-text-muted/40 italic text-[9px]">off</span> : '-'}
-                             </span>
-                             {!isOff && <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 transition-opacity absolute right-1 text-text-muted" />}
-                           </button>
-                        </td>
-                      );
-                    }
-                    // Official formula: good_count / total_valid × 100 (score 3 excluded, stored in daily.score=good, daily.count=total_valid)
-                    const avg = daily.count > 0 ? (daily.score / daily.count) * 100 : 0;
-                    const baseColor = getKpiColor(avg, viewMode === 'full' ? 'csatFull' : 'csatFair');
-                    const textColor = isPullout ? `text-text-muted italic` : baseColor;
-
-                    return (
-                      <td key={date} className={`p-0 text-center z-10 ${bgClass}`}>
-                        <button 
-                          onClick={() => setSelectedAgent({ agent, date, type: 'csat' })} 
-                          className="w-full h-full min-h-[36px] flex flex-col items-center justify-center hover:bg-surface-muted transition-colors group/btn relative cursor-pointer"
-                        >
-                          <span className={`text-[11px] font-bold ${textColor}`}>
-                            {formatNum(avg)}%
-                          </span>
-                          <span className={`text-[9px] font-medium ${isPullout ? 'text-text-muted/70 italic' : 'text-text-muted'}`}>({daily.count} valid ratings)</span>
-                          <Eye className="w-3 h-3 opacity-0 group-hover/btn:opacity-100 text-text-muted transition-opacity absolute right-1" />
-                        </button>
+                      <td className="p-2 text-center text-text-muted font-medium w-[48px]">{index + 1}</td>
+                      <td className="p-2 min-w-[200px]">
+                        <div className="font-semibold text-text-primary truncate" title={agent.csId}>{displayName}</div>
+                        <div className="text-[9px] text-text-muted truncate">{agent.csId}</div>
                       </td>
-                    );
-                  })}
-                </tr>
-              )})}
+                      <td className="p-2 text-text-secondary min-w-[130px] truncate">
+                        <span className="uppercase">{agent.bpo || '-'}</span>
+                        <span className="text-text-muted"> · {agent.teamLeader || '-'}</span>
+                      </td>
+                      <td className="p-2 min-w-[150px]">
+                        <div className={status === 'miss' ? 'text-danger' : status === 'watch' ? 'text-warning' : 'text-text-muted'}>
+                          <Sparkline values={dailyVals} height={22} />
+                        </div>
+                      </td>
+                      <td className="p-2 text-right w-[130px]">
+                        {pct !== null ? (
+                          <div className="flex flex-col items-end">
+                            <KpiValue value={pct} type={csatKpiType} text={`${formatNum(pct)}%`} className="justify-end" />
+                            <span className="text-[9px] text-text-muted">{totalCount} valid</span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-text-disabled">-</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-right w-[72px] text-[11px] tabular-nums">
+                        {vsTarget !== null ? (
+                          <span className={`inline-flex items-center justify-end gap-1 font-medium ${status === 'miss' ? 'text-danger' : status === 'watch' ? 'text-warning' : 'text-text-muted'}`}>
+                            <KpiCue status={status} />
+                            {vsTarget >= 0 ? '+' : '−'}{Math.abs(vsTarget).toFixed(1)}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="p-2 text-center w-[40px]">
+                        <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-surface/40 border-b border-border">
+                        <td colSpan={7} className="px-4 pb-4 pt-1">
+                          <div className="flex items-center justify-between pt-3 pb-2">
+                            <span className="text-[9px] text-text-muted uppercase tracking-wide">
+                              CSAT per hari &mdash; hanya di bawah target yang berwarna &middot; klik sel untuk rincian
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedAgent({ agent, type: 'csat' }); }}
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-muted hover:text-primary transition-colors"
+                            >
+                              <Eye className="w-3 h-3" /> Lihat semua rating
+                            </button>
+                          </div>
+                          <DayStrip
+                            kpiType={csatKpiType}
+                            format={(v) => `${formatNum(v, 0)}%`}
+                            onSelect={(date) => setSelectedAgent({ agent, date, type: 'csat' })}
+                            items={chronoDates.map((date, di) => {
+                              const st = getByCalendarDate(scheduleByDate, date)?.status?.toUpperCase() || '';
+                              return { date, value: dailyVals[di], off: st === 'OFF' || st === 'C' };
+                            })}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
               {tableData.length === 0 && (
                 <tr>
-                  <td colSpan={6 + uniqueDates.length} className="p-4 z-10">
+                  <td colSpan={7} className="p-4 z-10">
                     <EmptyState
                       title="Tidak ada data CSAT survey"
                       description="Coba ubah pencarian, filter TL, view mode, atau rentang tanggal."
@@ -1192,7 +1192,7 @@ export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], p
   );
 };
 
-const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewMode }: any) => {
+const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any) => {
   const { startDate, endDate, comparisonMode } = useStore(useShallow((s) => ({
     startDate: s.startDate,
     endDate: s.endDate,
@@ -1241,7 +1241,9 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
     { name: getWeekLabel(1), 'SC Full': w1.full, 'SC After Takeout': w1.takeout },
     { name: getWeekLabel(0), 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
-  const visibleChartData = comparisonMode === 'mom' ? chartData.slice(1) : chartData;
+  // Drop periods with no survey data (un-populated month) — a 0 there is noise.
+  const visibleChartData = (comparisonMode === 'mom' ? chartData.slice(1) : chartData)
+    .filter(d => d['SC Full'] > 0 || d['SC After Takeout'] > 0);
 
   const dailyData = React.useMemo(() => {
     const dates = new Map<string, { goodFull: number, totalFull: number, goodTakeout: number, totalTakeout: number }>();
@@ -1360,33 +1362,37 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
     <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         
-        {/* Weekly Trend Panel */}
+        {/* Period comparison — bars */}
         <div className="flex flex-col">
-          <div className="flex items-center justify-center mb-4">
-            <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? '3-Month Comparison Trend' : '4-Week Comparison Trend'}</h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-text-primary">{comparisonMode === 'mom' ? 'Tren 3 bulan' : 'Tren 4 minggu'}</h3>
+            <span className="inline-flex items-center gap-3 text-[9px] text-text-muted">
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2.5 rounded-sm" style={{ background: chart.muted }} />Full · t 75</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2.5 rounded-sm" style={{ background: chart.kpiCsat }} />After Takeout · t 92</span>
+            </span>
           </div>
-          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+          <div className="h-96 w-full rounded-xl border border-border/50 bg-surface/20 p-5">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={visibleChartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
-                <Bar dataKey="SC Full" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.kpiCsat}} />
+              <BarChart data={visibleChartData} margin={{ top: 22, right: 6, left: -14, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'var(--color-surface-muted)', opacity: 0.4 }} contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 11 }} formatter={(v: any) => formatNum(Number(v), 2)} />
+                <Bar dataKey="SC Full" fill={chart.muted} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC Full" position="top" style={{ fontSize: 9, fontWeight: 700, fill: 'var(--color-text-muted)' }} formatter={(v: any) => (Number(v) > 0 ? formatNum(Number(v), 2) : '')} />
                 </Bar>
-                <Bar dataKey="SC After Takeout" fill={chart.success} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.success}} />
+                <Bar dataKey="SC After Takeout" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  <LabelList dataKey="SC After Takeout" position="top" style={{ fontSize: 10, fontWeight: 700, fill: 'var(--color-text-primary)' }} formatter={(v: any) => (Number(v) > 0 ? formatNum(Number(v), 2) : '')} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Weekly/Daily Trend Panel */}
+        {/* Current period — daily / weekly bars */}
         <div className="flex flex-col">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="text-sm font-bold text-text-primary">
-              {trendMode === 'weekly' ? 'Weekly Average Trend' : 'Daily Trend'} ({comparisonMode === 'mom' ? 'Current Month' : 'Current Week'})
+              {trendMode === 'weekly' ? 'Rata-rata mingguan' : 'Tren harian'} ({comparisonMode === 'mom' ? 'bulan ini' : 'minggu ini'})
             </h3>
             <div className="inline-flex items-center rounded-lg border border-border bg-surface-muted p-0.5">
               {(['weekly', 'daily'] as const).map(mode => (
@@ -1396,7 +1402,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
                   onClick={() => setTrendMode(mode)}
                   className={cn(
                     'rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors',
-                    trendMode === mode ? 'bg-card text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
+                    trendMode === mode ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
                   )}
                 >
                   {mode === 'weekly' ? 'Weekly' : 'Daily'}
@@ -1404,17 +1410,17 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3, viewM
               ))}
             </div>
           </div>
-          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+          <div className="h-96 w-full rounded-xl border border-border/50 bg-surface/20 p-5">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={trendData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
-                <Bar dataKey="SC Full" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC Full" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.kpiCsat}} />
+              <BarChart data={trendData} margin={{ top: 22, right: 6, left: -14, bottom: 0 }}>
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} minTickGap={8} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'var(--color-surface-muted)', opacity: 0.4 }} contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 11 }} formatter={(v: any) => formatNum(Number(v), 2)} />
+                <Bar dataKey="SC Full" fill={chart.muted} radius={[3, 3, 0, 0]} maxBarSize={26}>
+                  <LabelList dataKey="SC Full" position="top" style={{ fontSize: 9, fontWeight: 700, fill: 'var(--color-text-muted)' }} formatter={(v: any) => (Number(v) > 0 ? formatNum(Number(v), 2) : '')} />
                 </Bar>
-                <Bar dataKey="SC After Takeout" fill={chart.success} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  <LabelList dataKey="SC After Takeout" position="top" style={{fontSize: '10px', fontWeight: 'bold', fill: chart.success}} />
+                <Bar dataKey="SC After Takeout" fill={chart.kpiCsat} radius={[3, 3, 0, 0]} maxBarSize={26}>
+                  <LabelList dataKey="SC After Takeout" position="top" style={{ fontSize: 10, fontWeight: 700, fill: 'var(--color-text-primary)' }} formatter={(v: any) => (Number(v) > 0 ? formatNum(Number(v), 2) : '')} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -1678,7 +1684,9 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
       { name: getWeekLabel(0), ...w0 },
     ];
     return (comparisonMode === 'mom' ? periods.slice(1) : periods)
-      .filter(d => d.name !== 'WNaN Invalid Date');
+      .filter(d => d.name !== 'WNaN Invalid Date')
+      // Drop un-populated periods so their card + nonsense % don't show.
+      .filter(d => d.processed > 0 || d.respondents > 0);
   }, [data, previousData, previousData2, previousData3, startDate, endDate, viewMode, comparisonMode]);
 
   const dailyRespData = React.useMemo(() => {
@@ -1840,10 +1848,9 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           <div className={cn('grid gap-4', comparisonMode === 'mom' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2')}>
             {weeksData.map((w, idx) => {
               const prevW = idx > 0 ? weeksData[idx - 1] : null;
-              let diff = 0;
-              if (prevW && prevW.respondents > 0) {
-                diff = Number((((w.respondents - prevW.respondents) / prevW.respondents) * 100).toFixed(1));
-              }
+              // Absolute change in respondent count — a % here is meaningless when
+              // one period is a partial week / near-empty.
+              const diff = prevW ? w.respondents - prevW.respondents : 0;
               const isUp = diff > 0;
               const isDown = diff < 0;
 
@@ -1854,11 +1861,11 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                   <span className="text-3xl xl:text-4xl font-bold text-text-primary mb-1">{formatNum(w.respondents, 0)}</span>
                   
                   {idx > 0 ? (
-                    <div className={`flex items-center gap-1 text-[11px] font-bold ${isUp ? 'text-green-500' : isDown ? 'text-red-500' : 'text-text-tertiary'}`}>
-                      {isUp ? '▲' : isDown ? '▼' : '▬'} {Math.abs(diff)}%
+                    <div className="flex items-center gap-1 text-[11px] font-semibold text-text-muted">
+                      {isUp ? '▲' : isDown ? '▼' : '▬'} {Math.abs(diff)}
                     </div>
                   ) : (
-                    <div className="text-[11px] text-text-tertiary font-bold">&nbsp;</div>
+                    <div className="text-[11px] text-text-muted font-bold">&nbsp;</div>
                   )}
                   
                   <div className="mt-auto pt-2 border-t border-border/50 w-full text-center flex flex-col gap-1">
@@ -1908,7 +1915,7 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
                   onClick={() => setTrendMode(mode)}
                   className={cn(
                     'rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors',
-                    trendMode === mode ? 'bg-card text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
+                    trendMode === mode ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
                   )}
                 >
                   {mode === 'weekly' ? 'Weekly' : 'Daily'}
