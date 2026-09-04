@@ -1,12 +1,12 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { AgentKPI, getOfficialCsatAggregate, getPreviousMonthPeriod, getPreviousPeriod, normalizeDateStr } from "../../lib/dataProcessor";
-import { formatNum, getKpiColor, parseDateForSort } from "../../lib/utils";
-import { kpiThemeColor } from "../../lib/themeColors";
-import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown } from "lucide-react";
+import { formatNum, getKpiStatus, parseDateForSort, type KpiType } from "../../lib/utils";
+import { Activity, Star, Clock, CheckCircle, TrendingUp, Users, Info, ChevronDown, ClipboardCheck } from "lucide-react";
+import { Sparkline } from "../ui/Sparkline";
 import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
 import { DashboardCharts } from "./DashboardCharts";
-import { DashboardAgentTable } from "./DashboardAgentTable";
+import { TeamLeaderSummary } from "./TeamLeaderSummary";
 import { EmptyState } from "../ui/EmptyState";
 
 interface Props {
@@ -92,6 +92,19 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
     if (!isComparisonEnabled || !previousData.length) return undefined;
     return curr - prev;
   };
+
+  // A comparison period with rows but no activity (e.g. an un-populated month:
+  // CSID roster loaded, activity sheets empty) must not render as columns of 0.
+  const periodHasActivity = (d: AgentKPI[]) =>
+    d.some((a) =>
+      a.productivityBase > 0 ||
+      a.qaScoreCount > 0 ||
+      a.csatScTotalValid > 0 ||
+      a.manDays > 0 ||
+      (a.csat4Count || 0) + (a.csat5Count || 0) > 0 ||
+      a.sla1m !== null ||
+      a.whu !== null,
+    );
 
   const generateDailyTrend = (dataset: AgentKPI[]) => {
     type DayAcc = {
@@ -216,9 +229,12 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
         const key = toKey(s.date, s.normDate);
         if (!key || !byDate.has(key)) return;
         const acc = byDate.get(key)!;
+        // Mirror the processor's duty/presence rules exactly so the daily
+        // Attendance line matches the headline Attendance KPI card.
         if (s.isManDay || s.status === "PULLOUT") acc.totalAttendanceDuty += 1;
-        const isNum = !isNaN(parseFloat(String(s.status || "").replace(",", "."))) && s.status !== "";
-        if (isNum || s.status === "PULLOUT") acc.totalAttendancePresence += 1;
+        if (s.status === "PULLOUT" || (s.isManDay && s.status !== "S")) {
+          acc.totalAttendancePresence += 1;
+        }
       });
 
       a.qaHistory?.forEach((q) => {
@@ -337,96 +353,148 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
         <>
 
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <StatCard
-              title="Total Productivity"
-              value={formatNum(currentStats.productivity, 0)}
-              delta={getDelta(currentStats.productivity, previousStats.productivity)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.productivity, 0) : undefined}
-              kpiTheme="productivity"
-            />
-            <StatCard
-              title="Avg Productivity"
-              value={formatNum(currentStats.avgProductivity, 0)}
-              delta={getDelta(currentStats.avgProductivity, previousStats.avgProductivity)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.avgProductivity, 0) : undefined}
-              kpiTheme="productivity-avg"
-            />
-            <StatCard
-              title="CSAT Official"
-              value={formatNum(currentStats.csat)}
-              subValue={currentStats.csatPercent > 0 ? formatNum(currentStats.csatPercent, 2) + "%" : undefined}
-              delta={getDelta(currentStats.csatPercent, previousStats.csatPercent)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.csatPercent) + "%" : undefined}
-              kpiTheme="csat"
-            />
-            <StatCard
-              title="CSAT SC Full"
-              value={formatNum(currentStats.csatScFull) + "%"}
-              subValue={currentStats.csatScFull > 0 ? formatNum((currentStats.csatScFull / 100) * 5, 2) + " poin" : undefined}
-              delta={getDelta(currentStats.csatScFull, previousStats.csatScFull)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.csatScFull) + "%" : undefined}
-              kpiTheme="csat"
-            />
-            <StatCard
-              title="CSAT SC After Takeout"
-              value={formatNum(currentStats.csatScFair) + "%"}
-              subValue={currentStats.csatScFair > 0 ? formatNum((currentStats.csatScFair / 100) * 5, 2) + " poin" : undefined}
-              delta={getDelta(currentStats.csatScFair, previousStats.csatScFair)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.csatScFair) + "%" : undefined}
-              kpiTheme="csat"
-            />
-            <StatCard
-              title="SLA 1 Menit"
-              value={formatNum(currentStats.sla1m) + "%"}
-              delta={getDelta(currentStats.sla1m, previousStats.sla1m)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.sla1m) + "%" : undefined}
-              kpiTheme="sla"
-            />
-            <StatCard
-              title="SLA 3 Menit"
-              value={formatNum(currentStats.sla3m) + "%"}
-              delta={getDelta(currentStats.sla3m, previousStats.sla3m)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.sla3m) + "%" : undefined}
-              kpiTheme="sla"
-            />
-            <StatCard
-              title="WHU (%)"
-              value={formatNum(currentStats.whu) + "%"}
-              delta={getDelta(currentStats.whu, previousStats.whu)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.whu) + "%" : undefined}
-              kpiTheme="whu"
-            />
-            <StatCard
-              title="QA Score"
-              value={formatNum(currentStats.qa) + "%"}
-              delta={getDelta(currentStats.qa, previousStats.qa)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.qa) + "%" : undefined}
-              kpiTheme="qa"
-            />
-            <StatCard
-              title="Attendance"
-              value={formatNum(currentStats.attendance) + "%"}
-              delta={getDelta(currentStats.attendance, previousStats.attendance)}
-              previousValue={isComparisonEnabled && previousData.length ? formatNum(previousStats.attendance) + "%" : undefined}
-              kpiTheme="neutral"
-            />
-          </div>
+          {(() => {
+            const cmp = isComparisonEnabled && previousData.length > 0;
+            const prev = (s: string | undefined) => (cmp ? s : undefined);
+            const trend = (key: keyof (typeof dailyTrend)[number]) =>
+              dailyTrend.map((d) => d[key] as number | null);
+            return (
+              <>
+                {/* Hero KPI strip — the five people lead with */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <StatCard
+                    variant="hero"
+                    title="Total Productivity"
+                    value={formatNum(currentStats.productivity, 0)}
+                    sparkValues={trend("productivity")}
+                    delta={getDelta(currentStats.productivity, previousStats.productivity)}
+                    previousValue={prev(formatNum(previousStats.productivity, 0))}
+                    kpiTheme="productivity"
+                  />
+                  <StatCard
+                    variant="hero"
+                    title="Avg Productivity"
+                    value={formatNum(currentStats.avgProductivity, 0)}
+                    rawValue={currentStats.avgProductivity}
+                    targetType="productivity"
+                    targetLabel="100"
+                    sparkValues={trend("avgProductivity")}
+                    delta={getDelta(currentStats.avgProductivity, previousStats.avgProductivity)}
+                    previousValue={prev(formatNum(previousStats.avgProductivity, 0))}
+                    kpiTheme="productivity-avg"
+                  />
+                  <StatCard
+                    variant="hero"
+                    title="CSAT Official"
+                    value={formatNum(currentStats.csat)}
+                    unit="/ 5"
+                    rawValue={currentStats.csat}
+                    targetType="csatOfficial"
+                    targetLabel="3.75"
+                    sparkValues={trend("csat")}
+                    delta={getDelta(currentStats.csatPercent, previousStats.csatPercent)}
+                    previousValue={prev(formatNum(previousStats.csat) + " / 5")}
+                    kpiTheme="csat"
+                  />
+                  <StatCard
+                    variant="hero"
+                    title="QA Score"
+                    value={formatNum(currentStats.qa) + "%"}
+                    rawValue={currentStats.qa}
+                    targetType="qa"
+                    targetLabel="92%"
+                    sparkValues={trend("qa")}
+                    delta={getDelta(currentStats.qa, previousStats.qa)}
+                    previousValue={prev(formatNum(previousStats.qa) + "%")}
+                    kpiTheme="qa"
+                  />
+                  <StatCard
+                    variant="hero"
+                    title="Attendance"
+                    value={formatNum(currentStats.attendance) + "%"}
+                    rawValue={currentStats.attendance}
+                    targetType="attendance"
+                    targetLabel="95%"
+                    sparkValues={trend("attendance")}
+                    delta={getDelta(currentStats.attendance, previousStats.attendance)}
+                    previousValue={prev(formatNum(previousStats.attendance) + "%")}
+                    kpiTheme="attendance"
+                  />
+                </div>
+
+                {/* Secondary KPI tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <StatCard
+                    title="CSAT SC Full"
+                    value={formatNum(currentStats.csatScFull) + "%"}
+                    rawValue={currentStats.csatScFull}
+                    targetType="csatFull"
+                    targetLabel="75%"
+                    subValue={currentStats.csatScFull > 0 ? formatNum((currentStats.csatScFull / 100) * 5, 2) + " poin" : undefined}
+                    delta={getDelta(currentStats.csatScFull, previousStats.csatScFull)}
+                    previousValue={prev(formatNum(previousStats.csatScFull) + "%")}
+                    kpiTheme="csat"
+                  />
+                  <StatCard
+                    title="CSAT SC After Takeout"
+                    value={formatNum(currentStats.csatScFair) + "%"}
+                    rawValue={currentStats.csatScFair}
+                    targetType="csatFair"
+                    targetLabel="92%"
+                    subValue={currentStats.csatScFair > 0 ? formatNum((currentStats.csatScFair / 100) * 5, 2) + " poin" : undefined}
+                    delta={getDelta(currentStats.csatScFair, previousStats.csatScFair)}
+                    previousValue={prev(formatNum(previousStats.csatScFair) + "%")}
+                    kpiTheme="csat"
+                  />
+                  <StatCard
+                    title="SLA 1 Menit"
+                    value={formatNum(currentStats.sla1m) + "%"}
+                    rawValue={currentStats.sla1m}
+                    targetType="sla1m"
+                    targetLabel="92%"
+                    delta={getDelta(currentStats.sla1m, previousStats.sla1m)}
+                    previousValue={prev(formatNum(previousStats.sla1m) + "%")}
+                    kpiTheme="sla"
+                  />
+                  <StatCard
+                    title="SLA 3 Menit"
+                    value={formatNum(currentStats.sla3m) + "%"}
+                    rawValue={currentStats.sla3m}
+                    targetType="sla3m"
+                    targetLabel="96%"
+                    delta={getDelta(currentStats.sla3m, previousStats.sla3m)}
+                    previousValue={prev(formatNum(previousStats.sla3m) + "%")}
+                    kpiTheme="sla"
+                  />
+                  <StatCard
+                    title="WHU (%)"
+                    value={formatNum(currentStats.whu) + "%"}
+                    rawValue={currentStats.whu}
+                    targetType="whu"
+                    targetLabel="96%"
+                    delta={getDelta(currentStats.whu, previousStats.whu)}
+                    previousValue={prev(formatNum(previousStats.whu) + "%")}
+                    kpiTheme="whu"
+                  />
+                </div>
+              </>
+            );
+          })()}
 
           <KpiRulesPanel
             isOpen={isRulesOpen}
             onToggle={() => setIsRulesOpen((value) => !value)}
           />
 
-          {/* Weekly Report Panel - only shown when comparison is active */}
-          {isComparisonEnabled && previousData.length > 0 && (
+          {/* Weekly Report Panel - only shown when comparison is active + has data */}
+          {isComparisonEnabled && periodHasActivity(previousData) && (
             <WeeklyReportPanel
               currentStats={currentStats}
               previousStats={previousStats}
               previousStats2={previousStats2}
               previousStats3={previousStats3}
-              hasPrev2={previousData2.length > 0}
-              hasPrev3={previousData3.length > 0}
+              hasPrev2={periodHasActivity(previousData2)}
+              hasPrev3={periodHasActivity(previousData3)}
               startDate={startDate}
               endDate={endDate}
               comparisonMode={comparisonMode}
@@ -434,7 +502,7 @@ export const DashboardSummary: React.FC<Props> = ({ data, previousData = [], pre
           )}
 
           <DashboardCharts stats={currentStats} dailyTrend={dailyTrend} />
-          <DashboardAgentTable tableData={tableData} />
+          <TeamLeaderSummary data={tableData} />
         </>
       )}
     </div>
@@ -682,67 +750,104 @@ const CountUpValue = ({ value }: { value: string }) => {
   return <>{displayValue}</>;
 };
 
-const StatCard = ({ 
-  title, 
-  value, 
+const STATUS_TEXT_CLASS: Record<string, string> = {
+  on: 'text-text-primary',
+  none: 'text-text-primary',
+  watch: 'text-warning',
+  miss: 'text-danger',
+};
+
+const StatCard = ({
+  title,
+  value,
+  unit,
+  rawValue,
+  targetType,
+  targetLabel,
+  sparkValues,
   subValue,
   kpiTheme,
   delta,
   previousValue,
+  variant = 'mini',
 }: {
   title: string;
   value: string;
+  unit?: string;
+  rawValue?: number | null;
+  targetType?: KpiType;
+  targetLabel?: string;
+  sparkValues?: Array<number | null | undefined>;
   subValue?: string;
   kpiTheme: string;
   delta?: number;
   previousValue?: string;
+  variant?: 'hero' | 'mini';
 }) => {
   let Icon = Users;
   if (kpiTheme.includes('productivity')) Icon = TrendingUp;
   else if (kpiTheme === 'csat') Icon = Star;
   else if (kpiTheme === 'sla') Icon = Clock;
   else if (kpiTheme === 'whu') Icon = Activity;
-  else if (kpiTheme === 'qa') Icon = CheckCircle;
+  else if (kpiTheme === 'qa') Icon = ClipboardCheck;
+  else if (kpiTheme === 'attendance') Icon = CheckCircle;
 
-  const color = kpiThemeColor(kpiTheme);
+  const status = targetType ? getKpiStatus(rawValue, targetType) : 'none';
+  const numberColor = STATUS_TEXT_CLASS[status] ?? 'text-text-primary';
+  const sparkColor =
+    status === 'miss' ? 'text-danger' : status === 'watch' ? 'text-warning' : 'text-text-muted';
   const isCompareMode = previousValue !== undefined;
+  const isHero = variant === 'hero';
 
   return (
-    <div className={`bg-card w-full border border-border rounded-lg p-4 lg:p-5 flex flex-col justify-start hover:border-border-strong transition-colors ${ isCompareMode ? 'h-36' : 'h-28' } relative overflow-visible`}>
-      <div className="flex items-center gap-2 mb-1.5 w-full">
-        <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-surface-muted border border-border">
-          <Icon size={12} style={{ color }} />
+    <div className={`bg-card w-full border border-border rounded-xl ${isHero ? 'p-4' : 'p-3'} flex flex-col gap-2 hover:border-border-strong transition-colors relative overflow-visible`}>
+      <div className="flex items-center gap-2 w-full">
+        <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-surface-muted border border-border">
+          <Icon size={11} className="text-text-muted" />
         </div>
-        <p className="min-w-0 flex-1 text-xs font-medium text-text-secondary tracking-wide truncate">{title}</p>
+        <p className="min-w-0 flex-1 text-[10px] font-medium text-text-muted tracking-[0.08em] uppercase truncate">{title}</p>
         <FormulaTooltip title={title} />
       </div>
 
-      {/* Current Period */}
-      <div className="flex items-baseline justify-between mt-auto">
-        <span className="text-[26px] font-semibold tracking-tight leading-none" style={{ color }}>
-          <CountUpValue value={value} />
-        </span>
-        {delta !== undefined && delta !== 0 && (
-          <div className={`flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${
-            delta > 0 ? 'text-success bg-success/10' : 'text-danger bg-danger/10'
-          }`}>
-            {delta > 0 ? '+' : '-'} {Math.abs(delta).toFixed(1)}
-          </div>
-        )}
+      <div className={`flex items-baseline gap-1 tabular-nums font-semibold tracking-tight leading-none ${numberColor} ${isHero ? 'text-[27px]' : 'text-[19px]'}`}>
+        <CountUpValue value={value} />
+        {unit && <span className="text-[13px] font-medium text-text-muted">{unit}</span>}
       </div>
 
-      {/* SubValue - shown as small grey text below main value */}
-      {subValue && !isCompareMode && (
-        <div className="mt-0.5">
-          <span className="text-[10px] font-medium text-text-muted italic">{subValue}</span>
+      {isHero && sparkValues && (
+        <div className={sparkColor}>
+          <Sparkline values={sparkValues} height={24} />
         </div>
       )}
 
-      {/* Previous Period - always visible when compare mode is ON */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {targetLabel && !isCompareMode && (
+          <span className={`inline-flex items-center text-[11px] tabular-nums rounded-md px-1.5 py-0.5 ${
+            status === 'miss'
+              ? 'text-danger bg-danger/10'
+              : status === 'watch'
+                ? 'text-warning bg-warning/10'
+                : 'text-text-muted bg-surface-muted'
+          }`}>
+            target {targetLabel}
+          </span>
+        )}
+        {isCompareMode && delta !== undefined && delta !== 0 && (
+          <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-md tabular-nums ${
+            delta > 0 ? 'text-success bg-success/10' : 'text-danger bg-danger/10'
+          }`}>
+            {delta > 0 ? '+' : '−'}{Math.abs(delta).toFixed(1)}
+          </span>
+        )}
+        {subValue && !isCompareMode && (
+          <span className="text-[10px] font-medium text-text-muted">{subValue}</span>
+        )}
+      </div>
+
       {isCompareMode && (
-        <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-border/60">
-          <span className="text-[9px] font-medium text-text-muted tracking-wide">Prev:</span>
-          <span className="text-sm font-semibold text-text-muted">{previousValue}</span>
+        <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/60">
+          <span className="text-[9px] font-medium text-text-muted uppercase tracking-wide">Prev</span>
+          <span className="text-[13px] font-semibold text-text-secondary tabular-nums">{previousValue}</span>
         </div>
       )}
     </div>
@@ -817,23 +922,32 @@ const WeeklyReportPanel = ({
 
   const showPrev3 = comparisonMode !== 'mom' && Boolean(hasPrev3);
 
-  const rows = [
-    { label: 'Total Productivity', curr: formatNum(currentStats.productivity, 0),  prev: formatNum(previousStats.productivity, 0), prev2: formatNum(previousStats2?.productivity || 0, 0), prev3: formatNum(previousStats3?.productivity || 0, 0), delta: currentStats.productivity - previousStats.productivity,   isCount: true,  target: null,  rawCurr: currentStats.productivity,    rawPrev: previousStats.productivity, rawPrev2: previousStats2?.productivity || 0, rawPrev3: previousStats3?.productivity || 0 },
-    { label: 'Avg Productivity',   curr: formatNum(currentStats.avgProductivity, 0),prev: formatNum(previousStats.avgProductivity, 0),prev2: formatNum(previousStats2?.avgProductivity || 0, 0),prev3: formatNum(previousStats3?.avgProductivity || 0, 0),delta: currentStats.avgProductivity - previousStats.avgProductivity,isCount: true,  target: 100,   rawCurr: currentStats.avgProductivity, rawPrev: previousStats.avgProductivity, rawPrev2: previousStats2?.avgProductivity || 0, rawPrev3: previousStats3?.avgProductivity || 0 },
-    { label: 'CSAT Official',      curr: formatNum(currentStats.csat),        prev: formatNum(previousStats.csat), prev2: formatNum(previousStats2?.csat || 0), prev3: formatNum(previousStats3?.csat || 0), delta: currentStats.csat - previousStats.csat,                     isCount: false, target: 3.75,    rawCurr: currentStats.csat,            rawPrev: previousStats.csat, rawPrev2: previousStats2?.csat || 0, rawPrev3: previousStats3?.csat || 0 },
-    { label: 'CSAT SC Full',       curr: formatNum(currentStats.csatScFull) + '%',  prev: formatNum(previousStats.csatScFull) + '%', prev2: formatNum(previousStats2?.csatScFull || 0) + '%', prev3: formatNum(previousStats3?.csatScFull || 0) + '%', delta: currentStats.csatScFull - previousStats.csatScFull,         isCount: false, target: 75,    rawCurr: currentStats.csatScFull,      rawPrev: previousStats.csatScFull, rawPrev2: previousStats2?.csatScFull || 0, rawPrev3: previousStats3?.csatScFull || 0 },
-    { label: 'CSAT SC After Takeout', curr: formatNum(currentStats.csatScFair) + '%', prev: formatNum(previousStats.csatScFair) + '%', prev2: formatNum(previousStats2?.csatScFair || 0) + '%', prev3: formatNum(previousStats3?.csatScFair || 0) + '%', delta: currentStats.csatScFair - previousStats.csatScFair, isCount: false, target: 92, rawCurr: currentStats.csatScFair, rawPrev: previousStats.csatScFair, rawPrev2: previousStats2?.csatScFair || 0, rawPrev3: previousStats3?.csatScFair || 0 },
-    { label: 'SLA 1 Menit',        curr: formatNum(currentStats.sla1m) + '%',       prev: formatNum(previousStats.sla1m) + '%', prev2: formatNum(previousStats2?.sla1m || 0) + '%', prev3: formatNum(previousStats3?.sla1m || 0) + '%', delta: currentStats.sla1m - previousStats.sla1m,                   isCount: false, target: 92,    rawCurr: currentStats.sla1m,           rawPrev: previousStats.sla1m, rawPrev2: previousStats2?.sla1m || 0, rawPrev3: previousStats3?.sla1m || 0 },
-    { label: 'SLA 3 Menit',        curr: formatNum(currentStats.sla3m) + '%',       prev: formatNum(previousStats.sla3m) + '%', prev2: formatNum(previousStats2?.sla3m || 0) + '%', prev3: formatNum(previousStats3?.sla3m || 0) + '%', delta: currentStats.sla3m - previousStats.sla3m,                   isCount: false, target: 96,    rawCurr: currentStats.sla3m,           rawPrev: previousStats.sla3m, rawPrev2: previousStats2?.sla3m || 0, rawPrev3: previousStats3?.sla3m || 0 },
-    { label: 'WHU (%)',             curr: formatNum(currentStats.whu) + '%',         prev: formatNum(previousStats.whu) + '%', prev2: formatNum(previousStats2?.whu || 0) + '%', prev3: formatNum(previousStats3?.whu || 0) + '%', delta: currentStats.whu - previousStats.whu,                       isCount: false, target: 96,    rawCurr: currentStats.whu,             rawPrev: previousStats.whu, rawPrev2: previousStats2?.whu || 0, rawPrev3: previousStats3?.whu || 0 },
-    { label: 'QA Score',           curr: formatNum(currentStats.qa) + '%',          prev: formatNum(previousStats.qa) + '%', prev2: formatNum(previousStats2?.qa || 0) + '%', prev3: formatNum(previousStats3?.qa || 0) + '%', delta: currentStats.qa - previousStats.qa,                         isCount: false, target: 92,    rawCurr: currentStats.qa,              rawPrev: previousStats.qa, rawPrev2: previousStats2?.qa || 0, rawPrev3: previousStats3?.qa || 0 },
-    { label: 'Attendance',         curr: formatNum(currentStats.attendance) + '%',  prev: formatNum(previousStats.attendance) + '%', prev2: formatNum(previousStats2?.attendance || 0) + '%', prev3: formatNum(previousStats3?.attendance || 0) + '%', delta: currentStats.attendance - previousStats.attendance,         isCount: false, target: 95,    rawCurr: currentStats.attendance,      rawPrev: previousStats.attendance, rawPrev2: previousStats2?.attendance || 0, rawPrev3: previousStats3?.attendance || 0 },
+  const rows: Array<{
+    label: string; curr: string; prev: string; prev2: string; prev3: string;
+    delta: number; isCount: boolean; noDelta?: boolean; target: number | null;
+    kpiType: KpiType | null;
+    rawCurr: number; rawPrev: number; rawPrev2: number; rawPrev3: number;
+  }> = [
+    { label: 'Total Productivity', curr: formatNum(currentStats.productivity, 0),  prev: formatNum(previousStats.productivity, 0), prev2: formatNum(previousStats2?.productivity || 0, 0), prev3: formatNum(previousStats3?.productivity || 0, 0), delta: currentStats.productivity - previousStats.productivity,   isCount: true, noDelta: true, target: null, kpiType: null,  rawCurr: currentStats.productivity,    rawPrev: previousStats.productivity, rawPrev2: previousStats2?.productivity || 0, rawPrev3: previousStats3?.productivity || 0 },
+    { label: 'Avg Productivity',   curr: formatNum(currentStats.avgProductivity, 0),prev: formatNum(previousStats.avgProductivity, 0),prev2: formatNum(previousStats2?.avgProductivity || 0, 0),prev3: formatNum(previousStats3?.avgProductivity || 0, 0),delta: currentStats.avgProductivity - previousStats.avgProductivity,isCount: true,  target: 100,   kpiType: 'productivity', rawCurr: currentStats.avgProductivity, rawPrev: previousStats.avgProductivity, rawPrev2: previousStats2?.avgProductivity || 0, rawPrev3: previousStats3?.avgProductivity || 0 },
+    { label: 'CSAT Official',      curr: formatNum(currentStats.csat),        prev: formatNum(previousStats.csat), prev2: formatNum(previousStats2?.csat || 0), prev3: formatNum(previousStats3?.csat || 0), delta: currentStats.csat - previousStats.csat,                     isCount: false, target: 3.75,    kpiType: 'csatOfficial', rawCurr: currentStats.csat,            rawPrev: previousStats.csat, rawPrev2: previousStats2?.csat || 0, rawPrev3: previousStats3?.csat || 0 },
+    { label: 'CSAT SC Full',       curr: formatNum(currentStats.csatScFull) + '%',  prev: formatNum(previousStats.csatScFull) + '%', prev2: formatNum(previousStats2?.csatScFull || 0) + '%', prev3: formatNum(previousStats3?.csatScFull || 0) + '%', delta: currentStats.csatScFull - previousStats.csatScFull,         isCount: false, target: 75,    kpiType: 'csatFull', rawCurr: currentStats.csatScFull,      rawPrev: previousStats.csatScFull, rawPrev2: previousStats2?.csatScFull || 0, rawPrev3: previousStats3?.csatScFull || 0 },
+    { label: 'CSAT SC After Takeout', curr: formatNum(currentStats.csatScFair) + '%', prev: formatNum(previousStats.csatScFair) + '%', prev2: formatNum(previousStats2?.csatScFair || 0) + '%', prev3: formatNum(previousStats3?.csatScFair || 0) + '%', delta: currentStats.csatScFair - previousStats.csatScFair, isCount: false, target: 92, kpiType: 'csatFair', rawCurr: currentStats.csatScFair, rawPrev: previousStats.csatScFair, rawPrev2: previousStats2?.csatScFair || 0, rawPrev3: previousStats3?.csatScFair || 0 },
+    { label: 'SLA 1 Menit',        curr: formatNum(currentStats.sla1m) + '%',       prev: formatNum(previousStats.sla1m) + '%', prev2: formatNum(previousStats2?.sla1m || 0) + '%', prev3: formatNum(previousStats3?.sla1m || 0) + '%', delta: currentStats.sla1m - previousStats.sla1m,                   isCount: false, target: 92,    kpiType: 'sla1m', rawCurr: currentStats.sla1m,           rawPrev: previousStats.sla1m, rawPrev2: previousStats2?.sla1m || 0, rawPrev3: previousStats3?.sla1m || 0 },
+    { label: 'SLA 3 Menit',        curr: formatNum(currentStats.sla3m) + '%',       prev: formatNum(previousStats.sla3m) + '%', prev2: formatNum(previousStats2?.sla3m || 0) + '%', prev3: formatNum(previousStats3?.sla3m || 0) + '%', delta: currentStats.sla3m - previousStats.sla3m,                   isCount: false, target: 96,    kpiType: 'sla3m', rawCurr: currentStats.sla3m,           rawPrev: previousStats.sla3m, rawPrev2: previousStats2?.sla3m || 0, rawPrev3: previousStats3?.sla3m || 0 },
+    { label: 'WHU (%)',             curr: formatNum(currentStats.whu) + '%',         prev: formatNum(previousStats.whu) + '%', prev2: formatNum(previousStats2?.whu || 0) + '%', prev3: formatNum(previousStats3?.whu || 0) + '%', delta: currentStats.whu - previousStats.whu,                       isCount: false, target: 96,    kpiType: 'whu', rawCurr: currentStats.whu,             rawPrev: previousStats.whu, rawPrev2: previousStats2?.whu || 0, rawPrev3: previousStats3?.whu || 0 },
+    { label: 'QA Score',           curr: formatNum(currentStats.qa) + '%',          prev: formatNum(previousStats.qa) + '%', prev2: formatNum(previousStats2?.qa || 0) + '%', prev3: formatNum(previousStats3?.qa || 0) + '%', delta: currentStats.qa - previousStats.qa,                         isCount: false, target: 92,    kpiType: 'qa', rawCurr: currentStats.qa,              rawPrev: previousStats.qa, rawPrev2: previousStats2?.qa || 0, rawPrev3: previousStats3?.qa || 0 },
+    { label: 'Attendance',         curr: formatNum(currentStats.attendance) + '%',  prev: formatNum(previousStats.attendance) + '%', prev2: formatNum(previousStats2?.attendance || 0) + '%', prev3: formatNum(previousStats3?.attendance || 0) + '%', delta: currentStats.attendance - previousStats.attendance,         isCount: false, target: 95,    kpiType: 'attendance', rawCurr: currentStats.attendance,      rawPrev: previousStats.attendance, rawPrev2: previousStats2?.attendance || 0, rawPrev3: previousStats3?.attendance || 0 },
   ];
 
-  const reportRef = useRef<HTMLDivElement>(null);
+  const cellClass = (rawVal: number, kpiType: KpiType | null) => {
+    if (kpiType === null) return 'text-text-primary';
+    const st = getKpiStatus(rawVal, kpiType);
+    return st === 'miss' ? 'text-danger' : st === 'watch' ? 'text-warning' : 'text-text-primary';
+  };
 
   return (
-    <div ref={reportRef} className="bg-card border border-border rounded-xl shadow-sm overflow-hidden mb-6 relative group">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden mb-6 relative group">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border bg-surface/40">
         <div className="flex items-center gap-3">
@@ -901,26 +1015,6 @@ const WeeklyReportPanel = ({
             {rows.map((row, i) => {
               const isUp = row.delta > 0;
               const isFlat = Math.abs(row.delta) < 0.01;
-              // Determine color: if no target, use neutral; otherwise green if meets target, red if not
-              const meetsTarget = row.target === null ? null : row.rawCurr >= row.target;
-              const currColor = meetsTarget === null
-                ? 'text-text-primary'
-                : meetsTarget ? 'text-success' : 'text-danger';
-
-              const meetsPrevTarget = row.target === null ? null : row.rawPrev >= row.target;
-              const prevColor = meetsPrevTarget === null
-                ? 'text-text-primary'
-                : meetsPrevTarget ? 'text-success' : 'text-danger';
-                
-              const meetsPrev2Target = row.target === null ? null : row.rawPrev2 >= row.target;
-              const prev2Color = meetsPrev2Target === null
-                ? 'text-text-primary'
-                : meetsPrev2Target ? 'text-success' : 'text-danger';
-                
-              const meetsPrev3Target = row.target === null ? null : row.rawPrev3 >= row.target;
-              const prev3Color = meetsPrev3Target === null
-                ? 'text-text-primary'
-                : meetsPrev3Target ? 'text-success' : 'text-danger';
 
               return (
                 <tr key={i} className={`border-b border-border/50 transition-colors ${ i % 2 === 0 ? 'bg-surface/20' : '' }`}>
@@ -933,20 +1027,18 @@ const WeeklyReportPanel = ({
                   <td className="px-4 py-3 text-right text-[12px] font-medium text-text-muted">
                     {row.target !== null ? row.label === 'CSAT Official' ? formatNum(row.target) : `${row.target}%` : '-'}
                   </td>
-                  <td className={`px-4 py-3 text-right font-bold text-[14px] ${currColor}`}>
+                  <td className={`px-4 py-3 text-right font-bold text-[14px] ${cellClass(row.rawCurr, row.kpiType)}`}>
                     {row.curr}
                   </td>
-                  <td className={`px-4 py-3 text-right text-[14px] font-bold ${prevColor}`}>{row.prev}</td>
-                  {hasPrev2 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev2Color}`}>{row.prev2}</td>}
-                  {showPrev3 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${prev3Color}`}>{row.prev3}</td>}
+                  <td className={`px-4 py-3 text-right text-[14px] font-bold ${cellClass(row.rawPrev, row.kpiType)}`}>{row.prev}</td>
+                  {hasPrev2 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${cellClass(row.rawPrev2, row.kpiType)}`}>{row.prev2}</td>}
+                  {showPrev3 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${cellClass(row.rawPrev3, row.kpiType)}`}>{row.prev3}</td>}
                   <td className="px-5 py-3 text-right">
-                    {isFlat ? (
-                      <span className="text-[11px] font-semibold text-text-muted">-</span>
+                    {row.noDelta || isFlat ? (
+                      <span className="text-[11px] font-semibold text-text-muted">–</span>
                     ) : (
-                      <span className={`inline-flex items-center gap-1 text-[12px] font-bold px-2 py-0.5 rounded-full ${
-                        isUp ? 'text-success bg-success/10' : 'text-danger bg-danger/10'
-                      }`}>
-                        {isUp ? '+' : '-'}
+                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold tabular-nums text-text-muted">
+                        {isUp ? '▲' : '▼'}
                         {Math.abs(row.delta).toFixed(row.isCount ? 0 : 2)}
                         {row.isCount ? '' : ' poin'}
                       </span>

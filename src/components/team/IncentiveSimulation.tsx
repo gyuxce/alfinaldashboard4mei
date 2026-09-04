@@ -1,44 +1,22 @@
 import React, { useMemo, useRef } from "react";
-import { Calculator, CheckCircle2, CircleAlert, FileText, Info, KeyRound, LockKeyhole, User, Users, X, Download } from "lucide-react";
-import { useShallow } from "zustand/react/shallow";
-import { useStore } from "../../store";
+import { Calculator, CheckCircle2, CircleAlert, FileText, KeyRound, LockKeyhole, User, Users, X } from "lucide-react";
+import { AgentKPI } from "../../lib/dataProcessor";
 import {
-  AgentKPI,
-  getCsatBadRatingCount,
-} from "../../lib/dataProcessor";
+  DAILY_LIVECHAT_TARGET,
+  TEAM_LEADER_GROSS_SALARY,
+  bestLeaderBonusPerTeamLeader,
+  buildIncentiveRow,
+  getCsatStats,
+  getTeamLeaderTier,
+  type IncentiveRow,
+  type IncentiveStatus,
+} from "../../lib/incentiveScoring";
 import { cn, formatNum } from "../../lib/utils";
-import { downloadCsv } from "../../lib/exportCsv";
-import { VirtualizedTbody } from "../ui/VirtualizedTbody";
+import { isInactiveAgent } from "../../lib/inactiveAgents";
+import { IncompleteDataNotice } from "../ui/IncompleteDataNotice";
 import { useVirtualRows } from "../../hooks/useVirtualRows";
 
-const DAILY_LIVECHAT_TARGET = 100;
-const LIVECHAT_PRODUCTIVITY_BONUS_PER_100 = 40000;
 const TEAM_LEADER_ACCESS_PIN = "170845";
-const TEAM_LEADER_BEST_BONUS = 500000;
-// PKWT TL: gaji Rp2.828.000 + jabatan Rp1.000.000 + transport Rp500.000 per bulan.
-const TEAM_LEADER_GROSS_SALARY = 4328000;
-
-type IncentiveStatus = "eligible" | "ineligible" | "incomplete";
-
-interface IncentiveRow {
-  csId: string;
-  name: string;
-  teamLeader: string;
-  qaPct: number | null;
-  qaPoints: number | null;
-  csatPct: number | null;
-  csatPoints: number | null;
-  productivityActual: number | null;
-  productivityTarget: number | null;
-  productivityPct: number | null;
-  productivityPoints: number | null;
-  totalScore: number | null;
-  tier: string;
-  baseIncentive: number | null;
-  productivityBonus: number | null;
-  totalIncentive: number | null;
-  status: IncentiveStatus;
-}
 
 interface TeamLeaderIncentiveRow {
   teamLeader: string;
@@ -80,115 +58,6 @@ const formatDateLabel = (date: string) => {
 };
 
 
-const normalizeAgentName = (value: string) =>
-  value.trim().replace(/\s+/g, " ").toLowerCase();
-
-const isInactiveAgent = (agent: Pick<AgentKPI, "name">, periodEnd: string) =>
-  normalizeAgentName(agent.name || "") === "edgar gasita adhigama" &&
-  (periodEnd || "").slice(0, 7) >= "2026-06";
-
-const getQcPoints = (qaPct: number) => {
-  if (qaPct >= 98) return 55;
-  if (qaPct >= 95) return 48.4;
-  if (qaPct >= 90) return 38.5;
-  if (qaPct >= 85) return 24.75;
-  if (qaPct >= 80) return 11;
-  return 0;
-};
-
-const getTier = (score: number) => {
-  if (score >= 96) return { label: "T1", incentive: 2000000 };
-  if (score >= 88) return { label: "T2", incentive: 1250000 };
-  if (score >= 80) return { label: "T3", incentive: 750000 };
-  return { label: "-", incentive: 0 };
-};
-
-const getTeamLeaderTier = (score: number) => {
-  if (score >= 90) return { label: "T1", incentive: 2000000 };
-  if (score >= 85) return { label: "T2", incentive: 1250000 };
-  if (score >= 80) return { label: "T3", incentive: 750000 };
-  return { label: "-", incentive: 0 };
-};
-
-const getCsatStats = (agent: AgentKPI) => {
-  const good = agent.csat4Count + agent.csat5Count;
-  const bad = getCsatBadRatingCount(agent);
-
-  return { good, bad, total: good + bad };
-};
-
-const getCsatPercent = (agent: AgentKPI) => {
-  const { good, total } = getCsatStats(agent);
-  return total > 0 ? (good / total) * 100 : null;
-};
-
-const buildIncentiveRow = (agent: AgentKPI): IncentiveRow => {
-  const qaPct = agent.qaScoreCount > 0
-    ? agent.qaScoreSum / agent.qaScoreCount
-    : null;
-  const csatPct = getCsatPercent(agent);
-  const productivityTarget = agent.manDays > 0
-    ? agent.manDays * DAILY_LIVECHAT_TARGET
-    : null;
-  const productivityActual = productivityTarget !== null
-    ? agent.productivityTotal
-    : null;
-  const hasCompleteData = qaPct !== null && csatPct !== null && productivityActual !== null;
-
-  if (!hasCompleteData) {
-    return {
-      csId: agent.csId,
-      name: agent.name || agent.csId,
-      teamLeader: agent.teamLeader || "-",
-      qaPct,
-      qaPoints: null,
-      csatPct,
-      csatPoints: null,
-      productivityActual,
-      productivityTarget,
-      productivityPct: productivityTarget ? (productivityActual! / productivityTarget) * 100 : null,
-      productivityPoints: null,
-      totalScore: null,
-      tier: "-",
-      baseIncentive: null,
-      productivityBonus: null,
-      totalIncentive: null,
-      status: "incomplete",
-    };
-  }
-
-  const qaPoints = getQcPoints(qaPct);
-  const csatPoints = (csatPct / 100) * 25;
-  const productivityPct = (productivityActual / productivityTarget!) * 100;
-  const productivityPoints = Math.min(productivityPct, 100) / 100 * 20;
-  const totalScore = qaPoints + csatPoints + productivityPoints;
-  const tier = getTier(totalScore);
-  const isEligible = tier.label !== "-";
-  const productivityBonus = isEligible
-    ? Math.max(0, productivityActual - productivityTarget!) / 100 * LIVECHAT_PRODUCTIVITY_BONUS_PER_100
-    : 0;
-
-  return {
-    csId: agent.csId,
-    name: agent.name || agent.csId,
-    teamLeader: agent.teamLeader || "-",
-    qaPct,
-    qaPoints,
-    csatPct,
-    csatPoints,
-    productivityActual,
-    productivityTarget,
-    productivityPct,
-    productivityPoints,
-    totalScore,
-    tier: tier.label,
-    baseIncentive: tier.incentive,
-    productivityBonus,
-    totalIncentive: tier.incentive + productivityBonus,
-    status: isEligible ? "eligible" : "ineligible",
-  };
-};
-
 const statusLabel: Record<IncentiveStatus, string> = {
   eligible: "Eligible",
   ineligible: "Tidak eligible",
@@ -222,6 +91,155 @@ const SummaryCard = ({
   </div>
 );
 
+/** One row in the rank list — normalised from either an agent or a TL row. */
+type ListItem = {
+  id: string;
+  name: string;
+  meta: string;
+  qcPts: number;
+  csatPts: number;
+  prodPts: number;
+  qcPct: number | null;
+  csatPct: number | null;
+  prodPct: number | null;
+  score: number | null;
+  tier: string;
+  status: IncentiveStatus;
+  total: number | null;
+};
+
+/** Monochrome KPI progress bar for the detail drawer (colour-discipline: no KPI hue). */
+const KpiBar = ({
+  label,
+  weight,
+  pct,
+  points,
+  maxPoints,
+}: {
+  label: string;
+  weight: string;
+  pct: number | null;
+  points: number;
+  maxPoints: number;
+}) => {
+  const width = Math.min((points / maxPoints) * 100, 100);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium text-text-muted">{label} ({weight})</span>
+        <span className="font-semibold tabular-nums text-text-primary">
+          {pct !== null ? `${formatNum(pct, 1)}%` : "–"}
+          <span className="ml-1 font-normal text-text-muted">· {formatNum(points, 1)}/{maxPoints}</span>
+        </span>
+      </div>
+      <div className="relative h-2 overflow-hidden rounded-full bg-border">
+        <div className="absolute inset-y-0 left-0 rounded-full bg-text-secondary" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
+};
+
+/** Score + incentive breakdown for one agent / TL — used in the side drawer. */
+const IncentiveDetail = ({
+  item,
+  mode,
+  rawAgent,
+  rawTl,
+  rank,
+  onClose,
+}: {
+  item: ListItem;
+  mode: "agent" | "tl";
+  rawAgent?: IncentiveRow;
+  rawTl?: TeamLeaderIncentiveRow;
+  rank: number;
+  onClose: () => void;
+}) => {
+  const breakdown: { label: string; value: string; tone?: "success" | "muted" }[] =
+    mode === "agent"
+      ? [
+          { label: "Tier", value: item.tier === "-" ? "Tidak eligible" : item.tier },
+          { label: "Insentif tier", value: formatCurrency(rawAgent?.baseIncentive ?? null) },
+          { label: "Bonus produktivitas", value: formatCurrency(rawAgent?.productivityBonus ?? null), tone: "success" },
+          { label: "Total insentif", value: formatCurrency(rawAgent?.totalIncentive ?? null) },
+        ]
+      : [
+          { label: "Tier TL", value: item.tier === "-" ? "Tidak eligible" : item.tier },
+          { label: "Insentif tier", value: formatCurrency(rawTl?.baseIncentive ?? null) },
+          { label: "Bagian bonus TL", value: formatCurrency(rawTl?.bestLeaderBonus ?? null), tone: "success" },
+          { label: "Total insentif", value: formatCurrency(rawTl?.totalIncentive ?? null) },
+          { label: "Gaji gross", value: formatCurrency(rawTl?.grossSalary ?? null), tone: "muted" },
+          { label: "THP gross", value: formatCurrency(rawTl?.grossThp ?? null) },
+        ];
+
+  return (
+    <>
+      <div className="mb-4 flex items-start justify-between">
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-text-primary">Rincian Insentif</h2>
+          <p className="mt-0.5 truncate text-xs text-text-secondary">
+            {item.name}
+            {mode === "agent" && rawAgent?.csId ? ` · ${rawAgent.csId}` : ""}
+            {mode === "agent" && rawAgent?.teamLeader ? ` · TL ${rawAgent.teamLeader}` : ""}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-xs text-text-muted">Rank #{rank}</span>
+            <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-text-secondary">
+              Skor {item.score !== null ? formatNum(item.score, 1) : "–"}
+            </span>
+            <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", statusClass[item.status])}>
+              {statusLabel[item.status]}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-surface-muted hover:text-text-primary"
+          aria-label="Tutup"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Skor KPI</h3>
+        <KpiBar label="QC audit" weight="55%" pct={item.qcPct} points={item.qcPts} maxPoints={55} />
+        <KpiBar label="CSAT (QC tagging)" weight="25%" pct={item.csatPct} points={item.csatPts} maxPoints={25} />
+        <KpiBar
+          label="Produktivitas"
+          weight="20%"
+          pct={item.prodPct !== null ? Math.min(item.prodPct, 100) : null}
+          points={item.prodPts}
+          maxPoints={20}
+        />
+        <p className="text-[10px] text-text-muted">
+          Total skor {item.score !== null ? formatNum(item.score, 2) : "–"} / 100. Kuis &amp; training wajib, tidak menambah skor.
+        </p>
+      </div>
+
+      <div className="mt-5 border-t border-border pt-4">
+        <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Insentif</h3>
+        <div className="space-y-2">
+          {breakdown.map((r) => (
+            <div key={r.label} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-[11px]">
+              <span className="text-text-muted">{r.label}</span>
+              <span className={cn(
+                "font-bold tabular-nums",
+                r.tone === "success" ? "text-success-text" : r.tone === "muted" ? "text-text-secondary" : "text-text-primary",
+              )}>{r.value}</span>
+            </div>
+          ))}
+        </div>
+        {mode === "tl" && (
+          <p className="mt-3 text-[11px] text-text-secondary">
+            <strong className="text-text-primary">Cara baca:</strong> persentase QC/CSAT/Prod adalah ringkasan tim; skor akhir dihitung dari rata-rata poin agent. THP gross belum dipotong pajak/BPJS dan belum termasuk lembur, hari libur, atau shift malam.
+          </p>
+        )}
+      </div>
+    </>
+  );
+};
+
 export const IncentiveSimulation: React.FC<{
   data: AgentKPI[];
   period: { start: string; end: string };
@@ -231,16 +249,19 @@ export const IncentiveSimulation: React.FC<{
   const [isPinDialogOpen, setIsPinDialogOpen] = React.useState(false);
   const [pinInput, setPinInput] = React.useState("");
   const [pinError, setPinError] = React.useState("");
-  const {
-    startDate,
-    endDate,
-  } = useStore(useShallow((s) => ({
-    startDate: s.startDate,
-    endDate: s.endDate,
-  })));
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedId(null);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
 
   const openTlView = () => {
     if (isTlUnlocked) {
+      setSelectedId(null);
       setViewMode("tl");
       return;
     }
@@ -259,6 +280,7 @@ export const IncentiveSimulation: React.FC<{
     setIsPinDialogOpen(false);
     setPinInput("");
     setPinError("");
+    setSelectedId(null);
     setViewMode("tl");
   };
 
@@ -281,13 +303,6 @@ export const IncentiveSimulation: React.FC<{
         if (b.totalScore === null) return -1;
         return b.totalScore - a.totalScore;
       }), [filteredAgents]);
-
-  const agentTableScrollRef = useRef<HTMLDivElement>(null);
-  const agentTableVirtual = useVirtualRows({
-    count: rows.length,
-    rowHeight: 52,
-    scrollRef: agentTableScrollRef,
-  });
 
   const teamLeaderRows = useMemo(() => {
     const grouped = new Map<string, AgentKPI[]>();
@@ -397,15 +412,17 @@ export const IncentiveSimulation: React.FC<{
     const teamLeaderCount = new Set(
       simulationRoster.map((agent) => String(agent.teamLeader || "-").trim() || "-"),
     ).size;
-    const bonusPerEligibleTeamLeader = teamLeaderCount > 0
-      ? TEAM_LEADER_BEST_BONUS / teamLeaderCount
-      : 0;
+    // Pool bonus TL terbaik (Rp500.000) dibagi RATA ke seluruh TL, bukan hanya
+    // yang eligible. Contoh 5 TL: masing-masing dapat Rp100.000.
+    const bestBonusPerTeamLeader = bestLeaderBonusPerTeamLeader(teamLeaderCount);
 
     return leaderRows.map((row) => {
-      const bestLeaderBonus = row.status === "eligible" ? bonusPerEligibleTeamLeader : 0;
-      const totalIncentive = row.status === "eligible"
-        ? (row.baseIncentive || 0) + bestLeaderBonus
-        : row.totalIncentive;
+      // TL dengan data belum lengkap (totalIncentive null) tidak bisa dihitung
+      // THP-nya, jadi bagiannya dibiarkan kosong.
+      const bestLeaderBonus = row.totalIncentive === null ? 0 : bestBonusPerTeamLeader;
+      const totalIncentive = row.totalIncentive === null
+        ? null
+        : (row.totalIncentive || 0) + bestLeaderBonus;
       return {
         ...row,
         bestLeaderBonus,
@@ -415,13 +432,76 @@ export const IncentiveSimulation: React.FC<{
     });
   }, [filteredAgents, simulationRoster]);
 
+  // One normalised shape for the rank list, whichever view is active.
+  const activeItems = useMemo<ListItem[]>(() => {
+    if (viewMode === "agent") {
+      return rows.map((row) => ({
+        id: row.csId,
+        name: row.name,
+        meta: row.csId,
+        qcPts: row.qaPoints ?? 0,
+        csatPts: row.csatPoints ?? 0,
+        prodPts: row.productivityPoints ?? 0,
+        qcPct: row.qaPct,
+        csatPct: row.csatPct,
+        prodPct: row.productivityPct,
+        score: row.totalScore,
+        tier: row.tier,
+        status: row.status,
+        total: row.totalIncentive,
+      }));
+    }
+    return teamLeaderRows.map((row) => ({
+      id: row.teamLeader,
+      name: row.teamLeader,
+      meta: `${row.agentCount} agent`,
+      qcPts: row.averageQaPoints ?? 0,
+      csatPts: row.averageCsatPoints ?? 0,
+      prodPts: row.averageProductivityPoints ?? 0,
+      qcPct: row.finalQaPct,
+      csatPct: row.finalCsatPct,
+      prodPct: row.finalProductivityPct,
+      score: row.finalScore,
+      tier: row.tier,
+      status: row.status,
+      total: row.totalIncentive,
+    }));
+  }, [viewMode, rows, teamLeaderRows]);
+
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  const listVirtual = useVirtualRows({
+    count: activeItems.length,
+    rowHeight: 56,
+    scrollRef: listScrollRef,
+  });
+
+  const selectedItem = selectedId ? activeItems.find((i) => i.id === selectedId) ?? null : null;
+  const selectedRank = selectedId ? activeItems.findIndex((i) => i.id === selectedId) + 1 : 0;
+  const selectedRawAgent = viewMode === "agent" && selectedId
+    ? rows.find((r) => r.csId === selectedId)
+    : undefined;
+  const selectedRawTl = viewMode === "tl" && selectedId
+    ? teamLeaderRows.find((r) => r.teamLeader === selectedId)
+    : undefined;
+
   const eligibleRows = rows.filter((row) => row.status === "eligible");
   const ineligibleRows = rows.filter((row) => row.status === "ineligible");
+  const incompleteRows = rows.filter((row) => row.status === "incomplete");
+  const dataIssues: string[] = [];
+  if (incompleteRows.length > 0) {
+    dataIssues.push(
+      `${incompleteRows.length} agent berstatus "Data belum lengkap" (QA / CSAT / produktivitas belum ada) — tidak dapat tier insentif.`,
+    );
+  }
   const totalIncentive = eligibleRows.reduce(
     (sum, row) => sum + (row.totalIncentive || 0),
     0,
   );
   const hasData = safeData.length > 0 || filteredAgents.length > 0;
+  // Roster resolved but the incentive period itself has no QA/CSAT/productivity
+  // rows (e.g. an un-populated month) — every agent is "Data belum lengkap".
+  const incentivePeriodEmpty = rows.length > 0 && rows.every((r) => r.status === "incomplete")
+    && filteredAgents.every((a) => a.manDays === 0 && a.qaScoreCount === 0 && a.productivityBase === 0);
   const teamLeaderAgentCount = teamLeaderRows.reduce((sum, row) => sum + row.agentCount, 0);
   const teamLeaderIneligibleCount = teamLeaderRows.reduce(
     (sum, row) => sum + (row.status === "ineligible" ? 1 : 0),
@@ -432,71 +512,50 @@ export const IncentiveSimulation: React.FC<{
     (sum, row) => sum + (row.grossThp || 0),
     0,
   );
+
+  const gridCols = "grid-cols-[32px_minmax(0,1fr)_104px_112px_104px]";
+
   return (
-    <div className="flex flex-col gap-5 p-2">
-      <div>
+    <div className="flex flex-col gap-4 p-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
           <Calculator className="h-5 w-5 text-primary" />
-          Simulasi Insentif Baru
+          Simulasi Insentif
         </h2>
-        <p className="mt-1 text-[13px] text-text-secondary">
-          Skema Livechat berdasarkan data periode yang sudah selesai.
-        </p>
-        <p className="mt-1 text-[11px] text-text-muted">
-          KPI: {formatDateLabel(safePeriod.start)} s/d {formatDateLabel(safePeriod.end)}; roster TL dan agent: {formatDateLabel(startDate)} s/d {formatDateLabel(endDate)}.
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
-          <span className="rounded-full border border-border bg-surface px-2.5 py-1">
-            QC 55% + CSAT 25% + Produktivitas 20%
-          </span>
-        </div>
-        <p className="mt-1.5 text-[11px] text-text-muted">
-          CSAT dari <strong>QA CSAT/DSAT tagging</strong> (QC audit), bukan CSAT SC survey. Angka bisa beda dengan Dashboard Summary.
-        </p>
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            onClick={() => downloadCsv(
-              `insentif_${safePeriod.start}_${safePeriod.end}.csv`,
-              rows,
-              [
-                { key: 'name', label: 'Agent' },
-                { key: 'csId', label: 'CS ID' },
-                { key: 'teamLeader', label: 'Team Leader' },
-                { key: 'qaPct', label: 'QA %' },
-                { key: 'qaPoints', label: 'QA Points' },
-                { key: 'csatPct', label: 'CSAT %' },
-                { key: 'csatPoints', label: 'CSAT Points' },
-                { key: 'productivityPoints', label: 'Prod Points' },
-                { key: 'totalScore', label: 'Total Score' },
-                { key: 'tier', label: 'Tier' },
-                { key: 'baseIncentive', label: 'Insentif' },
-                { key: 'totalIncentive', label: 'Total' },
-                { key: 'status', label: 'Status' },
-              ],
-            )}
-            className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-[10px] font-medium text-text-secondary hover:bg-primary-soft hover:text-primary transition-colors"
-          >
-            <Download size={12} />
-            Export CSV
-          </button>
-        </div>
+        <span className="text-[11px] tabular-nums text-text-muted">
+          Periode: {formatDateLabel(safePeriod.start)} &ndash; {formatDateLabel(safePeriod.end)}
+        </span>
       </div>
 
       {!hasData ? (
         <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
           <FileText className="mx-auto h-10 w-10 text-text-muted" />
           <p className="mt-3 text-sm font-semibold text-text-primary">Data simulasi belum tersedia</p>
-          <p className="mt-1 text-xs text-text-muted">Sync data periode sebelumnya melalui File Center.</p>
+          <p className="mt-1 text-xs text-text-muted">Sync data melalui File Center.</p>
+        </div>
+      ) : incentivePeriodEmpty ? (
+        <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
+          <FileText className="mx-auto h-10 w-10 text-text-muted" />
+          <p className="mt-3 text-sm font-semibold text-text-primary">
+            Data periode insentif ({formatDateLabel(safePeriod.start)} &ndash; {formatDateLabel(safePeriod.end)}) belum tersedia
+          </p>
+          <p className="mt-1 text-xs text-text-muted">
+            Roster {rows.length} agent terbaca, tapi tab QA / CSAT SC / Productivity / SLA / Schedule bulan itu masih kosong di spreadsheet. Isi datanya lalu Sync ulang.
+          </p>
         </div>
       ) : (
         <>
+          <IncompleteDataNotice
+            title="Simulasi di bawah ini belum final — data tidak lengkap."
+            issues={dataIssues}
+          />
           <div className="inline-flex w-max items-center gap-1 rounded-lg bg-surface-muted p-1">
             <button
               type="button"
-              onClick={() => setViewMode("agent")}
+              onClick={() => { setSelectedId(null); setViewMode("agent"); }}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors",
-                viewMode === "agent" ? "bg-card text-primary shadow-sm" : "text-text-muted hover:text-text-primary",
+                viewMode === "agent" ? "bg-card text-text-primary shadow-sm" : "text-text-muted hover:text-text-primary",
               )}
             >
               <User className="h-3.5 w-3.5" /> Agents
@@ -506,7 +565,7 @@ export const IncentiveSimulation: React.FC<{
               onClick={openTlView}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors",
-                viewMode === "tl" ? "bg-card text-primary shadow-sm" : "text-text-muted hover:text-text-primary",
+                viewMode === "tl" ? "bg-card text-text-primary shadow-sm" : "text-text-muted hover:text-text-primary",
               )}
             >
               {isTlUnlocked ? <Users className="h-3.5 w-3.5" /> : <LockKeyhole className="h-3.5 w-3.5" />} Team Leaders
@@ -574,178 +633,142 @@ export const IncentiveSimulation: React.FC<{
             )}
           </div>
 
-          <section className="rounded-lg border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <div className="flex flex-col gap-2 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-text-primary">
-                  {viewMode === "agent" ? "Simulasi per Agent" : "Simulasi per Team Leader"}
-                </h3>
-                <p className="mt-0.5 text-[11px] text-text-muted">
-                  {viewMode === "agent"
-                    ? "Nilai produktivitas di atas target menghasilkan bonus tambahan."
-                    : "Skor TL memakai rata-rata KPI agent; QA dihitung dari rata-rata persentase QA agent."}
-                </p>
+          <div className="flex flex-col gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">
+                {viewMode === "agent" ? "Simulasi per Agent" : "Simulasi per Team Leader"}
+              </h3>
+              <p className="mt-0.5 text-[11px] text-text-muted">
+                {viewMode === "agent"
+                  ? "Klik baris untuk rincian skor & insentif. Produktivitas di atas target menambah bonus."
+                  : "Klik baris untuk rincian. Skor TL memakai rata-rata KPI agent; QA dari rata-rata persentase QA agent."}
+              </p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+              {/* rank list */}
+              <div
+                ref={listScrollRef}
+                className="max-h-[calc(100vh-240px)] overflow-y-auto rounded-xl border border-border bg-card"
+              >
+                <div className={cn("sticky top-0 z-10 grid gap-3 border-b border-border bg-surface px-4 py-2.5 text-[10px] font-medium uppercase tracking-wide text-text-muted", gridCols)}>
+                  <span className="text-center">#</span>
+                  <span>{viewMode === "agent" ? "Agent" : "Team Leader"}</span>
+                  <span>Kontribusi poin</span>
+                  <span>QC · CSAT · Prod</span>
+                  <span className="text-right">Insentif</span>
+                </div>
+
+                {activeItems.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-text-muted">
+                    {viewMode === "agent"
+                      ? "Tidak ada agent pada filter yang dipilih."
+                      : "Tidak ada Team Leader pada filter yang dipilih."}
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ height: listVirtual.paddingTop }} aria-hidden />
+                    {listVirtual.virtualIndexes.map((idx) => {
+                      const item = activeItems[idx];
+                      if (!item) return null;
+                      const rank = idx + 1;
+                      const isSel = selectedId === item.id;
+                      const rest = Math.max(0, 100 - item.qcPts - item.csatPts - item.prodPts);
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setSelectedId(item.id)}
+                          className={cn(
+                            "grid w-full items-center gap-3 border-b border-border/60 px-4 py-3 text-left transition-colors",
+                            gridCols,
+                            isSel ? "bg-surface-muted" : "hover:bg-surface-muted/60",
+                          )}
+                        >
+                          <span className={cn("text-center text-[12px] font-bold tabular-nums", rank <= 3 ? "text-text-primary" : "text-text-muted")}>{rank}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-[13px] font-semibold text-text-primary" title={item.name}>{item.name}</span>
+                            <span className="block truncate text-[10px] text-text-muted">{item.meta}</span>
+                          </span>
+                          <span
+                            className="flex h-2 overflow-hidden rounded-full bg-surface-muted"
+                            title={`QC ${item.qcPts.toFixed(1)} · CSAT ${item.csatPts.toFixed(1)} · Prod ${item.prodPts.toFixed(1)}`}
+                          >
+                            <span className="bg-text-secondary" style={{ width: `${item.qcPts}%` }} />
+                            <span className="bg-text-muted" style={{ width: `${item.csatPts}%` }} />
+                            <span className="bg-border-strong" style={{ width: `${item.prodPts}%` }} />
+                            <span className="bg-border" style={{ width: `${rest}%` }} />
+                          </span>
+                          <span className="truncate text-[11px] tabular-nums text-text-secondary">
+                            {item.qcPct !== null ? formatNum(item.qcPct, 1) : "–"}
+                            <span className="text-text-disabled"> · </span>
+                            {item.csatPct !== null ? formatNum(item.csatPct, 1) : "–"}
+                            <span className="text-text-disabled"> · </span>
+                            {item.prodPct !== null ? formatNum(Math.min(item.prodPct, 999), 0) + "%" : "–"}
+                          </span>
+                          <span className="text-right">
+                            <span className="block text-[12px] font-bold tabular-nums text-text-primary">{formatCurrency(item.total)}</span>
+                            <span className={cn("mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold", statusClass[item.status])}>
+                              {item.tier === "-" ? statusLabel[item.status] : item.tier}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                    <div style={{ height: listVirtual.paddingBottom }} aria-hidden />
+                  </>
+                )}
+
+                <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border px-4 py-2.5 text-[10px] text-text-muted">
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2.5 rounded-sm bg-text-secondary" />QC (55)</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2.5 rounded-sm bg-text-muted" />CSAT (25)</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2.5 rounded-sm bg-border-strong" />Prod (20)</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
-                <Info className="h-3.5 w-3.5 text-primary" />
-                Kuis dan training bersifat mandatory, tidak masuk total skor.
+
+              {/* detail — inline on large screens */}
+              <div className="hidden lg:block">
+                <div className="sticky top-4 max-h-[calc(100vh-240px)] overflow-y-auto rounded-xl border border-border bg-card p-4">
+                  {selectedItem ? (
+                    <IncentiveDetail
+                      item={selectedItem}
+                      mode={viewMode}
+                      rawAgent={selectedRawAgent}
+                      rawTl={selectedRawTl}
+                      rank={selectedRank}
+                      onClose={() => setSelectedId(null)}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted">
+                      <Calculator className="mb-3 h-8 w-8 stroke-1" />
+                      <p className="text-xs">Pilih baris untuk lihat rincian skor &amp; insentif.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {viewMode === "agent" ? (
-            <div ref={agentTableScrollRef} className="max-h-[calc(100vh-280px)] overflow-auto">
-              <table className="kpi-data-table min-w-[1240px] w-full table-fixed border-collapse text-left">
-                <colgroup>
-                  <col className="w-[34px]" />
-                  <col className="w-[190px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[64px]" />
-                  <col className="w-[72px]" />
-                  <col className="w-[64px]" />
-                  <col className="w-[72px]" />
-                  <col className="w-[84px]" />
-                  <col className="w-[76px]" />
-                  <col className="w-[72px]" />
-                  <col className="w-[50px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[108px]" />
-                  <col className="w-[112px]" />
-                </colgroup>
-                <thead className="sticky top-0 z-20 bg-primary text-white">
-                  <tr>
-                    {[
-                      "#", "Agent", "Team Leader", "QA", "Poin QA", "CSAT", "Poin CSAT",
-                      "Produktivitas", "Poin Prod", "Total Score", "Tier", "Insentif Tier",
-                      "Bonus Prod", "Total Insentif", "Status",
-                    ].map((label) => (
-                      <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <VirtualizedTbody
-                  colSpan={15}
-                  paddingTop={agentTableVirtual.paddingTop}
-                  paddingBottom={agentTableVirtual.paddingBottom}
+            {/* detail — slide-in drawer on small screens */}
+            {selectedItem && (
+              <div
+                className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm lg:hidden"
+                onClick={() => setSelectedId(null)}
+              >
+                <div
+                  className="h-full w-full max-w-[380px] overflow-y-auto border-l border-border bg-card p-4 animate-in slide-in-from-right duration-200"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {agentTableVirtual.virtualIndexes.map((index) => {
-                    const row = rows[index];
-                    if (!row) return null;
-                    return (
-                    <tr key={row.csId} className="border-b border-border hover:bg-surface-muted">
-                      <td className="px-2 py-2 font-semibold text-text-muted">{index + 1}</td>
-                      <td className="px-2 py-2">
-                        <p className="truncate font-bold text-text-primary" title={row.name}>{row.name}</p>
-                        <p className="mt-0.5 truncate text-[10px] text-text-muted" title={row.csId}>{row.csId}</p>
-                      </td>
-                      <td className="truncate px-2 py-2 text-text-secondary" title={row.teamLeader}>{row.teamLeader}</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">
-                        {formatNum(row.qaPct, 2)}%
-                      </td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">
-                        {formatNum(row.qaPoints, 2)} / 55
-                      </td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">
-                        {formatNum(row.csatPct, 2)}%
-                      </td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">
-                        {formatNum(row.csatPoints, 2)} / 25
-                      </td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">
-                        {row.productivityActual === null || row.productivityTarget === null
-                          ? "-"
-                          : `${formatNum(row.productivityActual, 0)} / ${formatNum(row.productivityTarget, 0)}`}
-                      </td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">
-                        {formatNum(row.productivityPoints, 2)} / 20
-                      </td>
-                      <td className="px-2 py-2 font-bold text-text-primary">
-                        {formatNum(row.totalScore, 2)}
-                      </td>
-                      <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
-                      <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.productivityBonus)}</td>
-                      <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.totalIncentive)}</td>
-                      <td className="px-2 py-2">
-                        <span className={cn("inline-flex rounded-full px-2 py-1 text-[10px] font-bold", statusClass[row.status])}>
-                          {statusLabel[row.status]}
-                        </span>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                  {rows.length === 0 && (
-                    <tr>
-                      <td colSpan={15} className="p-8 text-center text-xs text-text-muted">
-                        Tidak ada agent pada filter yang dipilih.
-                      </td>
-                    </tr>
-                  )}
-                </VirtualizedTbody>
-              </table>
-            </div>
-            ) : (
-            <div className="max-h-[calc(100vh-280px)] overflow-auto">
-              <table className="kpi-data-table min-w-[1280px] w-full border-collapse text-left">
-                <thead className="sticky top-0 z-20 bg-primary text-white">
-                  <tr>
-                    {[
-                      "#", "Team Leader", "Agents", "Final QA", "Final CSAT", "Final Prod",
-                      "Breakdown Poin", "Final KPI", "Tier TL", "Insentif TL", "Bagian Bonus TL",
-                      "Gaji Gross", "Total THP Gross", "Status",
-                    ].map((label) => (
-                      <th key={label} className="border-r border-white/30 px-2 py-2 font-bold last:border-r-0">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {teamLeaderRows.map((row, index) => (
-                    <tr key={row.teamLeader} className="border-b border-border hover:bg-surface-muted">
-                      <td className="px-2 py-2 font-semibold text-text-muted">{index + 1}</td>
-                      <td className="px-2 py-2 font-bold text-text-primary">{row.teamLeader}</td>
-                      <td className="px-2 py-2 text-text-secondary">{row.agentCount}</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalQaPct, 2)}%</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalCsatPct, 2)}%</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatNum(row.finalProductivityPct, 1)}%</td>
-                      <td className="px-2 py-2 text-[9px] leading-4 text-text-secondary">
-                        <div>QA: <strong className="text-text-primary">{formatNum(row.averageQaPoints, 2)} / 55</strong></div>
-                        <div>CSAT: <strong className="text-text-primary">{formatNum(row.averageCsatPoints, 2)} / 25</strong></div>
-                        <div>Prod: <strong className="text-text-primary">{formatNum(row.averageProductivityPoints, 2)} / 20</strong></div>
-                      </td>
-                      <td className="px-2 py-2 font-bold text-text-primary">{formatNum(row.finalScore, 2)}</td>
-                      <td className="px-2 py-2 font-bold text-primary">{row.tier}</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.baseIncentive)}</td>
-                      <td className="px-2 py-2 font-semibold text-success-text">{formatCurrency(row.bestLeaderBonus)}</td>
-                      <td className="px-2 py-2 font-semibold text-text-secondary">{formatCurrency(row.grossSalary)}</td>
-                      <td className="px-2 py-2 font-bold text-text-primary">{formatCurrency(row.grossThp)}</td>
-                      <td className="px-2 py-2">
-                        <span className={cn("inline-flex rounded-full px-2 py-1 text-[10px] font-bold", statusClass[row.status])}>
-                          {statusLabel[row.status]}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {teamLeaderRows.length === 0 && (
-                    <tr>
-                      <td colSpan={14} className="p-8 text-center text-xs text-text-muted">
-                        Tidak ada Team Leader pada filter yang dipilih.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            )}
-            {viewMode === "tl" && (
-              <div className="border-t border-border bg-surface-muted px-4 py-3 text-[11px] text-text-secondary">
-                <strong className="text-text-primary">Cara baca:</strong> persentase QA/CSAT/Prod adalah ringkasan tim, sedangkan Final KPI dihitung dari rata-rata Final KPI setiap agent. Breakdown poin menunjukkan rata-rata poin agent sebelum dijumlahkan menjadi Final KPI TL.
+                  <IncentiveDetail
+                    item={selectedItem}
+                    mode={viewMode}
+                    rawAgent={selectedRawAgent}
+                    rawTl={selectedRawTl}
+                    rank={selectedRank}
+                    onClose={() => setSelectedId(null)}
+                  />
+                </div>
               </div>
             )}
-          </section>
+          </div>
 
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
             <div className="rounded-lg border border-border bg-card p-4">
@@ -817,7 +840,7 @@ export const IncentiveSimulation: React.FC<{
                 ) : (
                   <>
                     <p className="rounded-lg bg-surface-muted p-3">Skor TL dihitung dari rata-rata KPI agent. Nilai QA memakai rata-rata persentase QA agent, bukan bucket poin agent.</p>
-                    <p className="rounded-lg bg-success-soft p-3 text-success-text">Pool bonus TL terbaik sebesar <strong>Rp500.000</strong> dibagi rata kepada TL yang eligible. Contoh 5 TL: masing-masing mendapat <strong>Rp100.000</strong>.</p>
+                    <p className="rounded-lg bg-success-soft p-3 text-success-text">Pool bonus TL terbaik sebesar <strong>Rp500.000</strong> dibagi rata kepada seluruh TL. Contoh 5 TL: masing-masing mendapat <strong>Rp100.000</strong>.</p>
                     <p className="rounded-lg bg-surface-muted p-3">Gaji gross TL per bulan <strong className="text-text-primary">Rp4.328.000</strong>. THP gross = gaji gross + insentif TL.</p>
                     <p className="rounded-lg bg-warning-soft p-3 text-warning-text">THP gross belum dikurangi pajak/BPJS dan belum termasuk lembur, hari libur, atau shift malam.</p>
                   </>

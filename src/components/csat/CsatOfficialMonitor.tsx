@@ -1,23 +1,28 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { AgentKPI, getOfficialCsatAggregate } from '../../lib/dataProcessor';
-import { formatNum, getKpiColor, getMonthOffsetLabel, parseDateForSort, cn, indexByDate, uniqueCalendarDates, weekSeparatorClass, getByCalendarDate, formatCalendarHeader } from '../../lib/utils';
-import { Search, Star, Users } from 'lucide-react';
+import { formatNum, getKpiStatus, getMonthOffsetLabel, parseDateForSort, cn, indexByDate, uniqueCalendarDates, getByCalendarDate } from '../../lib/utils';
+import { KpiValue, KpiCue } from '../ui/KpiCue';
+import { Sparkline } from '../ui/Sparkline';
+import { DayStrip } from '../ui/DayStrip';
+import { Search, Star, Users, ChevronDown } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import { SortableHeader } from '../ui/SortableHeader';
 import { EmptyState } from '../ui/EmptyState';
-import { MobileScrollHint } from '../ui/ChartScrollArea';
 import { KpiRankLists } from '../ui/KpiRankLists';
 import { chart } from '../../lib/themeColors';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import { VirtualizedTbody } from '../ui/VirtualizedTbody';
 import { useVirtualRows } from '../../hooks/useVirtualRows';
 
 export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
   const [search, setSearch] = useState('');
-  const [filterTL, setFilterTL] = useState<string | null>(null);
+  const [filterTL] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const CSAT_OFFICIAL_TARGET = 3.75;
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -27,12 +32,13 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
     setSortConfig({ key, direction });
   };
 
-  const dict = useStore(state => state.agentDictionary);
-  const { startDate, endDate, setDateRange } = useStore(useShallow((s) => ({
-    startDate: s.startDate,
-    endDate: s.endDate,
-    setDateRange: s.setDateRange,
-  })));
+  const toggleRow = (csId: string) =>
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(csId)) next.delete(csId);
+      else next.add(csId);
+      return next;
+    });
 
   const tableData = useMemo(() => {
     let filtered = data.filter(a => {
@@ -80,6 +86,8 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
       a.dailyHistory?.csat,
     ]));
   }, [tableData]);
+  // Sparkline + day-strip read oldest→newest; uniqueDates is newest-first.
+  const chronoDates = useMemo(() => [...uniqueDates].reverse(), [uniqueDates]);
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const tableVirtual = useVirtualRows({
@@ -87,7 +95,7 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
     rowHeight: 52,
     scrollRef: tableScrollRef,
   });
-  const tableColSpan = 5 + uniqueDates.length;
+  const tableColSpan = 7;
 
   const highlightStats = useMemo(() => {
     const aggregate = getOfficialCsatAggregate(tableData);
@@ -212,87 +220,114 @@ export const CsatOfficialMonitor: React.FC<{ data: AgentKPI[], previousData?: Ag
         />
       )}
 
-      <MobileScrollHint label="Geser → untuk lihat semua kolom" />
-      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all flex-1 max-h-[calc(100vh-200px)]">
-            <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
-              <thead className="bg-surface text-text-secondary sticky top-0 z-30">
-              <tr>
-                <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">No</th>
-                <SortableHeader label="Nama / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
-                <SortableHeader label="BPO" sortKey="bpo" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
-                <SortableHeader label="TL" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
-                <SortableHeader label="CSAT Official (Avg)" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface shrink-0 z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
-                {uniqueDates.map((date, i) => (
-                  <th key={date} className="p-2 font-bold text-center text-text-muted bg-surface  $\{weekSeparatorClass(i)}">{formatCalendarHeader(date)}</th>
-                ))}
-              </tr>
-            </thead>
-            <VirtualizedTbody
-              colSpan={tableColSpan}
-              paddingTop={tableVirtual.paddingTop}
-              paddingBottom={tableVirtual.paddingBottom}
-            >
-              {tableVirtual.virtualIndexes.map((index) => {
-                const agent = tableData[index];
-                if (!agent) return null;
-                const displayName = agent.name || agent.csId;
-                const csatByDate = indexByDate(agent.dailyHistory?.csat);
-                const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] text-text-muted">Klik baris untuk skor harian &middot; target {CSAT_OFFICIAL_TARGET} / 5</span>
+      </div>
+      <div ref={tableScrollRef} className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl flex-1 max-h-[calc(100vh-200px)]">
+        <table className="kpi-data-table w-full text-left border-collapse">
+          <thead className="bg-surface text-text-secondary sticky top-0 z-30">
+            <tr>
+              <th className="p-2 font-bold text-center border-b border-border bg-surface w-[48px]">No</th>
+              <SortableHeader label="Nama / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="border-b border-border bg-surface min-w-[200px]" />
+              <SortableHeader label="BPO · TL" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="border-b border-border bg-surface min-w-[130px]" />
+              <th className="p-2 font-bold text-text-muted border-b border-border bg-surface min-w-[150px]">Tren 20 hari</th>
+              <SortableHeader label={`Rata-rata · t ${CSAT_OFFICIAL_TARGET}`} sortKey="average" config={sortConfig} onSort={handleSort} className="text-right text-text-primary border-b border-border bg-surface w-[110px]" />
+              <th className="p-2 font-bold text-right text-text-muted border-b border-border bg-surface w-[72px]">vs&nbsp;{CSAT_OFFICIAL_TARGET}</th>
+              <th className="p-2 border-b border-border bg-surface w-[40px]" aria-hidden />
+            </tr>
+          </thead>
+          <VirtualizedTbody
+            colSpan={tableColSpan}
+            paddingTop={tableVirtual.paddingTop}
+            paddingBottom={tableVirtual.paddingBottom}
+          >
+            {tableVirtual.virtualIndexes.map((index) => {
+              const agent = tableData[index];
+              if (!agent) return null;
+              const displayName = agent.name || agent.csId;
+              const csatByDate = indexByDate(agent.dailyHistory?.csat);
+              const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
+              const dailyVals = chronoDates.map((date) => {
+                const d = getByCalendarDate(csatByDate, date);
+                return d && d.value !== null && d.value !== undefined ? d.value : null;
+              });
+              const avg = agent.csatAsli;
+              const status = getKpiStatus(avg, 'csatOfficial');
+              const vsTarget = avg !== null && avg !== undefined ? avg - CSAT_OFFICIAL_TARGET : null;
+              const isOpen = expandedRows.has(agent.csId);
 
-                return (
-                  <tr key={agent.csId} className="border-b border-border transition-colors group hover:bg-surface-muted">
-                    <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">{index + 1}</td>
-                    <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                      <span className="text-kpi-neutral-text font-semibold" title={agent.csId}>
-                        {displayName}
-                      </span>
+              return (
+                <React.Fragment key={agent.csId}>
+                  <tr
+                    className="border-b border-border transition-colors group hover:bg-surface-muted cursor-pointer"
+                    onClick={() => toggleRow(agent.csId)}
+                  >
+                    <td className="p-2 text-center text-text-muted font-medium w-[48px]">{index + 1}</td>
+                    <td className="p-2 min-w-[200px]">
+                      <div className="font-semibold text-text-primary truncate" title={agent.csId}>{displayName}</div>
+                      <div className="text-[9px] text-text-muted truncate">{agent.csId}</div>
                     </td>
-                    <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
-                      {agent.bpo || '-'}
+                    <td className="p-2 text-text-secondary min-w-[130px] truncate">
+                      <span className="uppercase">{agent.bpo || '-'}</span>
+                      <span className="text-text-muted"> · {agent.teamLeader || '-'}</span>
                     </td>
-                    <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">{agent.teamLeader || '-'}</td>
-                    <td className="p-2 text-center font-bold border-border z-10 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                      <span className={`font-bold text-[11px] ${getKpiColor(agent.csatAsli, 'csatOfficial')}`}>
-                        {agent.csatAsli !== null ? formatNum(agent.csatAsli) : '-'}
-                      </span>
+                    <td className="p-2 min-w-[150px]">
+                      <div className={status === 'miss' ? 'text-danger' : status === 'watch' ? 'text-warning' : 'text-text-muted'}>
+                        <Sparkline values={dailyVals} height={22} />
+                      </div>
                     </td>
-                    {uniqueDates.map((date, i) => {
-                      const daily = getByCalendarDate(csatByDate, date);
-                      const sched = getByCalendarDate(scheduleByDate, date);
-                      const status = sched?.status?.toUpperCase() || '';
-                      
-                      const isOff = status === 'OFF' || status === 'C';
-                      const isPullout = status === 'PULLOUT';
-                      const bgClass = '';
-                      const baseColor = daily && daily.value !== null ? getKpiColor(daily.value, 'csatOfficial') : 'text-text-disabled';
-                      const textColor = isPullout && daily && daily.value !== null ? 'text-text-muted italic' : baseColor;
-
-                      return (
-                        <td key={date} className={`p-2 text-center  z-10 transition-colors ${bgClass}`}>
-                          <span className={`font-bold text-[11px] ${textColor}`}>
-                            {daily && daily.value !== null ? formatNum(daily.value) : '-'}
-                          </span>
-                        </td>
-                      );
-                    })}
+                    <td className="p-2 text-right w-[110px]">
+                      {avg !== null && avg !== undefined
+                        ? <KpiValue value={avg} type="csatOfficial" text={formatNum(avg, 2)} className="justify-end" />
+                        : <span className="text-[11px] text-text-disabled">-</span>}
+                    </td>
+                    <td className="p-2 text-right w-[72px] text-[11px] tabular-nums">
+                      {vsTarget !== null ? (
+                        <span className={`inline-flex items-center justify-end gap-1 font-medium ${status === 'miss' ? 'text-danger' : status === 'watch' ? 'text-warning' : 'text-text-muted'}`}>
+                          <KpiCue status={status} />
+                          {vsTarget >= 0 ? '+' : '−'}{Math.abs(vsTarget).toFixed(2)}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td className="p-2 text-center w-[40px]">
+                      <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </td>
                   </tr>
-                );
-              })}
-              {tableData.length === 0 && (
-                <tr>
-                  <td colSpan={tableColSpan} className="p-4 z-10">
-                    <EmptyState
-                      title="Tidak ada data CSAT official"
-                      description="Coba ubah pencarian, filter TL, atau rentang tanggal."
-                      variant="filter"
-                      className="border-0 bg-transparent py-6"
-                      showDataActions
-                    />
-                  </td>
-                </tr>
-              )}
-            </VirtualizedTbody>
-          </table>
+                  {isOpen && (
+                    <tr className="bg-surface/40 border-b border-border">
+                      <td colSpan={tableColSpan} className="px-4 pb-4 pt-1">
+                        <div className="text-[9px] text-text-muted uppercase tracking-wide pt-3 pb-2">
+                          Skor CSAT per hari &mdash; hanya di bawah target yang berwarna &middot; sel kosong = tidak ada responden
+                        </div>
+                        <DayStrip
+                          kpiType="csatOfficial"
+                          format={(v) => formatNum(v, 2)}
+                          items={chronoDates.map((date, di) => {
+                            const st = getByCalendarDate(scheduleByDate, date)?.status?.toUpperCase() || '';
+                            return { date, value: dailyVals[di], off: st === 'OFF' || st === 'C' };
+                          })}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            {tableData.length === 0 && (
+              <tr>
+                <td colSpan={tableColSpan} className="p-4 z-10">
+                  <EmptyState
+                    title="Tidak ada data CSAT official"
+                    description="Coba ubah pencarian, filter TL, atau rentang tanggal."
+                    variant="filter"
+                    className="border-0 bg-transparent py-6"
+                    showDataActions
+                  />
+                </td>
+              </tr>
+            )}
+          </VirtualizedTbody>
+        </table>
       </div>
     </div>
   );
@@ -349,7 +384,9 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
     { name: getWeekLabel(1), 'CSAT Official': w1.asli, 'SC Full': w1.full, 'SC After Takeout': w1.takeout },
     { name: getWeekLabel(0), 'CSAT Official': w0.asli, 'SC Full': w0.full, 'SC After Takeout': w0.takeout },
   ].filter(d => d.name !== 'WNaN Invalid Date');
-  const visibleChartData = comparisonMode === 'mom' ? chartData.slice(1) : chartData;
+  // Drop un-populated periods so a 0 there is not shown.
+  const visibleChartData = (comparisonMode === 'mom' ? chartData.slice(1) : chartData)
+    .filter(d => (d['CSAT Official'] as number) > 0 || (d['SC Full'] as number) > 0 || (d['SC After Takeout'] as number) > 0);
 
   const dailyData = React.useMemo(() => {
     const dates = new Map<string, { sum: number, count: number }>();
@@ -428,15 +465,14 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
           <div className="flex items-center justify-center mb-4">
             <h3 className="text-sm font-bold text-text-primary text-center">{comparisonMode === 'mom' ? 'Tren perbandingan 3 bulan' : 'Tren perbandingan 4 minggu'}</h3>
           </div>
-          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+          <div className="h-96 w-full border border-border/50 rounded-xl p-5 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={visibleChartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 5]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
-                <Bar dataKey="CSAT Official" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={50}>
-                  <LabelList dataKey="CSAT Official" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: chart.kpiCsat}} />
+              <BarChart data={visibleChartData} margin={{ top: 22, right: 6, left: -14, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'var(--color-surface-muted)', opacity: 0.4 }} contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 11 }} formatter={(v: any) => formatNum(Number(v), 2)} />
+                <Bar dataKey="CSAT Official" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={48}>
+                  <LabelList dataKey="CSAT Official" position="top" style={{ fontSize: 11, fontWeight: 700, fill: 'var(--color-text-primary)' }} formatter={(v: any) => (Number(v) > 0 ? formatNum(Number(v), 2) : '')} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -457,7 +493,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
                   onClick={() => setTrendMode(mode)}
                   className={cn(
                     'rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors',
-                    trendMode === mode ? 'bg-card text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
+                    trendMode === mode ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
                   )}
                 >
                   {mode === 'weekly' ? 'Weekly' : 'Daily'}
@@ -465,15 +501,14 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
               ))}
             </div>
           </div>
-          <div className="h-80 w-full border border-border/50 rounded-xl p-6 bg-surface/20">
+          <div className="h-96 w-full border border-border/50 rounded-xl p-5 bg-surface/20">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={trendData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 5]} tick={{fontSize: 11}} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: 'rgba(0,0,0,0.05)'}} />
-                <Bar dataKey="CSAT" fill={chart.kpiCsat} radius={[4, 4, 0, 0]} maxBarSize={50}>
-                  <LabelList dataKey="CSAT" position="top" style={{fontSize: '11px', fontWeight: 'bold', fill: chart.kpiCsat}} />
+              <BarChart data={trendData} margin={{ top: 22, right: 6, left: -14, bottom: 0 }}>
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} minTickGap={8} />
+                <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'var(--color-surface-muted)', opacity: 0.4 }} contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 11 }} formatter={(v: any) => formatNum(Number(v), 2)} />
+                <Bar dataKey="CSAT" fill={chart.kpiCsat} radius={[3, 3, 0, 0]} maxBarSize={30}>
+                  <LabelList dataKey="CSAT" position="top" style={{ fontSize: 10, fontWeight: 700, fill: 'var(--color-text-primary)' }} formatter={(v: any) => (Number(v) > 0 ? formatNum(Number(v), 2) : '')} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

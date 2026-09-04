@@ -16,6 +16,7 @@ import {
   ValidationResult
 } from '../../lib/csvValidator';
 import { normalizeDateStr } from '../../lib/dates';
+import { lastDataDate, laggingSources, type SourceLastDates } from '../../lib/sourceFreshness';
 import { formatRelativeTime, isStaleSync } from '../../lib/dataQuality';
 import {
   cell,
@@ -120,9 +121,10 @@ const extractCsIds = (
 
 const getDateHealth = (source: DataSource, data: any[][]) => {
   if (source.dataKey === 'csidData') {
-    return { checked: 0, invalid: 0, samples: [] as string[], ruleLabel: 'No date expected' };
+    return { checked: 0, invalid: 0, samples: [] as string[], ruleLabel: 'No date expected', lastDate: null as string | null };
   }
 
+  const lastDate = lastDataDate(source.dataKey, data);
   const samples: string[] = [];
   let checked = 0;
   let invalid = 0;
@@ -143,7 +145,7 @@ const getDateHealth = (source: DataSource, data: any[][]) => {
     for (let c = firstDate; c < header.length; c++) {
       checkValue(header[c]);
     }
-    return { checked, invalid, samples, ruleLabel: 'Schedule header dates' };
+    return { checked, invalid, samples, ruleLabel: 'Schedule header dates', lastDate };
   }
 
   const header = data[0] || [];
@@ -170,7 +172,7 @@ const getDateHealth = (source: DataSource, data: any[][]) => {
     },
   };
   const sourceConfig = dateIdxBySource[source.dataKey];
-  if (!sourceConfig) return { checked, invalid, samples, ruleLabel: 'No date rule' };
+  if (!sourceConfig) return { checked, invalid, samples, ruleLabel: 'No date rule', lastDate };
 
   for (let r = sourceConfig.startRow; r < data.length; r++) {
     const row = data[r];
@@ -178,7 +180,7 @@ const getDateHealth = (source: DataSource, data: any[][]) => {
     checkValue(row[sourceConfig.idx]);
   }
 
-  return { checked, invalid, samples, ruleLabel: sourceConfig.label };
+  return { checked, invalid, samples, ruleLabel: sourceConfig.label, lastDate };
 };
 
 type CoverageStatus = 'ok' | 'partial' | 'empty';
@@ -380,6 +382,7 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
         const data = (store[source.dataKey] || []) as any[][];
         return {
           sourceLabel: source.label,
+          dataKey: source.dataKey,
           ...getDateHealth(source, data),
         };
       });
@@ -392,6 +395,17 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
   ]);
 
   const totalInvalidDates = dateChecks.reduce((sum, check) => sum + check.invalid, 0);
+  const dateLags = React.useMemo(
+    () =>
+      laggingSources(
+        Object.fromEntries(
+          dateChecks.map((c) => [c.dataKey, c.lastDate]),
+        ) as SourceLastDates,
+      ),
+    [dateChecks],
+  );
+  const fmtDay = (iso: string | null) =>
+    iso ? iso.split('-').reverse().join('/') : '-';
   const productivityDuplicateHealth = React.useMemo(
     () => getProductivityDuplicateHealth((store.productivityData || []) as any[][]),
     [store.productivityData],
@@ -703,13 +717,24 @@ const DataHealthPanel = ({ isSheetMode }: { isSheetMode: boolean }) => {
               {totalInvalidDates} invalid
             </span>
           </div>
+          {dateLags.length > 0 && (
+            <div className="mb-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[10px] text-warning">
+              <span className="font-bold">Sumber tidak sinkron:</span>{' '}
+              {dateLags
+                .map((s) => `${s.label} baru s/d ${fmtDay(s.lastDate)} (${s.lagDays} hari di belakang)`)
+                .join(' · ')}
+            </div>
+          )}
           <div className="space-y-2">
             {dateChecks.map((check) => (
               <div key={check.sourceLabel} className="flex items-start justify-between gap-3 text-[11px] border-b border-border/60 last:border-0 pb-2 last:pb-0">
                 <div className="min-w-0">
                   <div className="font-semibold text-text-primary">{check.sourceLabel}</div>
                   <div className="text-text-muted mt-0.5">{check.ruleLabel}</div>
-                  <div className="text-text-muted mt-0.5">{check.checked} date values checked</div>
+                  <div className="text-text-muted mt-0.5">
+                    {check.checked} date values checked
+                    {check.lastDate ? ` · data s/d ${fmtDay(check.lastDate)}` : ''}
+                  </div>
                   {check.samples.length > 0 && (
                     <div className="text-warning mt-1 truncate" title={check.samples.join(', ')}>
                       Sample: {check.samples.join(', ')}

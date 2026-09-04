@@ -1,18 +1,14 @@
 import React from "react";
-import { formatNum, parseDateForSort } from "../../lib/utils";
+import { formatNum, getKpiStatus, parseDateForSort, type KpiType } from "../../lib/utils";
 import { chart } from "../../lib/themeColors";
-import { ChartScrollArea } from "../ui/ChartScrollArea";
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  Cell,
   LabelList
 } from "recharts";
 
@@ -20,6 +16,51 @@ interface DashboardChartsProps {
   stats: any;
   dailyTrend: any[];
 }
+
+const STATUS_TEXT: Record<string, string> = {
+  none: "text-text-disabled",
+  on: "text-text-primary",
+  watch: "text-warning",
+  miss: "text-danger",
+};
+
+/** One KPI as a bullet row: label · fill vs a target tick · value + Δ.
+ *  Colour only when the value misses target (discipline). */
+const KpiBulletRow: React.FC<{
+  label: string;
+  value: number;
+  type: KpiType;
+  valueText: string;
+  target: number;
+  targetText: string;
+}> = ({ label, value, type, valueText, target, targetText }) => {
+  const hasVal = value > 0;
+  const status = hasVal ? getKpiStatus(value, type) : "none";
+  const toPct = (v: number) => (type === "csatOfficial" ? (v / 5) * 100 : v);
+  const fillPct = Math.max(0, Math.min(toPct(value), 100));
+  const targetPct = Math.max(0, Math.min(toPct(target), 100));
+  const delta = value - target;
+  const fillClass =
+    status === "miss" ? "bg-danger" : status === "watch" ? "bg-warning" : "bg-text-muted";
+
+  return (
+    <div className="grid grid-cols-[minmax(0,124px)_1fr_104px] items-center gap-3">
+      <span className="truncate text-[11px] font-medium text-text-secondary" title={label}>{label}</span>
+      <div className="relative h-2 rounded-full bg-surface-muted">
+        <div className={`absolute inset-y-0 left-0 rounded-full ${fillClass}`} style={{ width: `${fillPct}%` }} />
+        <div className="absolute inset-y-[-3px] w-px bg-text-primary" style={{ left: `${targetPct}%` }} title={`target ${targetText}`} />
+      </div>
+      <span className="flex items-baseline justify-end gap-1.5 tabular-nums">
+        <span className={`text-[13px] font-bold ${STATUS_TEXT[status]}`}>{valueText}</span>
+        {hasVal && (
+          <span className={`text-[10px] ${delta < 0 ? "text-danger" : "text-text-muted"}`}>
+            {delta >= 0 ? "+" : "−"}{formatNum(Math.abs(delta), type === "csatOfficial" ? 2 : 1)}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+};
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTrend }) => {
   const [trendMode, setTrendMode] = React.useState<'weekly' | 'daily'>('daily');
@@ -103,147 +144,30 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6 min-w-0">
-      {/* KPI Comparison Chart */}
+      {/* KPI vs Target — bullet rows */}
       <div className="bg-card border border-border rounded-lg p-5 min-w-0">
-        <div className="flex items-center justify-between gap-4 mb-8">
-          <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-            KPI Comparison (vs Target) <span className="text-[10px] text-text-muted font-normal">ⓘ</span>
-          </h2>
-          <div className="flex items-center gap-4 text-xs font-semibold text-text-primary">
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-1.5 rounded-full bg-text-primary"></div>
-              <span className="text-text-primary">Actual</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-1.5 rounded-full bg-danger"></div>
-              <span className="text-danger">Target</span>
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <h2 className="text-sm font-bold text-text-primary">KPI vs Target</h2>
+          <span className="inline-flex items-center gap-3 text-[9px] text-text-muted">
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded-sm bg-text-muted" />aktual</span>
+            <span className="inline-flex items-center gap-1"><span className="h-3 w-px bg-text-primary" />target</span>
+          </span>
         </div>
 
-        <ChartScrollArea canvasClassName="h-[280px] min-w-[640px] sm:min-w-[700px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={[
-                  { name: 'CSAT Official', actual: parseFloat(((stats.csat / 5) * 100 || 0).toFixed(2)), target: 75, color: chart.kpiCsat, isCsat: true, rawVal: stats.csat || 0 },
-                  { name: 'CSAT SC Full', actual: parseFloat((stats.csatScFull || 0).toFixed(2)), target: 75, color: chart.kpiCsat },
-                  { name: 'CSAT SC After Takeout', actual: parseFloat((stats.csatScFair || 0).toFixed(2)), target: 92, color: chart.kpiCsat },
-                  { name: 'QA Score', actual: parseFloat(stats.qa.toFixed(2)), target: 92, color: chart.kpiQa },
-                  { name: 'Avg Attendance', actual: parseFloat(stats.attendance.toFixed(2)), target: 95, color: chart.kpiNeutral },
-                  { name: 'WHU (%)', actual: parseFloat(stats.whu.toFixed(2)), target: 96, color: chart.kpiWhu },
-                  { name: 'SLA 1 Menit', actual: parseFloat(stats.sla1m.toFixed(2)), target: 92, color: chart.kpiSla },
-                  { name: 'SLA 3 Menit', actual: parseFloat(stats.sla3m.toFixed(2)), target: 96, color: chart.kpiSla }
-                ]}
-                margin={{ top: 30, right: 50, left: -20, bottom: 45 }}
-                barGap="-100%"
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="var(--color-border)"
-                />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  interval={0}
-                  tickMargin={20}
-                  tick={(props: any) => {
-                    const { x, y, payload } = props;
-                    const words = payload.value.split(" ");
-                    return (
-                      <g transform={`translate(${x},${y + 18})`}>
-                        <text x={0} y={0} textAnchor="middle" fill="var(--color-text-muted)" fontSize={10} fontWeight={600}>
-                          {words.length > 2 ? (
-                            <>
-                              <tspan x={0} dy="0">{words.slice(0, 2).join(" ")}</tspan>
-                              <tspan x={0} dy="14">{words.slice(2).join(" ")}</tspan>
-                            </>
-                          ) : (
-                            <tspan x={0} dy="0">{payload.value}</tspan>
-                          )}
-                        </text>
-                      </g>
-                    );
-                  }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
-                  domain={[0, 110]}
-                  tickFormatter={(val) => `${val}%`}
-                />
-                <RechartsTooltip cursor={{ fill: 'var(--color-surface-muted)', opacity: 0.5 }} content={() => null} />
-                <Bar dataKey="actual" radius={[4, 4, 0, 0]} maxBarSize={32}>
-                  <LabelList 
-                    dataKey="actual" 
-                    position="top" 
-                    fill="var(--color-text-primary)" 
-                    fontSize={11} 
-                    fontWeight={700} 
-                    formatter={(val: unknown) => {
-                      const num = Number(val);
-                      return num > 0 ? `${num}%` : "";
-                    }} 
-                  />
-                  {
-                    [
-                      { color: chart.kpiCsat },
-                      { color: chart.kpiCsat },
-                      { color: chart.kpiCsat },
-                      { color: chart.kpiQa },
-                      { color: chart.kpiNeutral },
-                      { color: chart.kpiWhu },
-                      { color: chart.kpiSla },
-                      { color: chart.kpiSla }
-                    ].map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))
-                  }
-                </Bar>
-                <Bar 
-                  dataKey="target" 
-                  maxBarSize={32}
-                  shape={(props: any) => {
-                    const { x, y, width, payload } = props;
-                    if (payload.isBlank) return <g></g>;
-                    return (
-                      <g>
-                        <line 
-                          x1={x + width + 2} 
-                          y1={y} 
-                          x2={x + width + 10} 
-                          y2={y} 
-                          stroke={chart.danger} 
-                          strokeWidth={2} 
-                        />
-                        <rect 
-                          x={x + width + 10} 
-                          y={y - 8} 
-                          width={28} 
-                          height={16} 
-                          rx={4} 
-                          fill={chart.dangerSoft} 
-                        />
-                        <text 
-                          x={x + width + 24} 
-                          y={y} 
-                          textAnchor="middle" 
-                          fill={chart.danger} 
-                          fontSize={9} 
-                          fontWeight={700}
-                          dy={3}
-                        >
-                          {payload.target}%
-                        </text>
-                      </g>
-                    );
-                  }} 
-                />
-              </BarChart>
-            </ResponsiveContainer>
-        </ChartScrollArea>
+        <div className="flex flex-col gap-3">
+          {([
+            { label: "CSAT Official", value: stats.csat || 0, type: "csatOfficial" as KpiType, valueText: formatNum(stats.csat || 0, 2), target: 3.75, targetText: "3.75" },
+            { label: "CSAT SC Full", value: stats.csatScFull || 0, type: "csatFull" as KpiType, valueText: `${formatNum(stats.csatScFull || 0, 1)}%`, target: 75, targetText: "75%" },
+            { label: "CSAT SC After Takeout", value: stats.csatScFair || 0, type: "csatFair" as KpiType, valueText: `${formatNum(stats.csatScFair || 0, 1)}%`, target: 92, targetText: "92%" },
+            { label: "QA Score", value: stats.qa || 0, type: "qa" as KpiType, valueText: `${formatNum(stats.qa || 0, 1)}%`, target: 92, targetText: "92%" },
+            { label: "Avg Attendance", value: stats.attendance || 0, type: "attendance" as KpiType, valueText: `${formatNum(stats.attendance || 0, 1)}%`, target: 95, targetText: "95%" },
+            { label: "WHU", value: stats.whu || 0, type: "whu" as KpiType, valueText: `${formatNum(stats.whu || 0, 1)}%`, target: 96, targetText: "96%" },
+            { label: "SLA 1 Menit", value: stats.sla1m || 0, type: "sla1m" as KpiType, valueText: `${formatNum(stats.sla1m || 0, 1)}%`, target: 92, targetText: "92%" },
+            { label: "SLA 3 Menit", value: stats.sla3m || 0, type: "sla3m" as KpiType, valueText: `${formatNum(stats.sla3m || 0, 1)}%`, target: 96, targetText: "96%" },
+          ]).map((r) => (
+            <KpiBulletRow key={r.label} {...r} />
+          ))}
+        </div>
       </div>
 
       {/* Weekly/Daily Trend Chart */}
@@ -260,7 +184,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ stats, dailyTr
                 onClick={() => setTrendMode(mode)}
                 className={[
                   'rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors',
-                  trendMode === mode ? 'bg-card text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
+                  trendMode === mode ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary',
                 ].join(' ')}
               >
                 {mode === 'weekly' ? 'Weekly' : 'Daily'}

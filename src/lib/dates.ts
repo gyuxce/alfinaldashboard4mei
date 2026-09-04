@@ -46,10 +46,17 @@ export function normalizeDateStr(raw: string): string | null {
   if (dateStrCache.has(rawKey))
     return dateStrCache.get(rawKey) as string | null;
 
+  // Drop a trailing clock time so "13-Agu-2026 14:30" / "13 Agu 2026 09:00:00"
+  // still match the anchored date patterns below instead of falling through to
+  // null and having the whole Productivity/SLA row dropped silently.
+  const dateKey = rawKey
+    .replace(/[ T]\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp]\.?[Mm]\.?)?$/, '')
+    .trim();
+
   let result: string | null = null;
 
   // Try to parse DD MMM YYYY or DD-MMM-YYYY
-  const dashMatch = rawKey.match(
+  const dashMatch = dateKey.match(
     /^(\d{1,2})[-\s]([A-Za-z]+)(?:[-\s](\d{4}))?$/,
   );
   if (dashMatch) {
@@ -99,7 +106,7 @@ export function normalizeDateStr(raw: string): string | null {
   }
 
   if (!result) {
-    const clean = rawKey.split(" ")[0]; // Take only the date part if there's time
+    const clean = dateKey.split(" ")[0]; // Take only the date part if there's time
     const parts = clean.split(/[-/]/);
 
     if (parts.length >= 3) {

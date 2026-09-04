@@ -1,23 +1,63 @@
 import React, { useMemo, useState, useRef } from "react";
 import { AgentKPI } from "../../lib/dataProcessor";
-import { formatNum, getKpiColor, indexByDate, uniqueCalendarDates, weekSeparatorClass, getByCalendarDate, formatCalendarHeader } from "../../lib/utils";
+import {
+  formatNum,
+  getKpiStatus,
+  type KpiType,
+  indexByDate,
+  uniqueCalendarDates,
+  getByCalendarDate,
+} from "../../lib/utils";
+import { KpiValue, KpiCue } from "../ui/KpiCue";
+import { Sparkline } from "../ui/Sparkline";
+import { DayStrip } from "../ui/DayStrip";
 import { chart } from "../../lib/themeColors";
 import { useShallow } from "zustand/react/shallow";
 import { useStore } from "../../store";
-import {
-  Search,
-  Activity,
-  AlertCircle,
-} from "lucide-react";
+import { Search, Activity, AlertCircle, ChevronDown } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from "recharts";
-import { SortableHeader } from '../ui/SortableHeader';
+import { SortableHeader } from "../ui/SortableHeader";
 import { EmptyState } from "../ui/EmptyState";
-import { MobileScrollHint } from '../ui/ChartScrollArea';
-import { KpiRankLists } from '../ui/KpiRankLists';
-import { VirtualizedTbody } from '../ui/VirtualizedTbody';
-import { useVirtualRows } from '../../hooks/useVirtualRows';
+import { MobileScrollHint } from "../ui/ChartScrollArea";
+import { VirtualizedTbody } from "../ui/VirtualizedTbody";
+import { useVirtualRows } from "../../hooks/useVirtualRows";
 
-export const ProductivityDetail: React.FC<{ 
+const PROD_TARGET = 100;
+
+/** One hero tile — value goes neutral unless it misses target (colour discipline). */
+const HeroTile = ({
+  label,
+  value,
+  sub,
+  status = "none",
+  progress,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  status?: ReturnType<typeof getKpiStatus>;
+  progress?: number;
+}) => {
+  const valueClass =
+    status === "miss" ? "text-danger" : status === "watch" ? "text-warning" : "text-text-primary";
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-text-muted">{label}</div>
+      <div className={`mt-2 text-2xl font-bold tabular-nums ${valueClass}`}>{value}</div>
+      {typeof progress === "number" ? (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-muted">
+          <div
+            className="h-full rounded-full bg-border-strong"
+            style={{ width: `${Math.max(0, Math.min(progress, 100))}%` }}
+          />
+        </div>
+      ) : null}
+      {sub ? <div className="mt-1.5 text-[11px] tabular-nums text-text-muted">{sub}</div> : null}
+    </div>
+  );
+};
+
+export const ProductivityDetail: React.FC<{
   data: AgentKPI[];
   previousData?: AgentKPI[];
   previousData2?: AgentKPI[];
@@ -29,23 +69,28 @@ export const ProductivityDetail: React.FC<{
   previousData3 = [],
 }) => {
   const [search, setSearch] = useState("");
-  const [filterTL, setFilterTL] = useState<string | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [filterTL] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [selectedHourIndex, setSelectedHourIndex] = useState<number | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (csId: string) =>
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(csId)) next.delete(csId);
+      else next.add(csId);
+      return next;
+    });
 
   const handleSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
 
-  const dict = useStore((state) => state.agentDictionary);
-  const { startDate, endDate, setDateRange, isComparisonEnabled, comparisonMode } = useStore(useShallow((s) => ({
-    startDate: s.startDate,
-    endDate: s.endDate,
-    setDateRange: s.setDateRange,
+  const { isComparisonEnabled, comparisonMode } = useStore(useShallow((s) => ({
     isComparisonEnabled: s.isComparisonEnabled,
     comparisonMode: s.comparisonMode,
   })));
@@ -60,57 +105,52 @@ export const ProductivityDetail: React.FC<{
     });
   }, [data, search, filterTL]);
 
-  // One column per calendar day (normDate), preferring schedule date labels
+  // One column per calendar day (normDate), preferring schedule date labels.
   const uniqueDates = useMemo(() => {
     return uniqueCalendarDates(filteredData.flatMap((a) => [
       a.dailyHistory?.schedule,
       a.dailyHistory?.productivity,
     ]));
   }, [filteredData]);
+  // Sparkline reads left→right as oldest→newest; uniqueDates is newest-first.
+  const chronoDates = useMemo(() => [...uniqueDates].reverse(), [uniqueDates]);
+
+  const localAverage = (agent: AgentKPI) =>
+    agent.manDays > 0 ? agent.productivityTotal / agent.manDays : 0;
+  const localGap = (agent: AgentKPI) => agent.productivityTotal - agent.manDays * PROD_TARGET;
 
   const tableData = useMemo(() => {
-    let sorted = [...filteredData];
+    const sorted = [...filteredData];
     if (sortConfig) {
       sorted.sort((a, b) => {
-        let aVal: any = 0;
-        let bVal: any = 0;
-
-        const getLocalGap = (agent: AgentKPI) =>
-          agent.productivityTotal - agent.manDays * 100;
-
-        const getLocalAverage = (agent: AgentKPI) =>
-          agent.manDays > 0 ? agent.productivityTotal / agent.manDays : 0;
-
+        let aVal: string | number = 0;
+        let bVal: string | number = 0;
         switch (sortConfig.key) {
-          case 'name':
-            aVal = a.name || a.csId;
-            bVal = b.name || b.csId;
-            break;
-          case 'bpo':
-            aVal = a.bpo || '';
-            bVal = b.bpo || '';
-            break;
-          case 'teamLeader':
-            aVal = a.teamLeader || '';
-            bVal = b.teamLeader || '';
-            break;
-          case 'average':
-            aVal = getLocalAverage(a);
-            bVal = getLocalAverage(b);
-            break;
-          case 'gap':
-            aVal = getLocalGap(a);
-            bVal = getLocalGap(b);
-            break;
+          case "name": aVal = a.name || a.csId; bVal = b.name || b.csId; break;
+          case "bpo": aVal = a.bpo || ""; bVal = b.bpo || ""; break;
+          case "teamLeader": aVal = a.teamLeader || ""; bVal = b.teamLeader || ""; break;
+          case "total": aVal = a.productivityTotal; bVal = b.productivityTotal; break;
+          case "average": aVal = localAverage(a); bVal = localAverage(b); break;
+          case "gap": aVal = localGap(a); bVal = localGap(b); break;
         }
-
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
+    } else {
+      // Default: a ranking by output per man-day.
+      sorted.sort((a, b) => localAverage(b) - localAverage(a));
     }
     return sorted;
   }, [filteredData, sortConfig]);
+
+  const bottomThreeIds = useMemo(() => {
+    return [...filteredData]
+      .filter((a) => a.manDays > 0)
+      .sort((a, b) => localAverage(a) - localAverage(b))
+      .slice(0, 3)
+      .map((a) => a.csId);
+  }, [filteredData]);
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const tableVirtual = useVirtualRows({
@@ -118,170 +158,51 @@ export const ProductivityDetail: React.FC<{
     rowHeight: 52,
     scrollRef: tableScrollRef,
   });
-  const tableColSpan = 8 + uniqueDates.length;
+  const tableColSpan = 8;
 
-  // --- CUSTOM BENTO DASHBOARD WIDGETS ---
+  // --- Hero widgets ---
   const {
     totalChat,
     totalAvg,
     totalManDays,
     activeAgents,
-    overTarget,
     underTarget,
     totalQuota,
     quotaAchievement,
     totalGap,
-    bpoList,
-    tlList,
   } = useMemo(() => {
-    const filteredForWidgets = data.filter((a) => a.productivityBase > 0);
-
+    const forWidgets = data.filter((a) => a.productivityBase > 0);
     let sumChat = 0;
     let sumManDays = 0;
     let sumQuota = 0;
     let sumGap = 0;
-    let overTarget = 0;
-    let underTarget = 0;
+    let under = 0;
 
-    const bpoStats: Record<
-      string,
-      { sum: number; mdays: number; quota: number; gap: number }
-    > = {};
-    const tlStats: Record<
-      string,
-      { sum: number; mdays: number; quota: number; gap: number }
-    > = {};
-
-    filteredForWidgets.forEach((agent) => {
+    forWidgets.forEach((agent) => {
       sumChat += agent.productivityTotal;
-      const localManDays = agent.manDays;
-      sumManDays += localManDays;
-      const localTargetQuota = localManDays * 100;
-      sumQuota += localTargetQuota;
-      const localGap = agent.productivityTotal - localTargetQuota;
-      sumGap += localGap;
-
-      const localAvg =
-        localManDays > 0 ? agent.productivityTotal / localManDays : 0;
-      if (localAvg >= 100) overTarget++;
-      else if (localAvg > 0 && localAvg < 70) underTarget++;
-
-      const bpo = agent.bpo || "-";
-      if (!bpoStats[bpo])
-        bpoStats[bpo] = { sum: 0, mdays: 0, quota: 0, gap: 0 };
-      bpoStats[bpo].sum += agent.productivityTotal;
-      bpoStats[bpo].mdays += localManDays;
-      bpoStats[bpo].quota += localTargetQuota;
-      bpoStats[bpo].gap += localGap;
-
-      const tl = agent.teamLeader || "-";
-      if (!tlStats[tl]) tlStats[tl] = { sum: 0, mdays: 0, quota: 0, gap: 0 };
-      tlStats[tl].sum += agent.productivityTotal;
-      tlStats[tl].mdays += localManDays;
-      tlStats[tl].quota += localTargetQuota;
-      tlStats[tl].gap += localGap;
+      sumManDays += agent.manDays;
+      const quota = agent.manDays * PROD_TARGET;
+      sumQuota += quota;
+      sumGap += agent.productivityTotal - quota;
+      const avg = agent.manDays > 0 ? agent.productivityTotal / agent.manDays : 0;
+      if (avg > 0 && avg < PROD_TARGET) under++;
     });
-
-    const bpoArr = Object.entries(bpoStats)
-      .map(([bpo, s]) => ({
-        bpo,
-        avg: s.mdays > 0 ? s.sum / s.mdays : 0,
-        gap: s.gap,
-        quota: s.quota,
-        sum: s.sum,
-        achievement: s.quota > 0 ? (s.sum / s.quota) * 100 : 0,
-      }))
-      .filter((x) => x.bpo !== "-");
-    bpoArr.sort((a, b) => b.avg - a.avg);
-
-    const tlArr = Object.entries(tlStats)
-      .map(([tl, s]) => ({
-        tl,
-        avg: s.mdays > 0 ? s.sum / s.mdays : 0,
-        gap: s.gap,
-        quota: s.quota,
-        sum: s.sum,
-        achievement: s.quota > 0 ? (s.sum / s.quota) * 100 : 0,
-      }))
-      .filter((x) => x.tl !== "-");
-    tlArr.sort((a, b) => b.gap - a.gap);
 
     return {
       totalChat: sumChat,
       totalAvg: sumManDays > 0 ? sumChat / sumManDays : 0,
       totalManDays: sumManDays,
-      activeAgents: filteredForWidgets.length,
-      overTarget,
-      underTarget,
+      activeAgents: forWidgets.length,
+      underTarget: under,
       totalQuota: sumQuota,
       quotaAchievement: sumQuota > 0 ? (sumChat / sumQuota) * 100 : 0,
       totalGap: sumGap,
-      bpoList: bpoArr,
-      tlList: tlArr,
-    };
-  }, [data]);
-
-  const highlightRanks = useMemo(() => {
-    const agents = data
-      .filter((a) => a.productivityBase > 0 && a.manDays > 0)
-      .map((a) => ({
-        agent: a,
-        avg: a.productivityTotal / a.manDays,
-      }))
-      .sort((a, b) => b.avg - a.avg);
-
-    const categoryCounts: Record<string, number> = {};
-    agents.forEach(({ agent }) => {
-      (agent.hourlyCategoryCounts || []).forEach((hourMap) => {
-        Object.entries(hourMap || {}).forEach(([category, count]) => {
-          categoryCounts[category] = (categoryCounts[category] || 0) + Number(count);
-        });
-      });
-    });
-
-    const hourProd = Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      total: data
-        .filter((a) => a.productivityBase > 0)
-        .reduce((sum, agent) => sum + (agent.hourlyProductivity?.[hour] || 0), 0),
-    }))
-      .filter((h) => h.total > 0)
-      .sort((a, b) => b.total - a.total);
-
-    const categories = Object.entries(categoryCounts)
-      .map(([category, count]) => ({ category, count }))
-      .sort((a, b) => b.count - a.count);
-
-    const topAgents = agents.slice(0, 3);
-    const bottomAgents =
-      agents.length > 3 ? agents.slice(Math.max(3, agents.length - 3)).reverse() : [];
-
-    return {
-      topAgents: topAgents.map((a) => ({
-        label: a.agent.name || a.agent.csId,
-        subLabel: a.agent.teamLeader || a.agent.csId,
-        value: `${formatNum(a.avg, 1)} /hari`,
-      })),
-      bottomAgents: bottomAgents.map((a) => ({
-        label: a.agent.name || a.agent.csId,
-        subLabel: a.agent.teamLeader || a.agent.csId,
-        value: `${formatNum(a.avg, 1)} /hari`,
-      })),
-      topCategories: categories.slice(0, 3).map((c) => ({
-        label: c.category,
-        value: formatNum(c.count, 0),
-      })),
-      topIntervals: hourProd.slice(0, 3).map((h) => ({
-        label: `${String(h.hour).padStart(2, '0')}:00 – ${String((h.hour + 1) % 24).padStart(2, '0')}:00`,
-        subLabel: 'Interval tersibuk',
-        value: formatNum(h.total, 0),
-      })),
     };
   }, [data]);
 
   const hourlyDataWow = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
-    
+
     const filterAgent = (a: AgentKPI) => {
       const matchSearch =
         a.csId.toLowerCase().includes(search.toLowerCase()) ||
@@ -289,17 +210,15 @@ export const ProductivityDetail: React.FC<{
       const matchTL = filterTL ? a.teamLeader === filterTL : true;
       return matchSearch && matchTL && a.productivityBase > 0;
     };
-    
+
     const prevFiltered = previousData.filter(filterAgent);
     const prev2Filtered = previousData2.filter(filterAgent);
     const prev3Filtered = previousData3.filter(filterAgent);
 
     return hours.map((hr) => {
-      const getSum = (dataset: AgentKPI[]) => dataset.reduce(
-        (sum, agent) => sum + (agent.hourlyProductivity?.[hr] || 0),
-        0
-      );
-      
+      const getSum = (dataset: AgentKPI[]) =>
+        dataset.reduce((sum, agent) => sum + (agent.hourlyProductivity?.[hr] || 0), 0);
+
       return {
         hour: `${String(hr).padStart(2, "0")}:00`,
         total: getSum(tableData),
@@ -313,7 +232,6 @@ export const ProductivityDetail: React.FC<{
   const intervalCategoryInsights = useMemo(() => {
     return hourlyDataWow.map((hourData, hourIndex) => {
       const categoryCounts: Record<string, number> = {};
-
       tableData.forEach((agent) => {
         const hourlyCounts = agent.hourlyCategoryCounts?.[hourIndex] || {};
         Object.entries(hourlyCounts).forEach(([category, count]) => {
@@ -340,78 +258,98 @@ export const ProductivityDetail: React.FC<{
   }, [hourlyDataWow, tableData]);
 
   const busiestHourIndex = useMemo(() => {
-    return hourlyDataWow.reduce((bestIndex, item, index) => {
-      return item.total > hourlyDataWow[bestIndex].total ? index : bestIndex;
-    }, 0);
+    return hourlyDataWow.reduce(
+      (bestIndex, item, index) => (item.total > hourlyDataWow[bestIndex].total ? index : bestIndex),
+      0,
+    );
   }, [hourlyDataWow]);
 
   const activeHourIndex = selectedHourIndex ?? busiestHourIndex;
   const selectedIntervalInsight = intervalCategoryInsights[activeHourIndex];
 
   const handleChartIntervalClick = (_data: unknown, index?: number) => {
-    if (typeof index === "number") {
-      setSelectedHourIndex(index);
-    }
+    if (typeof index === "number") setSelectedHourIndex(index);
   };
+
+  const avgStatus = getKpiStatus(totalAvg, "productivity" as KpiType);
 
   return (
     <div className="flex flex-col gap-6 p-2">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-lg font-bold text-text-primary">
-          Productivity Dashboard
-        </h1>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Cari CS ID atau nama..."
-              aria-label="Cari CS ID atau nama..."
-              className="pl-8 pr-3 py-1.5 border border-border bg-card text-text-primary rounded-xl text-xs focus:border-primary focus:outline-none w-full md:w-56"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <Search className="w-4 h-4 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-          </div>
+        <div>
+          <h1 className="text-lg font-bold text-text-primary">Productivity Detail</h1>
+          <p className="mt-0.5 text-[11px] text-text-muted">target {PROD_TARGET} chat / man-day</p>
+        </div>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Cari CS ID atau nama..."
+            aria-label="Cari CS ID atau nama..."
+            className="pl-8 pr-3 py-1.5 border border-border bg-card text-text-primary rounded-xl text-xs focus:border-primary focus:outline-none w-full md:w-56"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Search className="w-4 h-4 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
         </div>
       </div>
 
-      <KpiRankLists
-        cards={[
-          { title: 'Top 3 Kategori Chat', items: highlightRanks.topCategories, tone: 'good' },
-          { title: 'Top 3 Interval Rame', items: highlightRanks.topIntervals, tone: 'neutral' },
-          { title: 'Top 3 Agent (Avg/hari)', items: highlightRanks.topAgents, tone: 'good' },
-          { title: 'Bottom 3 Agent (Avg/hari)', items: highlightRanks.bottomAgents, tone: 'bad' },
-        ]}
-      />
+      {/* HERO STRIP */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <HeroTile
+          label="Total chat"
+          value={formatNum(totalChat, 0)}
+          sub={`${activeAgents} agent aktif · ${formatNum(totalManDays, 0)} man-day`}
+        />
+        <HeroTile
+          label="Avg / man-day"
+          value={formatNum(totalAvg, 1)}
+          status={avgStatus}
+          sub={`${totalAvg >= PROD_TARGET ? "+" : ""}${formatNum(totalAvg - PROD_TARGET, 1)} vs ${PROD_TARGET}`}
+        />
+        <HeroTile
+          label="Pencapaian kuota"
+          value={`${formatNum(quotaAchievement, 0)}%`}
+          progress={quotaAchievement}
+          sub={`kuota ${formatNum(totalQuota, 0)}`}
+        />
+        <HeroTile
+          label="Gap vs target"
+          value={`${totalGap >= 0 ? "+" : ""}${formatNum(totalGap, 0)}`}
+          status={totalGap < 0 ? "miss" : "none"}
+          sub={`${underTarget} agent di bawah kuota`}
+        />
+      </div>
 
-      {/* HOURLY PRODUCTIVITY CHART */}
+      {/* HOURLY CHART */}
       <div className="bg-card border border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl p-4 flex flex-col gap-4">
-        <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
-          <Activity className="w-4 h-4 text-primary" />
-          Hourly Traffic Distribution (Chat/Tiket per Jam)
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            Distribusi jam — volume chat
+          </h2>
+          <span className="text-[11px] tabular-nums text-text-muted">
+            puncak {hourlyDataWow[busiestHourIndex]?.hour ?? "-"}
+          </span>
+        </div>
         <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             {isComparisonEnabled && previousData.length > 0 ? (
-              <LineChart
-                data={hourlyDataWow}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              >
+              <LineChart data={hourlyDataWow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
-                <RechartsTooltip 
-                  cursor={{ fill: 'var(--color-surface-muted)', strokeWidth: 2 }}
+                <RechartsTooltip
+                  cursor={{ fill: "var(--color-surface-muted)", strokeWidth: 2 }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
                         <div className="bg-card border border-border p-2 rounded-lg shadow-lg">
                           <div className="text-xs font-bold text-text-primary mb-1">{payload[0].payload.hour}</div>
                           {payload.map((p, i) => (
-                             <div key={i} className="text-xs text-text-secondary mt-1 flex items-center gap-2">
-                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }}></span>
-                               {p.name}: <span className="font-bold text-primary" style={{ color: p.color }}>{formatNum(p.value as number, 0)}</span>
-                             </div>
+                            <div key={i} className="text-xs text-text-secondary mt-1 flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }}></span>
+                              {p.name}: <span className="font-bold" style={{ color: p.color }}>{formatNum(p.value as number, 0)}</span>
+                            </div>
                           ))}
                         </div>
                       );
@@ -419,36 +357,25 @@ export const ProductivityDetail: React.FC<{
                     return null;
                   }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Line
-                  type="monotone"
-                  name={comparisonMode === 'mom' ? 'Bulan Ini' : 'Minggu Ini'}
-                  dataKey="total"
-                  stroke={chart.primary}
-                  strokeWidth={3}
-                  dot={{ r: 3, cursor: "pointer", onClick: handleChartIntervalClick }}
-                  activeDot={{ r: 5, cursor: "pointer", onClick: handleChartIntervalClick }}
-                />
-                <Line type="monotone" name={comparisonMode === 'mom' ? 'Bulan Lalu' : 'Minggu Lalu'} dataKey="prev" stroke={chart.secondary} strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                {previousData2.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '2 Bulan Lalu' : '2 Minggu Lalu'} dataKey="prev2" stroke={chart.muted} strokeWidth={2} strokeDasharray="3 3" dot={false} />}
-                {previousData3.length > 0 && <Line type="monotone" name={comparisonMode === 'mom' ? '3 Bulan Lalu' : '3 Minggu Lalu'} dataKey="prev3" stroke={chart.disabled} strokeWidth={2} strokeDasharray="2 2" dot={false} />}
+                <Legend iconType="circle" wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }} />
+                <Line type="monotone" name={comparisonMode === "mom" ? "Bulan Ini" : "Minggu Ini"} dataKey="total" stroke={chart.primary} strokeWidth={3} dot={{ r: 3, cursor: "pointer", onClick: handleChartIntervalClick }} activeDot={{ r: 5, cursor: "pointer", onClick: handleChartIntervalClick }} />
+                <Line type="monotone" name={comparisonMode === "mom" ? "Bulan Lalu" : "Minggu Lalu"} dataKey="prev" stroke={chart.secondary} strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                {previousData2.length > 0 && <Line type="monotone" name={comparisonMode === "mom" ? "2 Bulan Lalu" : "2 Minggu Lalu"} dataKey="prev2" stroke={chart.muted} strokeWidth={2} strokeDasharray="3 3" dot={false} />}
+                {previousData3.length > 0 && <Line type="monotone" name={comparisonMode === "mom" ? "3 Bulan Lalu" : "3 Minggu Lalu"} dataKey="prev3" stroke={chart.disabled} strokeWidth={2} strokeDasharray="2 2" dot={false} />}
               </LineChart>
             ) : (
-              <BarChart
-                data={hourlyDataWow}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              >
+              <BarChart data={hourlyDataWow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} minTickGap={10} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
-                <RechartsTooltip 
-                  cursor={{ fill: 'var(--color-surface-muted)' }}
+                <RechartsTooltip
+                  cursor={{ fill: "var(--color-surface-muted)" }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
                         <div className="bg-card border border-border p-2 rounded-lg shadow-lg">
                           <div className="text-xs font-bold text-text-primary">{payload[0].payload.hour}</div>
-                          <div className="text-xs text-text-secondary mt-1">Traffic: <span className="font-bold text-primary">{formatNum(payload[0].value as number, 0)}</span> chats</div>
+                          <div className="text-xs text-text-secondary mt-1">Traffic: <span className="font-bold text-text-primary">{formatNum(payload[0].value as number, 0)}</span> chats</div>
                         </div>
                       );
                     }
@@ -463,12 +390,11 @@ export const ProductivityDetail: React.FC<{
                       onClick={() => setSelectedHourIndex(index)}
                       fill={
                         index === activeHourIndex
-                          ? "var(--color-danger-text)"
+                          ? "var(--color-text-primary)"
                           : entry.total > 0
-                            ? "var(--color-primary)"
+                            ? "var(--color-border-strong)"
                             : "var(--color-border)"
                       }
-                      fillOpacity={index === activeHourIndex ? 1 : 0.88}
                     />
                   ))}
                 </Bar>
@@ -482,15 +408,15 @@ export const ProductivityDetail: React.FC<{
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="text-[11px] font-bold text-text-muted uppercase tracking-wide">
-                  Selected Interval {selectedIntervalInsight.hour}
+                  Interval {selectedIntervalInsight.hour}
                 </div>
                 <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-2xl font-semibold leading-none text-text-primary">
+                  <span className="text-2xl font-semibold leading-none text-text-primary tabular-nums">
                     {formatNum(selectedIntervalInsight.total, 0)}
                   </span>
                   <span className="text-xs font-semibold text-text-muted">chats</span>
                   {selectedIntervalInsight.change !== null && (
-                    <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${selectedIntervalInsight.change > 0 ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>
+                    <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${selectedIntervalInsight.change > 0 ? "bg-surface-muted text-text-secondary" : "bg-danger-soft text-danger-text"}`}>
                       {selectedIntervalInsight.change >= 0 ? "+" : ""}
                       {formatNum(selectedIntervalInsight.change, 0)} vs pembanding
                     </span>
@@ -532,10 +458,10 @@ export const ProductivityDetail: React.FC<{
                         <td className="max-w-[360px] truncate px-3 py-2 font-semibold text-text-primary" title={category.category}>
                           {category.category}
                         </td>
-                        <td className="px-3 py-2 text-right font-bold text-text-primary">
+                        <td className="px-3 py-2 text-right font-bold text-text-primary tabular-nums">
                           {formatNum(category.count, 0)}
                         </td>
-                        <td className="px-3 py-2 text-right font-bold text-text-secondary">
+                        <td className="px-3 py-2 text-right font-bold text-text-secondary tabular-nums">
                           {formatNum(category.share, 1)}%
                         </td>
                       </tr>
@@ -552,39 +478,26 @@ export const ProductivityDetail: React.FC<{
         )}
       </div>
 
+      {/* PER-AGENT — sparkline-first rank list */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] text-text-muted">Klik baris untuk chat harian · 3 terbawah ditandai garis merah</span>
+      </div>
       <MobileScrollHint label="Geser → untuk lihat semua kolom" />
       <div
         ref={tableScrollRef}
-        className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl transition-all max-h-[calc(100vh-200px)]"
+        className="relative w-full overflow-auto bg-card border text-sm border-border shadow-[0_1px_3px_rgba(0,0,0,0.04)] rounded-xl max-h-[calc(100vh-200px)]"
       >
-        <table className="kpi-data-table w-full text-left whitespace-nowrap border-collapse">
+        <table className="kpi-data-table w-full text-left border-collapse">
           <thead className="bg-surface text-text-secondary sticky top-0 z-30">
             <tr>
-              <th className="p-2 font-bold text-center  md:sticky md:left-0 z-40 bg-surface min-w-[60px] max-w-[60px]">
-                No
-              </th>
-              <SortableHeader label="Name / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[60px] z-40 bg-surface min-w-[250px] max-w-[250px]" />
-              <SortableHeader label="BPO" sortKey="bpo" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[310px] z-40 bg-surface min-w-[80px] max-w-[80px]" />
-              <SortableHeader label="Team Leader" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="md:sticky md:left-[390px] z-40 bg-surface min-w-[120px] max-w-[120px]" />
-              <th className="p-2 font-bold text-center text-text-primary bg-surface z-30 relative">
-                Total Prod
-              </th>
-              <th className="p-2 font-bold text-center text-text-muted bg-surface z-30 relative">
-                Man-Days
-              </th>
-              <SortableHeader label="Average" sortKey="average" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface z-30 relative" />
-              <th className="p-2 font-bold text-center text-text-muted bg-surface z-30 relative">
-                Target Quota
-              </th>
-              <SortableHeader label="Gap (+/-)" sortKey="gap" config={sortConfig} onSort={handleSort} className="text-center text-text-primary bg-surface z-30 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]" />
-              {uniqueDates.map((date, i) => (
-                <th
-                  key={date}
-                  className={`p-2 font-bold text-center text-text-muted bg-surface ${weekSeparatorClass(i)}`}
-                >
-                  {formatCalendarHeader(date)}
-                </th>
-              ))}
+              <th className="p-2 font-bold text-center border-b border-border bg-surface w-[48px]">No</th>
+              <SortableHeader label="Nama / CS ID" sortKey="name" config={sortConfig} onSort={handleSort} className="border-b border-border bg-surface min-w-[200px]" />
+              <SortableHeader label="BPO · TL" sortKey="teamLeader" config={sortConfig} onSort={handleSort} className="border-b border-border bg-surface min-w-[130px]" />
+              <th className="p-2 font-bold text-text-muted border-b border-border bg-surface min-w-[150px]">Tren harian</th>
+              <SortableHeader label="Total" sortKey="total" config={sortConfig} onSort={handleSort} className="text-right text-text-primary border-b border-border bg-surface w-[90px]" />
+              <SortableHeader label={`Avg/MD · t ${PROD_TARGET}`} sortKey="average" config={sortConfig} onSort={handleSort} className="text-right text-text-primary border-b border-border bg-surface w-[110px]" />
+              <SortableHeader label="Gap" sortKey="gap" config={sortConfig} onSort={handleSort} className="text-right text-text-primary border-b border-border bg-surface w-[84px]" />
+              <th className="p-2 border-b border-border bg-surface w-[40px]" aria-hidden />
             </tr>
           </thead>
           <VirtualizedTbody
@@ -596,130 +509,88 @@ export const ProductivityDetail: React.FC<{
               const agent = tableData[idx];
               if (!agent) return null;
               const displayName = agent.name || agent.csId;
-              const localManDays = agent.manDays;
-              const localTargetQuota = localManDays * 100;
-              const localGap = agent.productivityTotal - localTargetQuota;
-              const localAvg =
-                localManDays > 0 ? agent.productivityTotal / localManDays : 0;
               const prodByDate = indexByDate(agent.dailyHistory?.productivity);
               const scheduleByDate = indexByDate(agent.dailyHistory?.schedule);
+              const dailyByDate = uniqueDates.map((date) => {
+                const d = getByCalendarDate(prodByDate, date);
+                return d && d.value !== null && d.value !== undefined ? d.value : null;
+              });
+              const sparkVals = [...dailyByDate].reverse();
+              const md = agent.manDays;
+              const avg = md > 0 ? agent.productivityTotal / md : null;
+              const gap = md > 0 ? agent.productivityTotal - md * PROD_TARGET : null;
+              const avgStat = getKpiStatus(avg, "productivity");
+              const isOpen = expandedRows.has(agent.csId);
+              const isBottom = bottomThreeIds.includes(agent.csId);
 
               return (
-                <tr
-                  key={agent.csId}
-                  className="border-b border-border transition-colors group hover:bg-surface-muted"
-                >
-                  <td className="p-2 text-center text-text-muted font-medium md:sticky md:left-0 z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[60px] max-w-[60px]">
-                    {idx + 1}
-                  </td>
-                  <td className="p-2 font-medium md:sticky md:left-[60px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[250px] max-w-[250px] truncate">
-                    <span className="text-kpi-neutral-text font-semibold" title={agent.csId}>
-                      {displayName}
-                    </span>
-                  </td>
-                  <td className="p-2 font-medium text-text-primary uppercase md:sticky md:left-[310px] z-20 bg-card group-hover:bg-surface-muted min-w-[80px] max-w-[80px] truncate">
-                    {agent.bpo || "-"}
-                  </td>
-                  <td className="p-2 font-medium text-text-primary md:sticky md:left-[390px] z-20 bg-card group-hover:bg-surface-muted transition-colors min-w-[120px] max-w-[120px] truncate">
-                    {agent.teamLeader || "-"}
-                  </td>
-                  <td className="p-2 text-center z-10 relative">
-                    <span
-                      className={`font-bold text-[11px] ${getKpiColor(agent.productivityTotal, "productivity")}`}
-                    >
+                <React.Fragment key={agent.csId}>
+                  <tr
+                    className={`border-b border-border transition-colors group hover:bg-surface-muted cursor-pointer ${isBottom ? "border-l-2 border-l-danger" : ""}`}
+                    onClick={() => toggleRow(agent.csId)}
+                  >
+                    <td className="p-2 text-center text-text-muted font-medium w-[48px]">{idx + 1}</td>
+                    <td className="p-2 min-w-[200px]">
+                      <div className="font-semibold text-text-primary truncate" title={agent.csId}>{displayName}</div>
+                      <div className="text-[9px] text-text-muted truncate">{agent.csId}</div>
+                    </td>
+                    <td className="p-2 text-text-secondary min-w-[130px] truncate">
+                      <span className="uppercase">{agent.bpo || "-"}</span>
+                      <span className="text-text-muted"> · {agent.teamLeader || "-"}</span>
+                    </td>
+                    <td className="p-2 min-w-[150px]">
+                      <div className={avgStat === "miss" ? "text-danger" : avgStat === "watch" ? "text-warning" : "text-text-muted"}>
+                        <Sparkline values={sparkVals} height={22} />
+                      </div>
+                    </td>
+                    <td className="p-2 text-right w-[90px] text-[11px] tabular-nums text-text-secondary">
                       {formatNum(agent.productivityTotal, 0)}
-                    </span>
-                  </td>
-                  <td className="p-2 text-center text-text-muted font-medium z-10 relative">
-                    {localManDays}
-                  </td>
-                  <td className="p-2 text-center z-10 relative">
-                    {localManDays > 0 ? (
-                      <span
-                        className={`font-bold text-[11px] ${getKpiColor(localAvg, "productivity")}`}
-                      >
-                        {formatNum(localAvg, 0)}
-                      </span>
-                    ) : (
-                      <span className="text-text-disabled font-bold text-[11px]">
-                        -
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-2 text-center text-text-muted font-medium z-10 relative">
-                    {localTargetQuota}
-                  </td>
-                  <td className="p-2 text-center z-10 relative shadow-[10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                    {localManDays > 0 ? (
-                      <span
-                        className={`font-bold text-[11px] ${localGap >= 0 ? "text-success" : "text-danger"}`}
-                      >
-                        {localGap > 0 ? `+${localGap}` : localGap}
-                      </span>
-                    ) : (
-                      <span className="text-text-disabled font-bold text-[11px]">
-                        -
-                      </span>
-                    )}
-                  </td>
-                  {uniqueDates.map((date) => {
-                    const daily = getByCalendarDate(prodByDate, date);
-                    const sched = getByCalendarDate(scheduleByDate, date);
-                    const status = sched?.status?.toUpperCase() || "";
-
-                    const isOff = status === "OFF" || status === "C";
-                    const isPullout = status === "PULLOUT";
-                    const isShift22 = status === "22";
-
-                    let bgClass = "";
-
-                    let numContent = (
-                      <span className="text-text-disabled font-medium">-</span>
-                    );
-
-                    if (daily) {
-                      numContent = (
-                        <span
-                          className={`font-bold text-[11px] h-full flex flex-col justify-center ${getKpiColor(daily.value, "productivity")}`}
-                        >
-                          {formatNum(daily.value, 0)}
+                    </td>
+                    <td className="p-2 text-right w-[110px]">
+                      {avg !== null
+                        ? <KpiValue value={avg} type="productivity" text={formatNum(avg, 0)} className="justify-end" />
+                        : <span className="text-[11px] text-text-disabled">-</span>}
+                    </td>
+                    <td className="p-2 text-right w-[84px] text-[11px] tabular-nums">
+                      {gap !== null ? (
+                        <span className={`inline-flex items-center justify-end gap-1 font-medium ${gap < 0 ? "text-danger" : "text-text-muted"}`}>
+                          <KpiCue status={gap < 0 ? "miss" : "on"} />
+                          {gap >= 0 ? "+" : ""}{formatNum(gap, 0)}
                         </span>
-                      );
-                    }
-
-                    return (
-                      <td
-                        key={date}
-                        className={`p-2 text-center z-10 transition-colors ${bgClass}`}
-                      >
-                        <div className="flex items-center justify-center gap-1 relative">
-                          {numContent}
-                          {(isShift22 || isPullout) && daily && (
-                            <div className="group/tooltip relative flex items-center justify-center">
-                              <span className="text-[9px] text-text-muted font-medium cursor-help px-1 rounded">
-                                {isPullout ? "(PO)" : "(22)"}
-                              </span>
-                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-max max-w-[240px] bg-gray-900 text-white text-[10px] rounded px-2 py-1 opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity z-50 shadow-lg whitespace-normal text-left">
-                                {isPullout 
-                                  ? "Agent berstatus Pullout, namun produktivitasnya tetap dihitung masuk ke target harian agent ini."
-                                  : "Shift malam (22:00). Sebagian atau seluruh produktivitas shift ini dihitung pada hari sebelum atau sesudahnya."}
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                              </div>
-                            </div>
-                          )}
+                      ) : "-"}
+                    </td>
+                    <td className="p-2 text-center w-[40px]">
+                      <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="bg-surface/40 border-b border-border">
+                      <td colSpan={tableColSpan} className="px-4 pb-4 pt-1">
+                        <div className="text-[9px] text-text-muted uppercase tracking-wide pt-3 pb-2">
+                          Chat per hari &mdash; hanya di bawah {PROD_TARGET} yang berwarna &middot; sel kosong = tidak ada data &middot; ²² shift 22:00, ᴾᴼ pullout
                         </div>
+                        <DayStrip
+                          kpiType="productivity"
+                          items={chronoDates.map((date) => {
+                            const d = getByCalendarDate(prodByDate, date);
+                            const sched = getByCalendarDate(scheduleByDate, date);
+                            const st = (sched?.status || "").toUpperCase();
+                            return {
+                              date,
+                              value: d && d.value !== null && d.value !== undefined ? d.value : null,
+                              marker: st === "22" ? "22" : st === "PULLOUT" ? "PO" : null,
+                            };
+                          })}
+                        />
                       </td>
-                    );
-                  })}
-                </tr>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
             {tableData.length === 0 && (
               <tr>
-                <td
-                  colSpan={tableColSpan}
-                  className="p-4 z-10"
-                >
+                <td colSpan={tableColSpan} className="p-4 z-10">
                   <EmptyState
                     title="Tidak ada data productivity"
                     description="Coba ubah pencarian, filter TL, atau rentang tanggal."

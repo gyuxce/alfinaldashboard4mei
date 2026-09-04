@@ -49,10 +49,8 @@ export function processQa(
     const systemCheckingType = cell(row, pickColumn(qaColumns.systemCheckingType, 12));
     const qcName = cell(row, pickColumn(qaColumns.qcName, 14));
     const mistakeLevel = cell(row, pickColumn(qaColumns.mistakeLevel, 15));
-    const deduction = 0;
     const category = cell(row, pickColumn(qaColumns.category, 30));
     const remarks = cell(row, pickColumn(qaColumns.remarks, 32));
-    const feedback = "";
     const crmKode = cell(row, pickColumn(qaColumns.crmKode, 28));
 
     const scoreStr = cell(row, pickColumn(qaColumns.score, 17)).replace(",", ".");
@@ -111,10 +109,8 @@ export function processQa(
       mistakeLevel,
       category,
       remarks,
-      deduction,
       score: rowHasScore ? score : 0,
       hasScore: countScore,
-      feedback,
       crmKode,
     });
   }

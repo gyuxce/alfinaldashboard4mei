@@ -1,15 +1,4 @@
-import {
-  cell,
-  findLegacyCsIdIndex,
-  isLegacyCsId,
-  pickColumn,
-  resolveCsatScColumns,
-  resolveProductivityColumns,
-  resolveQaColumns,
-  resolveRowCsId,
-  resolveScheduleIdentityColumns,
-  resolveSlaColumns,
-} from './sheetHeaders';
+import { cell, findLegacyCsIdIndex, isLegacyCsId } from './sheetHeaders';
 import { isAgentDictionaryPopulated } from './csid';
 import { normalizeDateStr } from './dates';
 import { processSchedule } from './processors/schedule';
@@ -53,10 +42,8 @@ export interface QAEntry {
   mistakeLevel: string;
   category: string;
   remarks: string;
-  deduction: number;
   score: number;
   hasScore?: boolean;
-  feedback: string;
   crmKode?: string;
 }
 
@@ -115,14 +102,12 @@ export interface AgentKPI {
   csatAsli: number | null;
   whu: number | null;
 
-  csatScFullScore: number;
   csatScFullCount: number;
   csatScGoodCount: number;
   csatScBadCount: number;
   csatScTotalValid: number;
   csatScFull: number | null;
 
-  csatScFairScore: number;
   csatScFairCount: number;
   csatScFairGoodCount: number;
   csatScFairBadCount: number;
@@ -377,22 +362,6 @@ export function getPreviousMonthPeriod(startDate: string, endDate: string) {
   };
 }
 
-/** Full previous calendar month relative to a YYYY-MM-DD reference (used by incentive simulation). */
-export function getPreviousCalendarMonthRange(referenceDate: string) {
-  if (!referenceDate) return { start: '', end: '' };
-  const [yearValue, monthValue] = referenceDate.split('-').map(Number);
-  const year = yearValue || new Date().getFullYear();
-  const month = monthValue || new Date().getMonth() + 1;
-  const previousMonth = month === 1 ? 12 : month - 1;
-  const previousYear = month === 1 ? year - 1 : year;
-  const lastDay = new Date(previousYear, previousMonth, 0).getDate();
-
-  return {
-    start: `${previousYear}-${String(previousMonth).padStart(2, '0')}-01`,
-    end: `${previousYear}-${String(previousMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
-  };
-}
-
 // normalizeDateStr moved to lib/dates.ts — re-exported for backward compat.
 export { normalizeDateStr } from './dates';
 
@@ -598,13 +567,11 @@ export const processKPIs = (
         manDays: 0,
         csatAsli: null,
         whu: null,
-        csatScFullScore: 0,
         csatScFullCount: 0,
         csatScGoodCount: 0,
         csatScBadCount: 0,
         csatScTotalValid: 0,
         csatScFull: null,
-        csatScFairScore: 0,
         csatScFairCount: 0,
         csatScFairGoodCount: 0,
         csatScFairBadCount: 0,

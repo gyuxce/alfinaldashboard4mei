@@ -158,7 +158,7 @@ export function resolveProductivityColumns(data: unknown[][]): ProductivityColum
   };
 }
 
-export function resolveCsatScColumns(headers: unknown[], _dataRows?: unknown[][]): CsatScColumns {
+export function resolveCsatScColumns(headers: unknown[]): CsatScColumns {
   // Score is resolved by header only. The previous data-based fallback
   // (findScoreColumnByData) misread the date column as the score column
   // because parseFloat('5/8/2026') === 5, which made CSAT Room show only

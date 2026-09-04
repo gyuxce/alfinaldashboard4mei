@@ -26,7 +26,7 @@ export function processCsatSc(
   if (csatData.length <= 1) return;
 
   const headerRow = csatData[0] || [];
-  const csatColumns = resolveCsatScColumns(headerRow, csatData);
+  const csatColumns = resolveCsatScColumns(headerRow);
 
   for (let i = 1; i < csatData.length; i++) {
     const row = csatData[i];
@@ -169,7 +169,6 @@ export function processCsatSc(
     agent.csatScScoreDistribution[scoreKey][cleanCatForDist] += 1;
 
     if (isValidCsatScScore(score)) {
-      agent.csatScFullScore += score;
       agent.csatScFullCount += 1;
 
       if (score >= 4) {
@@ -194,7 +193,6 @@ export function processCsatSc(
       const isTakeout = isCsatTakeoutCategory(category);
 
       if (!isTakeout) {
-        agent.csatScFairScore += score;
         agent.csatScFairCount += 1;
 
         if (score >= 4) {

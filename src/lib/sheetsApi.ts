@@ -8,6 +8,10 @@ const DEFAULT_SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
 // Env variable tetap bisa dipakai jika ID-nya nanti dipindahkan atau diganti.
 const AUG_OCT_2026_SPREADSHEET_ID =
   import.meta.env.VITE_SPREADSHEET_ID_AUG_OCT_2026 || '156IyfTTE77MPbCUWoHS741M_VJoMzyLr6Tr-498Zmok';
+// Pilot CSAT roster lives in one small tab; it does not rotate by month.
+const PILOT_SPREADSHEET_ID =
+  import.meta.env.VITE_SPREADSHEET_ID_PILOT || AUG_OCT_2026_SPREADSHEET_ID;
+const PILOT_SHEET_NAME = import.meta.env.VITE_SHEET_PILOT || 'PILOT';
 const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
@@ -84,41 +88,6 @@ function buildSheetFetchError(sheetName: string, status: number, statusText: str
   return new Error(
     `Gagal mengambil tab "${sheetName}": ${status} ${statusText}${apiMessage ? ` - ${apiMessage}` : ''}`
   );
-}
-
-// Fetch single sheet (unused — kept for potential single-tab debugging)
-async function fetchSheet(
-  sheetName: string,
-  range: string = 'A:AZ',
-  spreadsheetId: string = DEFAULT_SPREADSHEET_ID,
-  signal?: AbortSignal,
-): Promise<SheetData> {
-  const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!${range}?key=${API_KEY}`;
-
-  for (let attempt = 0; attempt < 4; attempt++) {
-    throwIfAborted(signal);
-    try {
-      const response = await fetchWithTimeout(url, signal, 20000);
-
-      if (response.ok) {
-        const json = await response.json();
-        return json.values || [];
-      }
-
-      const shouldRetry = RETRYABLE_STATUS.has(response.status) && attempt < 3;
-      if (!shouldRetry) {
-        const apiMessage = await readGoogleSheetsError(response);
-        throw buildSheetFetchError(sheetName, response.status, response.statusText, apiMessage);
-      }
-    } catch (error) {
-      if (isAbortError(error) || signal?.aborted) throw error;
-      if (attempt >= 3 || !isTransientNetworkError(error)) throw error;
-    }
-
-    await sleep(1000 * Math.pow(2, attempt));
-  }
-
-  return [];
 }
 
 function buildRange(sheetName: string, range: string = 'A:AZ'): string {
@@ -322,6 +291,28 @@ export function getSpreadsheetIdForMonth(monthKey: string): string {
   return DEFAULT_SPREADSHEET_ID;
 }
 
+/**
+ * Workbooks to try, in order, when fetching a history month.
+ *
+ * A history month of an archive-workbook period (Aug–Oct 2026) usually lives in
+ * that same workbook — kept together for MoM comparison and the incentive
+ * simulation (previous calendar month). Without this, selecting August and
+ * opening Simulasi Insentif fetches `PRODUCTIVITY_JUL_2026` from the default
+ * workbook, 404s, and every agent shows "Data belum lengkap".
+ */
+export function getSpreadsheetIdCandidatesForMonth(
+  monthKey: string,
+  selectedMonthKey?: string,
+): string[] {
+  const ordered = [
+    getSpreadsheetIdForMonth(monthKey),
+    selectedMonthKey ? getSpreadsheetIdForMonth(selectedMonthKey) : '',
+    DEFAULT_SPREADSHEET_ID,
+    AUG_OCT_2026_SPREADSHEET_ID,
+  ];
+  return ordered.filter((id, i) => id && ordered.indexOf(id) === i);
+}
+
 export async function fetchAllSheets(
   config: SheetConfig = DEFAULT_CONFIG,
   spreadsheetId: string = DEFAULT_SPREADSHEET_ID,
@@ -371,6 +362,25 @@ export async function fetchAllSheets(
   }
 
   throw new Error('Koneksi ke Google Sheets terputus. Coba Sync lagi.');
+}
+
+/**
+ * Pilot CSAT roster tab. Optional — a missing / unshared tab just means "no pilot
+ * config" and must never fail a normal sync, so this swallows non-abort errors.
+ */
+export async function fetchPilotRows(signal?: AbortSignal): Promise<string[][]> {
+  if (!API_KEY || !PILOT_SPREADSHEET_ID) return [];
+  const range = buildRange(PILOT_SHEET_NAME);
+  const url = `${BASE_URL}/${PILOT_SPREADSHEET_ID}/values/${encodeURIComponent(range)}?key=${API_KEY}`;
+  try {
+    const res = await fetchWithTimeout(url, signal, 20000);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.values || []) as string[][];
+  } catch (error) {
+    if (isAbortError(error) || signal?.aborted) throw error;
+    return [];
+  }
 }
 
 function cellHasNumericScore(value: string): boolean {
@@ -518,20 +528,6 @@ export function mergeAllSheetsData(previous: AllSheetsData, current: AllSheetsDa
     // agent. Exact-row dedupe is enough for overlapping month tabs.
     qa: mergeSheetData(previous.qa, current.qa),
   };
-}
-
-// Convert SheetData ke format CSV string (unused — kept for potential export)
-function sheetDataToCsv(data: SheetData): string {
-  return data
-    .map(row => row.map(cell => {
-      const value = String(cell ?? '');
-      // Quote cells yang mengandung koma atau newline
-      if (value.includes(',') || value.includes('\n') || value.includes('"')) {
-        return `"${value.replace(/"/g, '""')}"`;
-      }
-      return value;
-    }).join(','))
-    .join('\n');
 }
 
 // Convert SheetData ke format yang sama dengan PapaParse output
