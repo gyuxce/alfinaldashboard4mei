@@ -573,10 +573,18 @@ export default function App() {
     if (sheetsFetchError || !import.meta.env.VITE_SHEETS_API_KEY) setInitialSyncSettled(true);
   }, [initialSyncSettled, isHydrating, isFetchingSheets, hasSourceData, sheetsFetchError]);
 
+  // Once the KPI pipeline has produced real rows a single time, never blank
+  // the whole app for it again — a later recompute (switching to a tab that
+  // needs a wider period, changing the date range, a background re-sync)
+  // keeps showing what's already on screen (useProcessedKpis is
+  // stale-while-revalidate) instead of re-triggering the full boot screen.
+  const hasRenderedKpiOnceRef = useRef(false);
+  if (rawData.length > 0) hasRenderedKpiOnceRef.current = true;
+
   const showBootLoading =
     !initialSyncSettled
     || isHydrating
-    || (isProcessingKpis && rawData.length === 0);
+    || (isProcessingKpis && rawData.length === 0 && !hasRenderedKpiOnceRef.current);
 
   const navItems = [
     { id: 'summary', label: 'Dashboard Summary', icon: LayoutDashboard, section: 'KPI' },

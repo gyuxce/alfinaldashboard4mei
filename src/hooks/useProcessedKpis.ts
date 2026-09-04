@@ -110,8 +110,12 @@ export function useProcessedKpis(args: Args): {
     const gen = ++genRef.current;
     let cancelled = false;
 
-    // Don't render a prior period/filter's KPI while this generation runs.
-    setBundle(EMPTY_BUNDLE);
+    // Stale-while-revalidate: keep showing the previous bundle (if any) while
+    // this generation runs instead of wiping it to empty. A tab switch that
+    // merely adds/removes the "pilot" period (or any other filter/date tweak)
+    // must not blank out data the user is already looking at — that's what
+    // caused the whole app to flash back to the full boot screen on every
+    // nav click. Only `enabled: false` below clears the bundle outright.
 
     const hasAnySource =
       productivityData.length > 0 ||
@@ -121,6 +125,8 @@ export function useProcessedKpis(args: Args): {
       qaData.length > 0;
 
     if (!hasAnySource) {
+      // Genuinely nothing to show (e.g. after Reset Data) — clear for real.
+      setBundle(EMPTY_BUNDLE);
       setIsProcessing(false);
       return;
     }

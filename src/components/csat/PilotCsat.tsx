@@ -84,7 +84,7 @@ const CaseCard: React.FC<{ c: PilotCase; tone: 'bad' | 'good' }> = ({ c, tone })
   </div>
 );
 
-const PilotDetail: React.FC<{ row: PilotAgentRow; onClose: () => void }> = ({ row, onClose }) => {
+const PilotDetail: React.FC<{ row: PilotAgentRow; onClose?: () => void }> = ({ row, onClose }) => {
   const st = STATUS[row.status];
   return (
     <>
@@ -94,13 +94,15 @@ const PilotDetail: React.FC<{ row: PilotAgentRow; onClose: () => void }> = ({ ro
           <p className="mt-0.5 truncate text-xs text-text-secondary">{row.csId} · TL {row.teamLeader}</p>
           <span className={cn('mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold', st.cls)}>{st.label}</span>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Tutup"
-          className="shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-surface-muted hover:text-text-primary"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            aria-label="Tutup"
+            className="shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-surface-muted hover:text-text-primary"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-center">
@@ -205,10 +207,13 @@ export const PilotCsat: React.FC<{
   const batches = useMemo(() => getPilotBatches(pilotEntries), [pilotEntries]);
   const [batchName, setBatchName] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The mobile slide-in drawer only opens on an explicit tap — auto-selecting
+  // the top participant (below) must not pop it open on page load.
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   React.useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedId(null);
+      if (e.key === 'Escape') setMobileDrawerOpen(false);
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
@@ -238,8 +243,33 @@ export const PilotCsat: React.FC<{
     return out;
   }, [activeBatch, byCsId]);
 
+  /** One row per batch (not just the active one) so batches can be compared side by side. */
+  const batchSummaries = useMemo(() => {
+    return batches.map((b) => {
+      const batchRows = b.entries.map((e) => buildPilotAgentRow(e, byCsId.get(e.csId), b.endDate || periodEnd));
+      const batchDeltas = batchRows.map((r) => r.delta).filter((d): d is number => d !== null);
+      return {
+        name: b.name,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        participants: b.entries.length,
+        lulus: batchRows.filter((r) => r.status === 'lulus').length,
+        avgDelta: batchDeltas.length ? batchDeltas.reduce((s, d) => s + d, 0) / batchDeltas.length : null,
+      };
+    });
+  }, [batches, byCsId, periodEnd]);
+
   const selected = rows.find((r) => r.csId === selectedId) ?? null;
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Default to the top-ranked participant so the detail panel is never a
+  // blank "pilih peserta" placeholder — it only stays empty when the batch
+  // truly has no one in it. Re-resolves after a batch switch too.
+  React.useEffect(() => {
+    if (rows.length === 0) { setSelectedId(null); return; }
+    if (selectedId && rows.some((r) => r.csId === selectedId)) return;
+    setSelectedId(rows[0].csId);
+  }, [rows, selectedId]);
 
   if (pilotEntries.length === 0) {
     return (
@@ -276,6 +306,7 @@ export const PilotCsat: React.FC<{
               setBatchName(e.target.value);
               setSelectedId(null);
               setExpandedId(null);
+              setMobileDrawerOpen(false);
             }}
             className="h-8 rounded-lg border border-border bg-surface px-2 text-xs font-semibold text-text-primary focus:border-primary focus:outline-none"
           >
@@ -341,7 +372,61 @@ export const PilotCsat: React.FC<{
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {batchSummaries.length > 1 && (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border bg-surface px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-text-muted">
+            Riwayat Batch
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-[11px]">
+              <thead>
+                <tr className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                  <th className="px-3 py-2 font-medium">Batch</th>
+                  <th className="px-3 py-2 font-medium">Periode</th>
+                  <th className="px-3 py-2 text-right font-medium">Peserta</th>
+                  <th className="px-3 py-2 text-right font-medium">LULUS</th>
+                  <th className="px-3 py-2 text-right font-medium">Rata-rata Δ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchSummaries.map((b) => {
+                  const isActive = b.name === (activeBatch?.name ?? '');
+                  return (
+                    <tr
+                      key={b.name}
+                      onClick={() => {
+                        setBatchName(b.name);
+                        setSelectedId(null);
+                        setExpandedId(null);
+                        setMobileDrawerOpen(false);
+                      }}
+                      className={cn(
+                        'cursor-pointer border-t border-border/60 transition-colors',
+                        isActive ? 'bg-surface-muted' : 'hover:bg-surface-muted/60',
+                      )}
+                    >
+                      <td className="px-3 py-2 font-semibold text-text-primary">{b.name}</td>
+                      <td className="px-3 py-2 tabular-nums text-text-secondary">{b.startDate} &ndash; {b.endDate || 'berjalan'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-text-secondary">{b.participants}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-text-secondary">{b.lulus}</td>
+                      <td
+                        className={cn(
+                          'px-3 py-2 text-right font-semibold tabular-nums',
+                          b.avgDelta === null ? 'text-text-disabled' : b.avgDelta >= 0 ? 'text-success' : 'text-danger',
+                        )}
+                      >
+                        {signed(b.avgDelta)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_460px] xl:grid-cols-[minmax(0,1fr)_520px]">
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div className={cn('grid gap-3 border-b border-border bg-surface px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-text-muted', gridCols)}>
             <span className="text-center">#</span>
@@ -371,7 +456,10 @@ export const PilotCsat: React.FC<{
               return (
                 <div key={r.csId} className="border-b border-border/60">
                   <button
-                    onClick={() => setSelectedId(r.csId)}
+                    onClick={() => {
+                      setSelectedId(r.csId);
+                      setMobileDrawerOpen(true);
+                    }}
                     className={cn(
                       'grid w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
                       gridCols,
@@ -437,27 +525,29 @@ export const PilotCsat: React.FC<{
         <div className="hidden lg:block">
           <div className="sticky top-4 max-h-[calc(100vh-200px)] overflow-y-auto rounded-xl border border-border bg-card p-4">
             {selected ? (
-              <PilotDetail row={selected} onClose={() => setSelectedId(null)} />
+              <PilotDetail row={selected} />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted">
                 <Rocket className="mb-3 h-8 w-8 stroke-1" />
-                <p className="text-xs">Pilih peserta untuk lihat before/after, DSAT, & contoh case.</p>
+                <p className="text-xs">
+                  {rows.length === 0 ? 'Belum ada peserta di batch ini.' : 'Pilih peserta untuk lihat before/after, DSAT, & contoh case.'}
+                </p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {selected && (
+      {selected && mobileDrawerOpen && (
         <div
           className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm lg:hidden"
-          onClick={() => setSelectedId(null)}
+          onClick={() => setMobileDrawerOpen(false)}
         >
           <div
             className="h-full w-full max-w-[380px] overflow-y-auto border-l border-border bg-card p-4 animate-in slide-in-from-right duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <PilotDetail row={selected} onClose={() => setSelectedId(null)} />
+            <PilotDetail row={selected} onClose={() => setMobileDrawerOpen(false)} />
           </div>
         </div>
       )}
