@@ -5,7 +5,7 @@ import { Sparkline } from '../ui/Sparkline';
 import { EmptyState } from '../ui/EmptyState';
 import { IncompleteDataNotice } from '../ui/IncompleteDataNotice';
 import { downloadCsv } from '../../lib/exportCsv';
-import { Rocket, X, Download, ChevronDown } from 'lucide-react';
+import { Rocket, X, Download, ChevronDown, Loader2 } from 'lucide-react';
 import {
   buildPilotAgentRow,
   getPilotBatches,
@@ -203,7 +203,12 @@ export const PilotCsat: React.FC<{
   data: AgentKPI[];
   pilotEntries: PilotEntry[];
   periodEnd: string;
-}> = ({ data, pilotEntries, periodEnd }) => {
+  /** True while the shared KPI worker is (re)computing — e.g. right after
+   *  landing on this tab, its wide baseline+batch window is still in
+   *  flight. Participant rows must not flash "tidak ketemu" while that's
+   *  still catching up — only once it settles is a mismatch real. */
+  isProcessing?: boolean;
+}> = ({ data, pilotEntries, periodEnd, isProcessing = false }) => {
   const batches = useMemo(() => getPilotBatches(pilotEntries), [pilotEntries]);
   const [batchName, setBatchName] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -363,7 +368,10 @@ export const PilotCsat: React.FC<{
         </div>
       )}
 
-      {mismatchedIds.length > 0 && (
+      {/* Mismatches only mean anything once the wide pilot window has actually
+          finished computing — while isProcessing is true, "not found" could
+          just be an empty in-flight result, not a real typo. */}
+      {!isProcessing && mismatchedIds.length > 0 && (
         <IncompleteDataNotice
           title="Ada CS ID di batch ini yang tidak ketemu di periode yang ter-load"
           issues={[
@@ -439,7 +447,12 @@ export const PilotCsat: React.FC<{
             <span />
           </div>
 
-          {rows.length === 0 ? (
+          {isProcessing ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-text-muted">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-xs">Menghitung data pilot…</p>
+            </div>
+          ) : rows.length === 0 ? (
             <EmptyState
               title="Agent batch ini belum ada di data"
               description="CS ID di batch ini tidak ketemu pada periode yang ter-load. Perlebar periode / Sync ulang."
@@ -526,6 +539,11 @@ export const PilotCsat: React.FC<{
           <div className="sticky top-4 max-h-[calc(100vh-200px)] overflow-y-auto rounded-xl border border-border bg-card p-4">
             {selected ? (
               <PilotDetail row={selected} />
+            ) : isProcessing ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted">
+                <Loader2 className="mb-3 h-6 w-6 animate-spin text-primary" />
+                <p className="text-xs">Menghitung data pilot…</p>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted">
                 <Rocket className="mb-3 h-8 w-8 stroke-1" />

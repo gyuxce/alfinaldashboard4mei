@@ -1090,7 +1090,7 @@ export default function App() {
                   {activeTab === 'csat_official' && <CsatOfficialMonitor data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
                   {activeTab === 'csat' && <CsatRoom data={kpiData} previousData={previousKpiData} previousData2={previousKpiData2} previousData3={previousKpiData3} />}
                   {activeTab === 'csat_rca' && <CsatRcaMonitor data={kpiData} />}
-                  {activeTab === 'pilot' && <PilotCsat data={pilotKpiData} pilotEntries={pilotEntries} periodEnd={endDate} />}
+                  {activeTab === 'pilot' && <PilotCsat data={pilotKpiData} pilotEntries={pilotEntries} periodEnd={endDate} isProcessing={isProcessingKpis} />}
                   {(activeTab === 'sla' || activeTab === 'whu') && <SlaWhuMonitor data={kpiData} />}
                   {activeTab === 'qa' && <QaAgent360 data={kpiData} />}
                   {activeTab === 'schedule' && <ScheduleBoard data={kpiData} />}
