@@ -924,11 +924,11 @@ const WeeklyReportPanel = ({
 
   const rows: Array<{
     label: string; curr: string; prev: string; prev2: string; prev3: string;
-    delta: number; isCount: boolean; noDelta?: boolean; target: number | null;
+    delta: number; isCount: boolean; target: number | null;
     kpiType: KpiType | null;
     rawCurr: number; rawPrev: number; rawPrev2: number; rawPrev3: number;
   }> = [
-    { label: 'Total Productivity', curr: formatNum(currentStats.productivity, 0),  prev: formatNum(previousStats.productivity, 0), prev2: formatNum(previousStats2?.productivity || 0, 0), prev3: formatNum(previousStats3?.productivity || 0, 0), delta: currentStats.productivity - previousStats.productivity,   isCount: true, noDelta: true, target: null, kpiType: null,  rawCurr: currentStats.productivity,    rawPrev: previousStats.productivity, rawPrev2: previousStats2?.productivity || 0, rawPrev3: previousStats3?.productivity || 0 },
+    { label: 'Total Productivity', curr: formatNum(currentStats.productivity, 0),  prev: formatNum(previousStats.productivity, 0), prev2: formatNum(previousStats2?.productivity || 0, 0), prev3: formatNum(previousStats3?.productivity || 0, 0), delta: currentStats.productivity - previousStats.productivity,   isCount: true, target: null, kpiType: null,  rawCurr: currentStats.productivity,    rawPrev: previousStats.productivity, rawPrev2: previousStats2?.productivity || 0, rawPrev3: previousStats3?.productivity || 0 },
     { label: 'Avg Productivity',   curr: formatNum(currentStats.avgProductivity, 0),prev: formatNum(previousStats.avgProductivity, 0),prev2: formatNum(previousStats2?.avgProductivity || 0, 0),prev3: formatNum(previousStats3?.avgProductivity || 0, 0),delta: currentStats.avgProductivity - previousStats.avgProductivity,isCount: true,  target: 100,   kpiType: 'productivity', rawCurr: currentStats.avgProductivity, rawPrev: previousStats.avgProductivity, rawPrev2: previousStats2?.avgProductivity || 0, rawPrev3: previousStats3?.avgProductivity || 0 },
     { label: 'CSAT Official',      curr: formatNum(currentStats.csat),        prev: formatNum(previousStats.csat), prev2: formatNum(previousStats2?.csat || 0), prev3: formatNum(previousStats3?.csat || 0), delta: currentStats.csat - previousStats.csat,                     isCount: false, target: 3.75,    kpiType: 'csatOfficial', rawCurr: currentStats.csat,            rawPrev: previousStats.csat, rawPrev2: previousStats2?.csat || 0, rawPrev3: previousStats3?.csat || 0 },
     { label: 'CSAT SC Full',       curr: formatNum(currentStats.csatScFull) + '%',  prev: formatNum(previousStats.csatScFull) + '%', prev2: formatNum(previousStats2?.csatScFull || 0) + '%', prev3: formatNum(previousStats3?.csatScFull || 0) + '%', delta: currentStats.csatScFull - previousStats.csatScFull,         isCount: false, target: 75,    kpiType: 'csatFull', rawCurr: currentStats.csatScFull,      rawPrev: previousStats.csatScFull, rawPrev2: previousStats2?.csatScFull || 0, rawPrev3: previousStats3?.csatScFull || 0 },
@@ -1034,10 +1034,10 @@ const WeeklyReportPanel = ({
                   {hasPrev2 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${cellClass(row.rawPrev2, row.kpiType)}`}>{row.prev2}</td>}
                   {showPrev3 && <td className={`px-4 py-3 text-right text-[14px] font-bold ${cellClass(row.rawPrev3, row.kpiType)}`}>{row.prev3}</td>}
                   <td className="px-5 py-3 text-right">
-                    {row.noDelta || isFlat ? (
+                    {isFlat ? (
                       <span className="text-[11px] font-semibold text-text-muted">–</span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold tabular-nums text-text-muted">
+                      <span className={`inline-flex items-center gap-1 text-[12px] font-semibold tabular-nums ${isUp ? 'text-success' : 'text-danger'}`}>
                         {isUp ? '▲' : '▼'}
                         {Math.abs(row.delta).toFixed(row.isCount ? 0 : 2)}
                         {row.isCount ? '' : ' poin'}
