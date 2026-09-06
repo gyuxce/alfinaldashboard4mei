@@ -1278,6 +1278,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
     const weeks = new Map<string, {
       label: string,
       startDate: string,
+      endDate: string,
       goodFull: number,
       totalFull: number,
       goodTakeout: number,
@@ -1287,7 +1288,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
     const getWeekBucket = (date: string) => {
       const parsedTimestamp = parseDateForSort(date);
       if (!parsedTimestamp) {
-        return { key: date, label: date, startDate: date };
+        return { key: date, label: date, startDate: date, endDate: date };
       }
       const parsed = new Date(parsedTimestamp);
 
@@ -1309,6 +1310,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         key: toDateKey(start),
         label,
         startDate: toDateKey(start),
+        endDate: toDateKey(end),
       };
     };
 
@@ -1318,6 +1320,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         weeks.set(bucket.key, {
           label: bucket.label,
           startDate: bucket.startDate,
+          endDate: bucket.endDate,
           goodFull: 0,
           totalFull: 0,
           goodTakeout: 0,
@@ -1327,7 +1330,19 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
       return weeks.get(bucket.key)!;
     };
 
-    (data || []).forEach(a => {
+    // Feed the weekly view from the active period AND the loaded comparison
+    // periods. A week that straddles the period start (e.g. Mon 28 Jul with
+    // the period starting 1 Aug) then fills its 28–31 Jul days from the prior
+    // period instead of rendering a lopsided 3-day bar. Periods are disjoint
+    // by construction, so concatenating and summing is safe.
+    const source = [
+      ...(data || []),
+      ...(previousData || []),
+      ...(previousData2 || []),
+      ...(previousData3 || []),
+    ];
+
+    source.forEach(a => {
       a.dailyHistory?.csatScFull?.forEach(h => {
         if (h.count > 0) {
           const week = ensureWeek(h.date);
@@ -1343,8 +1358,14 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         }
       });
     });
-    
+
+    // Keep only weeks that actually touch the active period — the prior
+    // periods are here to complete boundary weeks, not to add their own bars.
+    const inActivePeriod = (w: { startDate: string; endDate: string }) =>
+      !startDate || !endDate || (w.startDate <= endDate && w.endDate >= startDate);
+
     return Array.from(weeks.values())
+      .filter(inActivePeriod)
       .map(stats => {
         return {
           date: stats.label,
@@ -1354,7 +1375,7 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
         };
       })
       .sort((a, b) => parseDateForSort(a.rawDate) - parseDateForSort(b.rawDate));
-  }, [data]);
+  }, [data, previousData, previousData2, previousData3, startDate, endDate]);
 
   const trendData = trendMode === 'weekly' ? weeklyData : dailyData;
 
