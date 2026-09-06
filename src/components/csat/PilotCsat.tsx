@@ -9,6 +9,7 @@ import { Rocket, X, Download, ChevronDown, Loader2 } from 'lucide-react';
 import {
   buildPilotAgentRow,
   getPilotBatches,
+  summarizeBatch,
   PILOT_LULUS_MIN,
   type PilotEntry,
   type PilotAgentRow,
@@ -248,21 +249,55 @@ export const PilotCsat: React.FC<{
     return out;
   }, [activeBatch, byCsId]);
 
-  /** One row per batch (not just the active one) so batches can be compared side by side. */
+  /** One cohort roll-up per batch (not just the active one) for side-by-side compare. */
   const batchSummaries = useMemo(() => {
     return batches.map((b) => {
       const batchRows = b.entries.map((e) => buildPilotAgentRow(e, byCsId.get(e.csId), b.endDate || periodEnd));
-      const batchDeltas = batchRows.map((r) => r.delta).filter((d): d is number => d !== null);
       return {
         name: b.name,
         startDate: b.startDate,
         endDate: b.endDate,
-        participants: b.entries.length,
-        lulus: batchRows.filter((r) => r.status === 'lulus').length,
-        avgDelta: batchDeltas.length ? batchDeltas.reduce((s, d) => s + d, 0) / batchDeltas.length : null,
+        ...summarizeBatch(batchRows),
       };
     });
   }, [batches, byCsId, periodEnd]);
+
+  const maxCompareWeeks = useMemo(
+    () => batchSummaries.reduce((m, b) => Math.max(m, b.weekAvgs.length), 0),
+    [batchSummaries],
+  );
+
+  type BatchSummaryRow = (typeof batchSummaries)[number];
+  const compareRows = useMemo(() => {
+    const out: { label: string; get: (b: BatchSummaryRow) => React.ReactNode; section?: boolean }[] = [
+      { label: 'Peserta', get: (b) => b.participants },
+      { label: 'LULUS', get: (b) => b.lulus },
+      { label: 'Berproses', get: (b) => b.berproses },
+      { label: 'Next Batch', get: (b) => b.nextBatch },
+      { label: 'Avg baseline', get: (b) => pct(b.avgBaseline) },
+      { label: 'Avg terkini', get: (b) => pct(b.avgCurrent) },
+      {
+        label: 'Avg Δ vs baseline',
+        get: (b) => (
+          <span className={cn(b.avgDelta === null ? 'text-text-disabled' : b.avgDelta >= 0 ? 'text-success' : 'text-danger')}>
+            {signed(b.avgDelta)}
+          </span>
+        ),
+      },
+      { label: 'Rata-rata CSAT SC per minggu', get: () => null, section: true },
+    ];
+    for (let i = 0; i < maxCompareWeeks; i++) {
+      out.push({ label: `Minggu ${i + 1}`, get: (b) => pct(b.weekAvgs[i] ?? null) });
+    }
+    return out;
+  }, [maxCompareWeeks]);
+
+  const pickBatch = (name: string) => {
+    setBatchName(name);
+    setSelectedId(null);
+    setExpandedId(null);
+    setMobileDrawerOpen(false);
+  };
 
   const selected = rows.find((r) => r.csId === selectedId) ?? null;
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -307,12 +342,7 @@ export const PilotCsat: React.FC<{
         <div className="flex items-center gap-2">
           <select
             value={activeBatch?.name ?? ''}
-            onChange={(e) => {
-              setBatchName(e.target.value);
-              setSelectedId(null);
-              setExpandedId(null);
-              setMobileDrawerOpen(false);
-            }}
+            onChange={(e) => pickBatch(e.target.value)}
             className="h-8 rounded-lg border border-border bg-surface px-2 text-xs font-semibold text-text-primary focus:border-primary focus:outline-none"
           >
             {batches.map((b) => (
@@ -382,52 +412,65 @@ export const PilotCsat: React.FC<{
 
       {batchSummaries.length > 1 && (
         <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="border-b border-border bg-surface px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-text-muted">
-            Riwayat Batch
+          <div className="flex flex-wrap items-center justify-between gap-1 border-b border-border bg-surface px-3 py-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Perbandingan Batch</span>
+            <span className="text-[9px] text-text-muted">Minggu 1/2/3 disejajarkan antar batch · klik nama batch untuk buka detail</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-[11px]">
+            <table className="w-full text-[11px]" style={{ minWidth: 140 + batchSummaries.length * 104 }}>
               <thead>
-                <tr className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
-                  <th className="px-3 py-2 font-medium">Batch</th>
-                  <th className="px-3 py-2 font-medium">Periode</th>
-                  <th className="px-3 py-2 text-right font-medium">Peserta</th>
-                  <th className="px-3 py-2 text-right font-medium">LULUS</th>
-                  <th className="px-3 py-2 text-right font-medium">Rata-rata Δ</th>
+                <tr>
+                  <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                    Metrik
+                  </th>
+                  {batchSummaries.map((b) => {
+                    const isActive = b.name === (activeBatch?.name ?? '');
+                    return (
+                      <th
+                        key={b.name}
+                        onClick={() => pickBatch(b.name)}
+                        className={cn(
+                          'cursor-pointer px-3 py-2 text-right align-bottom transition-colors hover:bg-surface-muted/60',
+                          isActive && 'bg-surface-muted',
+                        )}
+                      >
+                        <div className="text-[11px] font-bold text-text-primary">{b.name}</div>
+                        <div className="mt-0.5 text-[9px] font-normal tabular-nums text-text-muted">
+                          {b.startDate.slice(5)} – {b.endDate ? b.endDate.slice(5) : 'now'}
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {batchSummaries.map((b) => {
-                  const isActive = b.name === (activeBatch?.name ?? '');
-                  return (
-                    <tr
-                      key={b.name}
-                      onClick={() => {
-                        setBatchName(b.name);
-                        setSelectedId(null);
-                        setExpandedId(null);
-                        setMobileDrawerOpen(false);
-                      }}
-                      className={cn(
-                        'cursor-pointer border-t border-border/60 transition-colors',
-                        isActive ? 'bg-surface-muted' : 'hover:bg-surface-muted/60',
-                      )}
-                    >
-                      <td className="px-3 py-2 font-semibold text-text-primary">{b.name}</td>
-                      <td className="px-3 py-2 tabular-nums text-text-secondary">{b.startDate} &ndash; {b.endDate || 'berjalan'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-text-secondary">{b.participants}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-text-secondary">{b.lulus}</td>
+                {compareRows.map((r) =>
+                  r.section ? (
+                    <tr key={r.label}>
                       <td
-                        className={cn(
-                          'px-3 py-2 text-right font-semibold tabular-nums',
-                          b.avgDelta === null ? 'text-text-disabled' : b.avgDelta >= 0 ? 'text-success' : 'text-danger',
-                        )}
+                        colSpan={batchSummaries.length + 1}
+                        className="sticky left-0 bg-card px-3 pb-1 pt-3 text-[9px] font-semibold uppercase tracking-wide text-text-muted"
                       >
-                        {signed(b.avgDelta)}
+                        {r.label}
                       </td>
                     </tr>
-                  );
-                })}
+                  ) : (
+                    <tr key={r.label} className="border-t border-border/60">
+                      <td className="sticky left-0 z-10 bg-card px-3 py-1.5 text-text-secondary">{r.label}</td>
+                      {batchSummaries.map((b) => (
+                        <td
+                          key={b.name}
+                          className={cn(
+                            'px-3 py-1.5 text-right font-semibold tabular-nums text-text-primary',
+                            b.name === (activeBatch?.name ?? '') && 'bg-surface-muted/50',
+                          )}
+                        >
+                          {r.get(b)}
+                        </td>
+                      ))}
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>
