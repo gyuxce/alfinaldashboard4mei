@@ -461,7 +461,7 @@ export const PilotCsat: React.FC<{
                         key={b.name}
                         onClick={() => pickBatch(b.name)}
                         className={cn(
-                          'cursor-pointer px-3 py-2 text-right align-bottom transition-colors hover:bg-surface-muted/60',
+                          'cursor-pointer px-3 py-2 text-center align-bottom transition-colors hover:bg-surface-muted/60',
                           isActive && 'bg-surface-muted',
                         )}
                       >
@@ -493,7 +493,7 @@ export const PilotCsat: React.FC<{
                           key={b.name}
                           className={cn(
                             'px-3 py-1 align-top font-semibold tabular-nums text-text-primary',
-                            r.align === 'left' ? 'text-left' : 'text-right',
+                            r.align === 'left' ? 'text-left' : 'text-center',
                             b.name === (activeBatch?.name ?? '') && 'bg-surface-muted/50',
                           )}
                         >
@@ -515,9 +515,9 @@ export const PilotCsat: React.FC<{
             <span className="text-center">#</span>
             <span>Peserta</span>
             <span>Tren</span>
-            <span className="text-right">Terkini</span>
-            <span className="text-right">Δ</span>
-            <span className="text-right">Status</span>
+            <span className="text-center">Terkini</span>
+            <span className="text-center">Δ</span>
+            <span className="text-center">Status</span>
             <span />
           </div>
 
@@ -564,16 +564,16 @@ export const PilotCsat: React.FC<{
                     <span className={cn('block', r.trendUp ? 'text-success' : 'text-text-muted')}>
                       <Sparkline values={r.weeks.map((w) => w.pct)} height={22} />
                     </span>
-                    <span className="text-right text-[13px] font-bold tabular-nums text-text-primary">{pct(r.current)}</span>
+                    <span className="text-center text-[13px] font-bold tabular-nums text-text-primary">{pct(r.current)}</span>
                     <span
                       className={cn(
-                        'text-right text-[11px] font-semibold tabular-nums',
+                        'text-center text-[11px] font-semibold tabular-nums',
                         r.delta === null ? 'text-text-disabled' : r.delta >= 0 ? 'text-success' : 'text-danger',
                       )}
                     >
                       {signed(r.delta)}
                     </span>
-                    <span className="text-right">
+                    <span className="text-center">
                       <span className={cn('inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold', st.cls)}>{st.label}</span>
                     </span>
                     <span

@@ -17,6 +17,25 @@ import { CsatDetailModal } from "./CsatDetailModal";
 import { chart } from '../../lib/themeColors';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, AreaChart, Area } from 'recharts';
 
+/** Normalize any date string the sheet threw at us to a sortable YYYY-MM-DD key. */
+const toDayKey = (dateStr: string): string => {
+  const ts = parseDateForSort(dateStr);
+  if (!ts) return dateStr;
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** "27 Jul-2 Agu" / "4-10 Agu" from two YYYY-MM-DD keys. */
+const dateRangeLabel = (startKey: string, endKey: string): string | null => {
+  const a = new Date(parseDateForSort(startKey) || NaN);
+  const b = new Date(parseDateForSort(endKey) || NaN);
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+  const mo = (d: Date) => new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(d);
+  return a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+    ? `${a.getDate()}-${b.getDate()} ${mo(a)}`
+    : `${a.getDate()} ${mo(a)}-${b.getDate()} ${mo(b)}`;
+};
+
 export const CsatRoom: React.FC<{ data: AgentKPI[], previousData?: AgentKPI[], previousData2?: AgentKPI[], previousData3?: AgentKPI[] }> = ({ data, previousData = [], previousData2 = [], previousData3 = [] }) => {
   const isComparisonEnabled = useStore(state => state.isComparisonEnabled);
   const comparisonMode = useStore(state => state.comparisonMode);
@@ -1279,6 +1298,8 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
       label: string,
       startDate: string,
       endDate: string,
+      minKey: string,
+      maxKey: string,
       goodFull: number,
       totalFull: number,
       goodTakeout: number,
@@ -1321,13 +1342,19 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
           label: bucket.label,
           startDate: bucket.startDate,
           endDate: bucket.endDate,
+          minKey: '',
+          maxKey: '',
           goodFull: 0,
           totalFull: 0,
           goodTakeout: 0,
           totalTakeout: 0,
         });
       }
-      return weeks.get(bucket.key)!;
+      const w = weeks.get(bucket.key)!;
+      const k = toDayKey(date);
+      if (!w.minKey || k < w.minKey) w.minKey = k;
+      if (k > w.maxKey) w.maxKey = k;
+      return w;
     };
 
     // Feed the weekly view from the active period AND the loaded comparison
@@ -1367,8 +1394,12 @@ const WoWChartPanel = ({ data, previousData, previousData2, previousData3 }: any
     return Array.from(weeks.values())
       .filter(inActivePeriod)
       .map(stats => {
+        // Label by the days that actually landed in the bucket, so a
+        // boundary week that only has 1–3 Aug reads "1-3 Agu", not
+        // "27 Jul-2 Agu" (label must match the data behind the bar).
+        const label = (stats.minKey && stats.maxKey && dateRangeLabel(stats.minKey, stats.maxKey)) || stats.label;
         return {
-          date: stats.label,
+          date: label,
           'SC Full': stats.totalFull > 0 ? Number(((stats.goodFull / stats.totalFull) * 100).toFixed(2)) : 0,
           'SC After Takeout': stats.totalTakeout > 0 ? Number(((stats.goodTakeout / stats.totalTakeout) * 100).toFixed(2)) : 0,
           rawDate: stats.startDate,
@@ -1754,6 +1785,8 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
     const weeks = new Map<string, {
       label: string,
       startDate: string,
+      minKey: string,
+      maxKey: string,
       processed: number,
       respondents: number,
       s5: number,
@@ -1793,6 +1826,8 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
             weeks.set(bucket.key, {
               label: bucket.label,
               startDate: bucket.startDate,
+              minKey: '',
+              maxKey: '',
               processed: 0,
               respondents: 0,
               s5: 0,
@@ -1804,6 +1839,9 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
           }
 
           const week = weeks.get(bucket.key)!;
+          const k = toDayKey(h.date);
+          if (!week.minKey || k < week.minKey) week.minKey = k;
+          if (k > week.maxKey) week.maxKey = k;
           week.processed += 1;
           if (h.score >= 1 && h.score <= 5) {
             week.respondents += 1;
@@ -1818,7 +1856,9 @@ const RespondentChartPanel = ({ data, previousData, previousData2, previousData3
 
     return Array.from(weeks.values())
       .map(week => ({
-        date: week.label,
+        // Label by the days actually in the bucket — a partial boundary
+        // week reads its real range, not the full Mon–Sun span.
+        date: (week.minKey && week.maxKey && dateRangeLabel(week.minKey, week.maxKey)) || week.label,
         Respondents: week.respondents,
         s5: week.s5,
         s4: week.s4,
