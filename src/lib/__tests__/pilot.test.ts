@@ -179,6 +179,19 @@ describe('buildPilotAgentRow', () => {
     expect(row.baseline).toBeNull();
     expect(row.current).toBeNull();
   });
+
+  it('baseline exists but no progress week yet → no-data, not next-batch', () => {
+    const agent = makeAgent({
+      dailyHistory: {
+        csatScFull: daily([['2026-07-25', 6, 10]]), // only the baseline window
+        csatScFair: [], productivity: [], csat: [], sla1m: [], sla3m: [], whu: [], schedule: [],
+      },
+    } as Partial<AgentKPI>);
+    const row = buildPilotAgentRow(entry, agent, '2026-08-31');
+    expect(row.baseline).toBe(60);
+    expect(row.current).toBeNull();
+    expect(row.status).toBe('no-data');
+  });
 });
 
 describe('summarizeBatch', () => {
@@ -194,32 +207,50 @@ describe('summarizeBatch', () => {
       },
     } as Partial<AgentKPI>);
 
-  it('rolls rows up to cohort counts, averages and week-aligned averages', () => {
-    const a = buildPilotAgentRow(entry({ csId: 'a' }), agentWith('a', [
-      ['2026-07-25', 6, 10],  // baseline 60
-      ['2026-08-05', 6, 10],  // wk1 60
-      ['2026-08-12', 8, 10],  // wk2 80 → up past 70 → lulus
-    ]), '2026-08-31');
+  it('rolls rows up to cohort counts, averages, week-aligned averages and DSAT', () => {
+    const a = buildPilotAgentRow(entry({ csId: 'a' }), makeAgent({
+      csId: 'a',
+      csatHistory: csat([
+        ['2026-08-04', 1, 'Slow respon', 'lama'],
+        ['2026-08-11', 2, 'Slow respon', 'masih lama'],   // repeat across wk1+wk2
+        ['2026-08-05', 5, 'Ramah', 'mantap'],
+      ]),
+      dailyHistory: {
+        csatScFull: daily([
+          ['2026-07-25', 6, 10],  // baseline 60
+          ['2026-08-05', 6, 10],  // wk1 60
+          ['2026-08-12', 8, 10],  // wk2 80 → improved
+        ]),
+        csatScFair: [], productivity: [], csat: [], sla1m: [], sla3m: [], whu: [], schedule: [],
+      },
+    } as Partial<AgentKPI>), '2026-08-31');
     const b = buildPilotAgentRow(entry({ csId: 'b' }), agentWith('b', [
       ['2026-07-25', 5, 10],  // baseline 50
       ['2026-08-05', 5, 10],  // wk1 50
-      ['2026-08-12', 5, 10],  // wk2 50 → flat → next-batch
+      ['2026-08-12', 5, 10],  // wk2 50 → flat
     ]), '2026-08-31');
     const c = buildPilotAgentRow(entry({ csId: 'c' }), makeAgent({ csId: 'c' }), '2026-08-31'); // no-data
 
     const s = summarizeBatch([a, b, c]);
     expect(s.participants).toBe(3);
-    expect(s.lulus).toBe(1);
-    expect(s.nextBatch).toBe(1);
-    expect(s.noData).toBe(1);
+    expect(s.withData).toBe(2);              // a, b have weeks; c doesn't
+    expect(s.improved).toBe(1);              // a (+20); b flat; c null
+    expect(s.declined).toBe(0);
     expect(s.avgBaseline).toBe(55);          // (60 + 50) / 2, c has no baseline
     expect(s.avgCurrent).toBe(65);           // (80 + 50) / 2
     expect(s.avgDelta).toBe(10);             // (+20 + 0) / 2
     expect(s.weekAvgs).toEqual([55, 65]);    // wk1 (60,50)→55 ; wk2 (80,50)→65
+    expect(s.dsatCount).toBe(2);             // a's two 1–2 ratings
+    expect(s.dsatValidTotal).toBe(3);        // a's 3 valid ratings
+    expect(s.topDsatCategories[0]).toEqual({ category: 'Slow respon', count: 2 });
+    expect(s.repeatCategories).toEqual(['Slow respon']);
   });
 
   it('empty cohort → zeros and nulls', () => {
     const s = summarizeBatch([]);
-    expect(s).toMatchObject({ participants: 0, lulus: 0, avgDelta: null, weekAvgs: [] });
+    expect(s).toMatchObject({
+      participants: 0, withData: 0, improved: 0, avgDelta: null,
+      dsatCount: 0, dsatPct: null, topDsatCategories: [], repeatCategories: [], weekAvgs: [],
+    });
   });
 });

@@ -10,7 +10,6 @@ import {
   buildPilotAgentRow,
   getPilotBatches,
   summarizeBatch,
-  PILOT_LULUS_MIN,
   type PilotEntry,
   type PilotAgentRow,
   type PilotStatus,
@@ -269,21 +268,35 @@ export const PilotCsat: React.FC<{
 
   type BatchSummaryRow = (typeof batchSummaries)[number];
   const compareRows = useMemo(() => {
+    const deltaCell = (v: number | null) => (
+      <span className={cn(v === null ? 'text-text-disabled' : v >= 0 ? 'text-success' : 'text-danger')}>
+        {signed(v)}
+      </span>
+    );
+    const catCell = (cats: { category: string; count: number }[]): React.ReactNode =>
+      cats.length === 0 ? '–' : (
+        <div className="flex flex-col items-end gap-0.5">
+          {cats.slice(0, 3).map((c) => (
+            <span key={c.category} className="text-[10px] leading-tight text-text-secondary">
+              {c.category} <span className="tabular-nums text-text-muted">·{c.count}</span>
+            </span>
+          ))}
+        </div>
+      );
+
     const out: { label: string; get: (b: BatchSummaryRow) => React.ReactNode; section?: boolean }[] = [
       { label: 'Peserta', get: (b) => b.participants },
-      { label: 'LULUS', get: (b) => b.lulus },
-      { label: 'Berproses', get: (b) => b.berproses },
-      { label: 'Next Batch', get: (b) => b.nextBatch },
+      { label: 'Peserta ada data', get: (b) => b.withData },
+      { label: 'Membaik vs baseline', get: (b) => (b.withData === 0 ? '–' : <span className={cn(b.improved > 0 && 'text-success')}>{b.improved}</span>) },
+      { label: 'Memburuk vs baseline', get: (b) => (b.withData === 0 ? '–' : <span className={cn(b.declined > 0 && 'text-danger')}>{b.declined}</span>) },
       { label: 'Avg baseline', get: (b) => pct(b.avgBaseline) },
       { label: 'Avg terkini', get: (b) => pct(b.avgCurrent) },
-      {
-        label: 'Avg Δ vs baseline',
-        get: (b) => (
-          <span className={cn(b.avgDelta === null ? 'text-text-disabled' : b.avgDelta >= 0 ? 'text-success' : 'text-danger')}>
-            {signed(b.avgDelta)}
-          </span>
-        ),
-      },
+      { label: 'Avg Δ vs baseline', get: (b) => deltaCell(b.avgDelta) },
+      { label: 'Segi CSAT', get: () => null, section: true },
+      { label: 'DSAT rate (1–2)', get: (b) => (b.dsatPct === null ? '–' : `${formatNum(b.dsatPct, 1)}%`) },
+      { label: 'DSAT (buruk / valid)', get: (b) => (b.dsatValidTotal ? `${b.dsatCount} / ${b.dsatValidTotal}` : '–') },
+      { label: 'Kategori DSAT teratas', get: (b) => catCell(b.topDsatCategories) },
+      { label: 'Indikator berulang', get: (b) => (b.repeatCategories.length ? b.repeatCategories.join(', ') : '–') },
       { label: 'Rata-rata CSAT SC per minggu', get: () => null, section: true },
     ];
     for (let i = 0; i < maxCompareWeeks; i++) {
@@ -329,7 +342,6 @@ export const PilotCsat: React.FC<{
     );
   }
 
-  const lulus = rows.filter((r) => r.status === 'lulus').length;
   const deltas = rows.map((r) => r.delta).filter((d): d is number => d !== null);
   const avgDelta = deltas.length ? deltas.reduce((s, d) => s + d, 0) / deltas.length : null;
 
@@ -392,9 +404,7 @@ export const PilotCsat: React.FC<{
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] tabular-nums text-text-muted">
           <span>{activeBatch.startDate} &ndash; {activeBatch.endDate || 'berjalan'}</span>
           <span>{rows.length} peserta</span>
-          <span>{lulus} LULUS</span>
           {avgDelta !== null && <span>rata-rata Δ {signed(avgDelta)} poin vs baseline</span>}
-          <span className="normal-case">ambang LULUS ≥ {PILOT_LULUS_MIN}% + tren naik</span>
         </div>
       )}
 
@@ -417,7 +427,7 @@ export const PilotCsat: React.FC<{
             <span className="text-[9px] text-text-muted">Minggu 1/2/3 disejajarkan antar batch · klik nama batch untuk buka detail</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-[11px]" style={{ minWidth: 140 + batchSummaries.length * 104 }}>
+            <table className="w-full text-[11px]" style={{ minWidth: 150 + batchSummaries.length * 124 }}>
               <thead>
                 <tr>
                   <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-text-muted">

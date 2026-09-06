@@ -54,6 +54,8 @@ export type PilotAgentRow = {
   trendUp: boolean;
   status: PilotStatus;
   dsatCount: number;
+  /** Valid CSAT SC ratings in the window — the denominator behind `dsatPct`. */
+  dsatValidTotal: number;
   dsatPct: number | null;
   dsatByCategory: { category: string; count: number }[];
   repeatIndicators: string[];
@@ -67,13 +69,22 @@ export const PILOT_LULUS_MIN = 70;
 /** Cohort-level roll-up of one batch, for comparing batches side by side. */
 export type BatchSummary = {
   participants: number;
-  lulus: number;
-  berproses: number;
-  nextBatch: number;
-  noData: number;
+  /** Participants with at least one week of CSAT SC data (i.e. status !== 'no-data'). */
+  withData: number;
+  /** delta vs baseline > 0 / < 0. */
+  improved: number;
+  declined: number;
   avgBaseline: number | null;
   avgCurrent: number | null;
   avgDelta: number | null;
+  /** Cohort DSAT (ratings 1–2) rolled up across all participants. */
+  dsatCount: number;
+  dsatValidTotal: number;
+  dsatPct: number | null;
+  /** Top DSAT categories across the whole cohort, most frequent first. */
+  topDsatCategories: { category: string; count: number }[];
+  /** Categories flagged as recurring for at least one participant. */
+  repeatCategories: string[];
   /** Cohort-average CSAT SC Full % per batch-relative week (index 0 = week 1);
    *  aligned by position so batch A's "week 2" lines up with batch B's "week 2". */
   weekAvgs: (number | null)[];
@@ -97,15 +108,32 @@ export function summarizeBatch(rows: PilotAgentRow[]): BatchSummary {
     ));
   }
 
+  const catMap = new Map<string, number>();
+  for (const r of rows) {
+    for (const c of r.dsatByCategory) {
+      catMap.set(c.category, (catMap.get(c.category) || 0) + c.count);
+    }
+  }
+  const topDsatCategories = Array.from(catMap.entries())
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const dsatCount = rows.reduce((s, r) => s + r.dsatCount, 0);
+  const dsatValidTotal = rows.reduce((s, r) => s + r.dsatValidTotal, 0);
+
   return {
     participants: rows.length,
-    lulus: rows.filter((r) => r.status === 'lulus').length,
-    berproses: rows.filter((r) => r.status === 'berproses').length,
-    nextBatch: rows.filter((r) => r.status === 'next-batch').length,
-    noData: rows.filter((r) => r.status === 'no-data').length,
+    withData: rows.filter((r) => r.status !== 'no-data').length,
+    improved: rows.filter((r) => r.delta !== null && r.delta > 0).length,
+    declined: rows.filter((r) => r.delta !== null && r.delta < 0).length,
     avgBaseline: mean(nums((r) => r.baseline)),
     avgCurrent: mean(nums((r) => r.current)),
     avgDelta: mean(nums((r) => r.delta)),
+    dsatCount,
+    dsatValidTotal,
+    dsatPct: dsatValidTotal > 0 ? (dsatCount / dsatValidTotal) * 100 : null,
+    topDsatCategories,
+    repeatCategories: Array.from(new Set(rows.flatMap((r) => r.repeatIndicators))),
     weekAvgs,
   };
 }
@@ -330,9 +358,11 @@ export function buildPilotAgentRow(
     .slice(0, 5)
     .map(toCase);
 
+  // No progress data yet (batch not started, or nothing synced) → can't judge.
+  // Only call someone "next-batch" once there's an actual result to look at.
   let status: PilotStatus;
-  if (baseline === null && current === null) status = 'no-data';
-  else if (current !== null && current >= PILOT_LULUS_MIN && trendUp) status = 'lulus';
+  if (current === null) status = 'no-data';
+  else if (current >= PILOT_LULUS_MIN && trendUp) status = 'lulus';
   else if (trendUp) status = 'berproses';
   else status = 'next-batch';
 
@@ -349,6 +379,7 @@ export function buildPilotAgentRow(
     trendUp,
     status,
     dsatCount,
+    dsatValidTotal: validTotal,
     dsatPct,
     dsatByCategory,
     repeatIndicators,
