@@ -267,31 +267,40 @@ export const PilotCsat: React.FC<{
   );
 
   type BatchSummaryRow = (typeof batchSummaries)[number];
+  type CompareRow = {
+    label: string;
+    get: (b: BatchSummaryRow) => React.ReactNode;
+    section?: boolean;
+    align?: 'left';
+  };
   const compareRows = useMemo(() => {
     const dash = <span className="text-text-disabled">–</span>;
     const catCell = (b: BatchSummaryRow): React.ReactNode => {
       if (b.topDsatCategories.length === 0) return dash;
       const repeat = new Set(b.repeatCategories);
       return (
-        <div className="flex flex-col items-end gap-0.5">
-          {b.topDsatCategories.slice(0, 3).map((c) => (
-            <span key={c.category} className="text-[10px] leading-tight text-text-secondary">
-              {c.category} <span className="tabular-nums text-text-muted">·{c.count}{repeat.has(c.category) ? ' ↻' : ''}</span>
-            </span>
+        <ul className="flex flex-col gap-1">
+          {b.topDsatCategories.slice(0, 5).map((c) => (
+            <li key={c.category} className="flex gap-1.5 text-[10px] leading-snug text-text-secondary">
+              <span className="text-text-muted">•</span>
+              <span className="min-w-0">
+                {c.category}
+                <span className="tabular-nums text-text-muted"> — {c.count}</span>
+                {repeat.has(c.category) && <span className="text-warning-text"> · berulang</span>}
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
       );
     };
 
-    const out: { label: string; get: (b: BatchSummaryRow) => React.ReactNode; section?: boolean }[] = [
-      { label: 'Peserta (ada data)', get: (b) => `${b.participants} · ${b.withData}` },
-      {
-        label: 'Membaik / memburuk',
-        get: (b) => b.withData === 0 ? dash : (
-          <span><span className="text-success">{b.improved}</span> / <span className="text-danger">{b.declined}</span></span>
-        ),
-      },
-      { label: 'Baseline → terkini', get: (b) => `${pct(b.avgBaseline)} → ${pct(b.avgCurrent)}` },
+    const out: CompareRow[] = [
+      { label: 'Peserta', get: (b) => b.participants },
+      { label: 'Peserta dengan data', get: (b) => b.withData },
+      { label: 'Membaik vs baseline', get: (b) => (b.withData === 0 ? dash : <span className={cn(b.improved > 0 && 'text-success')}>{b.improved}</span>) },
+      { label: 'Memburuk vs baseline', get: (b) => (b.withData === 0 ? dash : <span className={cn(b.declined > 0 && 'text-danger')}>{b.declined}</span>) },
+      { label: 'Avg baseline', get: (b) => pct(b.avgBaseline) },
+      { label: 'Avg terkini', get: (b) => pct(b.avgCurrent) },
       {
         label: 'Avg Δ vs baseline',
         get: (b) => (
@@ -300,25 +309,9 @@ export const PilotCsat: React.FC<{
           </span>
         ),
       },
-      {
-        label: 'DSAT (1–2)',
-        get: (b) => b.dsatPct === null ? dash : `${formatNum(b.dsatPct, 1)}% · ${b.dsatCount}/${b.dsatValidTotal}`,
-      },
-      { label: 'Kategori DSAT teratas', get: catCell },
-      {
-        label: 'Indikator berulang',
-        get: (b) => {
-          if (b.repeatCategories.length === 0) return dash;
-          const ordered = b.topDsatCategories.filter((c) => b.repeatCategories.includes(c.category)).map((c) => c.category);
-          const list = (ordered.length ? ordered : b.repeatCategories).slice(0, 3);
-          const extra = b.repeatCategories.length - list.length;
-          return (
-            <span className="text-[10px] leading-tight text-text-secondary">
-              {list.join(', ')}{extra > 0 ? ` +${extra}` : ''}
-            </span>
-          );
-        },
-      },
+      { label: 'DSAT rate (1–2)', get: (b) => (b.dsatPct === null ? dash : `${formatNum(b.dsatPct, 1)}%`) },
+      { label: 'Rating dinilai (buruk / total)', get: (b) => (b.dsatValidTotal ? `${b.dsatCount} / ${b.dsatValidTotal}` : dash) },
+      { label: 'Kategori DSAT teratas', get: catCell, align: 'left' },
       { label: 'CSAT SC per minggu', get: () => null, section: true },
     ];
     for (let i = 0; i < maxCompareWeeks; i++) {
@@ -449,10 +442,16 @@ export const PilotCsat: React.FC<{
             <span className="text-[9px] text-text-muted">Minggu 1/2/3 disejajarkan antar batch · klik nama batch untuk buka detail</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-[11px]" style={{ minWidth: 150 + batchSummaries.length * 124 }}>
+            <table className="w-full table-fixed text-[11px]" style={{ minWidth: 160 + batchSummaries.length * 190 }}>
+              <colgroup>
+                <col style={{ width: 160 }} />
+                {batchSummaries.map((b) => (
+                  <col key={b.name} style={{ width: `calc((100% - 160px) / ${batchSummaries.length})` }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                  <th className="bg-card px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-text-muted">
                     Metrik
                   </th>
                   {batchSummaries.map((b) => {
@@ -481,19 +480,20 @@ export const PilotCsat: React.FC<{
                     <tr key={r.label}>
                       <td
                         colSpan={batchSummaries.length + 1}
-                        className="sticky left-0 bg-card px-3 pb-1 pt-2.5 text-[9px] font-semibold uppercase tracking-wide text-text-muted"
+                        className="bg-card px-3 pb-1 pt-2.5 text-[9px] font-semibold uppercase tracking-wide text-text-muted"
                       >
                         {r.label}
                       </td>
                     </tr>
                   ) : (
                     <tr key={r.label} className="border-t border-border/60">
-                      <td className="sticky left-0 z-10 bg-card px-3 py-1 align-top text-text-secondary">{r.label}</td>
+                      <td className="bg-card px-3 py-1 align-top text-text-secondary">{r.label}</td>
                       {batchSummaries.map((b) => (
                         <td
                           key={b.name}
                           className={cn(
-                            'px-3 py-1 text-right align-top font-semibold tabular-nums text-text-primary',
+                            'px-3 py-1 align-top font-semibold tabular-nums text-text-primary',
+                            r.align === 'left' ? 'text-left' : 'text-right',
                             b.name === (activeBatch?.name ?? '') && 'bg-surface-muted/50',
                           )}
                         >
