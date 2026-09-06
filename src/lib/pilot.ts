@@ -64,6 +64,52 @@ export type PilotAgentRow = {
 /** LULUS threshold — "70–75% ke atas, yang penting ada tren kenaikan". */
 export const PILOT_LULUS_MIN = 70;
 
+/** Cohort-level roll-up of one batch, for comparing batches side by side. */
+export type BatchSummary = {
+  participants: number;
+  lulus: number;
+  berproses: number;
+  nextBatch: number;
+  noData: number;
+  avgBaseline: number | null;
+  avgCurrent: number | null;
+  avgDelta: number | null;
+  /** Cohort-average CSAT SC Full % per batch-relative week (index 0 = week 1);
+   *  aligned by position so batch A's "week 2" lines up with batch B's "week 2". */
+  weekAvgs: (number | null)[];
+};
+
+const mean = (xs: number[]): number | null =>
+  xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null;
+
+/** Roll a batch's already-built participant rows up to cohort averages/counts. */
+export function summarizeBatch(rows: PilotAgentRow[]): BatchSummary {
+  const nums = (pick: (r: PilotAgentRow) => number | null) =>
+    rows.map(pick).filter((x): x is number => x !== null);
+
+  const maxWeeks = rows.reduce((m, r) => Math.max(m, r.weeks.length), 0);
+  const weekAvgs: (number | null)[] = [];
+  for (let i = 0; i < maxWeeks; i++) {
+    weekAvgs.push(mean(
+      rows
+        .map((r) => r.weeks[i]?.pct ?? null)
+        .filter((x): x is number => x !== null),
+    ));
+  }
+
+  return {
+    participants: rows.length,
+    lulus: rows.filter((r) => r.status === 'lulus').length,
+    berproses: rows.filter((r) => r.status === 'berproses').length,
+    nextBatch: rows.filter((r) => r.status === 'next-batch').length,
+    noData: rows.filter((r) => r.status === 'no-data').length,
+    avgBaseline: mean(nums((r) => r.baseline)),
+    avgCurrent: mean(nums((r) => r.current)),
+    avgDelta: mean(nums((r) => r.delta)),
+    weekAvgs,
+  };
+}
+
 const toIso = (v: unknown): string | null => {
   const n = normalizeDateStr(String(v ?? '').trim());
   return n && /^\d{4}-\d{2}-\d{2}$/.test(n) ? n : null;
